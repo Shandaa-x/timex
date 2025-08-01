@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "325943660774",
+    "project_id": "timex-9ce03",
+    "storage_bucket": "timex-9ce03.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:325943660774:android:a4e346ecc8cc4217bbab27",
+        "android_client_info": {
+          "package_name": "com.example.timex"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCJplGXQfX7FqOJkI2UCcgDpPb10pSp3tM"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
