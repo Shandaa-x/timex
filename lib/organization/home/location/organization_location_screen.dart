@@ -17,23 +17,23 @@ class OrganizationLocationScreen extends StatefulWidget {
 class _OrganizationLocationScreenState extends State<OrganizationLocationScreen> {
   final _firestore = FirebaseFirestore.instance;
   final _auth = FirebaseAuth.instance;
-  
+
   List<Map<String, dynamic>> _locations = [];
   List<Map<String, dynamic>> _employees = [];
   bool _isLoading = true;
-  
+
   // Form controllers
   final TextEditingController _locationNameController = TextEditingController();
   final TextEditingController _latitudeController = TextEditingController();
   final TextEditingController _longitudeController = TextEditingController();
   final TextEditingController _radiusController = TextEditingController();
-  
+
   LatLng? _selectedLocation;
   double _currentRadius = 50.0;
   List<String> _selectedEmployeeIds = [];
   Set<Marker> _markers = {};
   Set<Circle> _circles = {};
-  
+
   // Main map markers and circles for displaying all locations
   Set<Marker> _mainMapMarkers = {};
   Set<Circle> _mainMapCircles = {};
@@ -46,10 +46,7 @@ class _OrganizationLocationScreenState extends State<OrganizationLocationScreen>
   }
 
   Future<void> _fetchData() async {
-    await Future.wait([
-      _fetchLocations(),
-      _fetchEmployees(),
-    ]);
+    await Future.wait([_fetchLocations(), _fetchEmployees()]);
     setState(() {
       _isLoading = false;
     });
@@ -65,13 +62,13 @@ class _OrganizationLocationScreenState extends State<OrganizationLocationScreen>
           .doc(user.uid)
           .collection('workLocations')
           .get();
-      
+
       _locations = snapshot.docs.map((doc) {
         final data = doc.data();
         data['id'] = doc.id;
         return data;
       }).toList();
-      
+
       _updateMainMapMarkers();
     } catch (e) {
       debugPrint("Error fetching locations: $e");
@@ -88,7 +85,7 @@ class _OrganizationLocationScreenState extends State<OrganizationLocationScreen>
           .doc(user.uid)
           .collection('employees')
           .get();
-      
+
       _employees = snapshot.docs.map((doc) {
         final data = doc.data();
         data['id'] = doc.id;
@@ -163,7 +160,7 @@ class _OrganizationLocationScreenState extends State<OrganizationLocationScreen>
                         hint: 'Байршлын дурын нэр өгнө үү.',
                       ),
                       const SizedBox(height: 16),
-                      
+
                       // Map
                       Container(
                         height: 300,
@@ -200,14 +197,16 @@ class _OrganizationLocationScreenState extends State<OrganizationLocationScreen>
                               myLocationButtonEnabled: true,
                               zoomControlsEnabled: true,
                               gestureRecognizers: <Factory<OneSequenceGestureRecognizer>>{
-                                Factory<OneSequenceGestureRecognizer>(() => EagerGestureRecognizer()),
+                                Factory<OneSequenceGestureRecognizer>(
+                                  () => EagerGestureRecognizer(),
+                                ),
                               },
                             ),
                           ),
                         ),
                       ),
                       const SizedBox(height: 16),
-                      
+
                       // Coordinates
                       Row(
                         children: [
@@ -231,7 +230,7 @@ class _OrganizationLocationScreenState extends State<OrganizationLocationScreen>
                         ],
                       ),
                       const SizedBox(height: 16),
-                      
+
                       // Radius Slider
                       Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
@@ -279,7 +278,8 @@ class _OrganizationLocationScreenState extends State<OrganizationLocationScreen>
                               value: _currentRadius,
                               min: 10,
                               max: 500,
-                              divisions: 99, // (1000-10)/10 = 99 steps of 10m each
+                              divisions: 99,
+                              // (1000-10)/10 = 99 steps of 10m each
                               onChanged: (value) {
                                 setModalState(() {
                                   _currentRadius = value;
@@ -297,17 +297,11 @@ class _OrganizationLocationScreenState extends State<OrganizationLocationScreen>
                               children: [
                                 Text(
                                   '10м',
-                                  style: TextStyle(
-                                    fontSize: 12,
-                                    color: Colors.grey.shade600,
-                                  ),
+                                  style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
                                 ),
                                 Text(
                                   '500м',
-                                  style: TextStyle(
-                                    fontSize: 12,
-                                    color: Colors.grey.shade600,
-                                  ),
+                                  style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
                                 ),
                               ],
                             ),
@@ -315,7 +309,7 @@ class _OrganizationLocationScreenState extends State<OrganizationLocationScreen>
                         ],
                       ),
                       const SizedBox(height: 16),
-                      
+
                       // Employee Selection
                       const Text(
                         'Байршилд ажиллах ажилтнууд',
@@ -336,7 +330,8 @@ class _OrganizationLocationScreenState extends State<OrganizationLocationScreen>
                             final isSelected = _selectedEmployeeIds.contains(employee['id']);
                             return CheckboxListTile(
                               title: Text(
-                                employee['fullName'] ?? '${employee['lastName'] ?? ''} ${employee['firstName'] ?? ''}',
+                                employee['fullName'] ??
+                                    '${employee['lastName'] ?? ''} ${employee['firstName'] ?? ''}',
                                 style: const TextStyle(color: Colors.black87),
                               ),
                               subtitle: Text(
@@ -359,7 +354,7 @@ class _OrganizationLocationScreenState extends State<OrganizationLocationScreen>
                         ),
                       ),
                       const SizedBox(height: 24),
-                      
+
                       // Save Button
                       SizedBox(
                         width: double.infinity,
@@ -368,9 +363,7 @@ class _OrganizationLocationScreenState extends State<OrganizationLocationScreen>
                           style: ElevatedButton.styleFrom(
                             backgroundColor: Colors.green.shade600,
                             padding: const EdgeInsets.symmetric(vertical: 16),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(8),
-                            ),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                           ),
                           child: const Text(
                             'Нэмэх',
@@ -417,14 +410,11 @@ class _OrganizationLocationScreenState extends State<OrganizationLocationScreen>
   }
 
   Future<void> _saveLocation(StateSetter setModalState) async {
-    if (_locationNameController.text.isEmpty || 
-        _selectedLocation == null || 
+    if (_locationNameController.text.isEmpty ||
+        _selectedLocation == null ||
         _selectedEmployeeIds.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Бүх талбарыг бөглөнө үү!'),
-          backgroundColor: Colors.red,
-        ),
+        const SnackBar(content: Text('Бүх талбарыг бөглөнө үү!'), backgroundColor: Colors.red),
       );
       return;
     }
@@ -461,28 +451,25 @@ class _OrganizationLocationScreenState extends State<OrganizationLocationScreen>
       setState(() {}); // Refresh the UI
     } catch (e) {
       debugPrint("Error saving location: $e");
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Алдаа гарлаа: $e'),
-          backgroundColor: Colors.red,
-        ),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Алдаа гарлаа: $e'), backgroundColor: Colors.red));
     }
   }
 
   void _updateMainMapMarkers() {
     _mainMapMarkers.clear();
     _mainMapCircles.clear();
-    
+
     for (int i = 0; i < _locations.length; i++) {
       final location = _locations[i];
       final lat = location['latitude']?.toDouble();
       final lng = location['longitude']?.toDouble();
       final radius = location['radius']?.toDouble() ?? 50.0;
-      
+
       if (lat != null && lng != null) {
         final position = LatLng(lat, lng);
-        
+
         // Add marker
         _mainMapMarkers.add(
           Marker(
@@ -492,13 +479,11 @@ class _OrganizationLocationScreenState extends State<OrganizationLocationScreen>
               title: location['name'] ?? 'Unknown Location',
               snippet: 'Радиус: ${radius.toInt()}м',
             ),
-            icon: BitmapDescriptor.defaultMarkerWithHue(
-              BitmapDescriptor.hueBlue,
-            ),
+            icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueBlue),
             onTap: () => _showLocationDetails(location),
           ),
         );
-        
+
         // Add circle
         _mainMapCircles.add(
           Circle(
@@ -571,17 +556,13 @@ class _OrganizationLocationScreenState extends State<OrganizationLocationScreen>
             const SizedBox(height: 16),
             const Text(
               'Ажилчид:',
-              style: TextStyle(
-                fontWeight: FontWeight.w600,
-                color: Colors.black87,
-                fontSize: 16,
-              ),
+              style: TextStyle(fontWeight: FontWeight.w600, color: Colors.black87, fontSize: 16),
             ),
             const SizedBox(height: 8),
             Wrap(
               spacing: 8,
-              children: (location['employeeIds'] as List<dynamic>?)
-                  ?.map<Widget>((employeeId) {
+              children:
+                  (location['employeeIds'] as List<dynamic>?)?.map<Widget>((employeeId) {
                     final employee = _employees.firstWhere(
                       (emp) => emp['id'] == employeeId,
                       orElse: () => {'fullName': 'Unknown Employee'},
@@ -594,7 +575,8 @@ class _OrganizationLocationScreenState extends State<OrganizationLocationScreen>
                       backgroundColor: Colors.blue.shade50,
                       side: BorderSide(color: Colors.blue.shade200),
                     );
-                  }).toList() ?? [],
+                  }).toList() ??
+                  [],
             ),
             const SizedBox(height: 24),
             Row(
@@ -606,16 +588,11 @@ class _OrganizationLocationScreenState extends State<OrganizationLocationScreen>
                       _editLocation(location);
                     },
                     icon: const Icon(Icons.edit, color: Colors.white),
-                    label: const Text(
-                      'Засах',
-                      style: TextStyle(color: Colors.white),
-                    ),
+                    label: const Text('Засах', style: TextStyle(color: Colors.white)),
                     style: ElevatedButton.styleFrom(
                       backgroundColor: Colors.blue.shade600,
                       padding: const EdgeInsets.symmetric(vertical: 12),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(8),
-                      ),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                     ),
                   ),
                 ),
@@ -627,16 +604,11 @@ class _OrganizationLocationScreenState extends State<OrganizationLocationScreen>
                       _confirmDeleteLocation(location['id'], location['name']);
                     },
                     icon: const Icon(Icons.delete, color: Colors.white),
-                    label: const Text(
-                      'Устгах',
-                      style: TextStyle(color: Colors.white),
-                    ),
+                    label: const Text('Устгах', style: TextStyle(color: Colors.white)),
                     style: ElevatedButton.styleFrom(
                       backgroundColor: Colors.red.shade600,
                       padding: const EdgeInsets.symmetric(vertical: 12),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(8),
-                      ),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                     ),
                   ),
                 ),
@@ -658,12 +630,9 @@ class _OrganizationLocationScreenState extends State<OrganizationLocationScreen>
                     _locations.first['latitude']?.toDouble() ?? 47.918,
                     _locations.first['longitude']?.toDouble() ?? 106.917,
                   ),
-                  zoom: 12,
+                  zoom: 16,
                 )
-              : const CameraPosition(
-                  target: LatLng(47.918, 106.917),
-                  zoom: 12,
-                ),
+              : const CameraPosition(target: LatLng(47.918, 106.917), zoom: 12),
           onMapCreated: (controller) {
             _mainMapController = controller;
           },
@@ -719,10 +688,7 @@ class _OrganizationLocationScreenState extends State<OrganizationLocationScreen>
   void _editLocation(Map<String, dynamic> location) {
     // TODO: Implement edit functionality
     ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Засах функц удахгүй нэмэгдэнэ.'),
-        backgroundColor: Colors.blue,
-      ),
+      const SnackBar(content: Text('Засах функц удахгүй нэмэгдэнэ.'), backgroundColor: Colors.blue),
     );
   }
 
@@ -736,19 +702,13 @@ class _OrganizationLocationScreenState extends State<OrganizationLocationScreen>
             'Та "${locationName ?? 'Unknown Location'}" байршлыг устгахдаа итгэлтэй байна уу?',
           ),
           actions: [
-            TextButton(
-              onPressed: () => Navigator.of(context).pop(),
-              child: const Text('Цуцлах'),
-            ),
+            TextButton(onPressed: () => Navigator.of(context).pop(), child: const Text('Цуцлах')),
             TextButton(
               onPressed: () {
                 Navigator.of(context).pop();
                 _deleteLocation(locationId);
               },
-              child: const Text(
-                'Устгах',
-                style: TextStyle(color: Colors.red),
-              ),
+              child: const Text('Устгах', style: TextStyle(color: Colors.red)),
             ),
           ],
         );
@@ -769,11 +729,7 @@ class _OrganizationLocationScreenState extends State<OrganizationLocationScreen>
       children: [
         Text(
           label,
-          style: const TextStyle(
-            fontSize: 14,
-            fontWeight: FontWeight.w600,
-            color: Colors.black87,
-          ),
+          style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: Colors.black87),
         ),
         const SizedBox(height: 8),
         TextField(
@@ -813,81 +769,64 @@ class _OrganizationLocationScreenState extends State<OrganizationLocationScreen>
       body: SafeArea(
         child: Column(
           children: [
-            // Header
-            Container(
-              padding: const EdgeInsets.all(16),
-              decoration: const BoxDecoration(
-                color: Colors.white,
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black12,
-                    blurRadius: 4,
-                    offset: Offset(0, 2),
-                  ),
-                ],
-              ),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  const Text(
-                    'Байршил',
-                    style: TextStyle(
-                      fontSize: 24,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.black87,
-                    ),
-                  ),
-                  ElevatedButton.icon(
-                    onPressed: _showAddLocationBottomSheet,
-                    icon: const Icon(Icons.add, color: Colors.white),
-                    label: const Text(
-                      'Байршил Нэмэх',
-                      style: TextStyle(color: Colors.white),
-                    ),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.green.shade600,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
             // Content
             Expanded(
               child: _isLoading
                   ? const Center(child: CircularProgressIndicator())
                   : _locations.isEmpty
-                      ? const Center(
+                  ? Column(
+                    children: [
+                      // Header
+                      Container(
+                        padding: const EdgeInsets.all(16),
+                        decoration: const BoxDecoration(
+                          color: Colors.white,
+                          boxShadow: [BoxShadow(color: Colors.black12, blurRadius: 4, offset: Offset(0, 2))],
+                        ),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            const Text(
+                              'Байршил',
+                              style: TextStyle(
+                                fontSize: 24,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.black87,
+                              ),
+                            ),
+                            ElevatedButton.icon(
+                              onPressed: _showAddLocationBottomSheet,
+                              icon: const Icon(Icons.add, color: Colors.white),
+                              label: const Text('Байршил Нэмэх', style: TextStyle(color: Colors.white)),
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: Colors.green.shade600,
+                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const Center(
                           child: Column(
                             mainAxisAlignment: MainAxisAlignment.center,
                             children: [
-                              Icon(
-                                Icons.location_off,
-                                size: 64,
-                                color: Colors.grey,
-                              ),
+                              Icon(Icons.location_off, size: 64, color: Colors.grey),
                               SizedBox(height: 16),
                               Text(
                                 'Байршил байхгүй байна.',
-                                style: TextStyle(
-                                  fontSize: 18,
-                                  color: Colors.black54,
-                                ),
+                                style: TextStyle(fontSize: 18, color: Colors.black54),
                               ),
                               SizedBox(height: 8),
                               Text(
                                 'Байршил нэмэх товч дээр дарж байршил нэмнэ үү.',
-                                style: TextStyle(
-                                  fontSize: 14,
-                                  color: Colors.grey,
-                                ),
+                                style: TextStyle(fontSize: 14, color: Colors.grey),
                               ),
                             ],
                           ),
-                        )
-                      : _buildMapView(),
+                        ),
+                    ],
+                  )
+                  : _buildMapView(),
             ),
           ],
         ),
@@ -918,12 +857,9 @@ class _OrganizationLocationScreenState extends State<OrganizationLocationScreen>
       setState(() {}); // Refresh the UI
     } catch (e) {
       debugPrint("Error deleting location: $e");
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Алдаа гарлаа: $e'),
-          backgroundColor: Colors.red,
-        ),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Алдаа гарлаа: $e'), backgroundColor: Colors.red));
     }
   }
 

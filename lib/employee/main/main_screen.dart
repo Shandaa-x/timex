@@ -1,16 +1,17 @@
 import 'package:flutter/material.dart';
+import 'package:timex/employee/test_screen.dart';
 import 'package:timex/index.dart';
 
 class MainScreen extends StatefulWidget {
-  final String loginMethod;
-  final String userName;
+  final String? userName; // Make optional since we'll get it from arguments
   final String? userImage;
+  final Map<String, dynamic>? arguments;
 
   const MainScreen({
     super.key,
-    required this.loginMethod,
-    required this.userName,
+    this.userName, // Make optional
     this.userImage,
+    this.arguments,
   });
 
   @override
@@ -22,17 +23,137 @@ class _MainScreenState extends State<MainScreen> {
   late final PageController _pageController;
 
   late final List<Widget> _screens;
+  
+  // Employee data variables
+  String _employeeFullName = 'Employee';
+  Map<String, dynamic>? _employeeData;
+  String? _employeeId;
+  String? _organizationId;
+  bool _isFirstLogin = false;
 
   @override
   void initState() {
     super.initState();
     _pageController = PageController(initialPage: _currentIndex);
+    
+    // Extract employee data from arguments
+    _extractEmployeeData();
 
     _screens = [
-      HomeScreen(userName: widget.userName, userImage: widget.userImage),
-      const LocationScreen(),
-      HomeScreen(userName: 'Guest'), // or pass any fallback name/image here
+      HomeScreen(userName: _employeeFullName, userImage: widget.userImage),
+      LocationScreen(
+        employeeId: _employeeId,
+        organizationId: _organizationId,
+        employeeData: _employeeData,
+      ),
+      TestScreen(),
     ];
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    
+    // Check for arguments from ModalRoute
+    final routeArgs = ModalRoute.of(context)?.settings.arguments as Map<String, dynamic>?;
+    if (routeArgs != null) {
+      _extractEmployeeDataFromRoute(routeArgs);
+      // Rebuild screens with updated employee data
+      _updateScreensWithEmployeeData();
+      setState(() {});
+    }
+  }
+
+  void _extractEmployeeData() {
+    // Extract from widget arguments if available
+    if (widget.arguments != null) {
+      _extractEmployeeDataFromRoute(widget.arguments!);
+    }
+    
+    // Also use widget.userName as fallback if provided
+    if (widget.userName != null && widget.userName!.isNotEmpty) {
+      _employeeFullName = widget.userName!;
+    }
+  }
+
+  void _extractEmployeeDataFromRoute(Map<String, dynamic> args) {
+    _employeeData = args['employeeData'] as Map<String, dynamic>?;
+    _employeeId = args['employeeId'] as String?;
+    _organizationId = args['organizationId'] as String?;
+    _isFirstLogin = args['isFirstLogin'] as bool? ?? false;
+    
+    // Extract employee full name
+    if (_employeeData != null) {
+      final firstName = _employeeData!['firstName'] as String? ?? '';
+      final lastName = _employeeData!['lastName'] as String? ?? '';
+      final fullName = _employeeData!['fullName'] as String?;
+      
+      // Use fullName if available, otherwise construct from firstName and lastName
+      if (fullName != null && fullName.isNotEmpty) {
+        _employeeFullName = fullName;
+      } else if (firstName.isNotEmpty || lastName.isNotEmpty) {
+        _employeeFullName = '$lastName $firstName'.trim();
+      } else {
+        _employeeFullName = _employeeData!['employeeEmail'] as String? ?? 'Employee';
+      }
+      
+      debugPrint('Employee logged in: $_employeeFullName');
+      debugPrint('Employee ID: $_employeeId');
+      debugPrint('Organization ID: $_organizationId');
+      debugPrint('Is first login: $_isFirstLogin');
+      
+      // Show first login message if needed
+      // if (_isFirstLogin) {
+      //   WidgetsBinding.instance.addPostFrameCallback((_) {
+      //     _showFirstLoginWelcome();
+      //   });
+      // }
+    }
+  }
+
+  void _updateScreensWithEmployeeData() {
+    _screens[0] = HomeScreen(userName: _employeeFullName, userImage: widget.userImage);
+    _screens[1] = LocationScreen(
+      employeeId: _employeeId,
+      organizationId: _organizationId,
+      employeeData: _employeeData,
+    );
+    _screens[2] = TestScreen();
+  }
+
+  void _showFirstLoginWelcome() {
+    showDialog(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: Text('Тавтай морил, $_employeeFullName!'),
+        content: const Text(
+          'Та анх удаа нэвтэрч байна. Аюулгүй байдлын үүднээс нууц үгээ солихыг зөвлөж байна.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext), // Use dialogContext here
+            child: const Text('Ойлголоо'),
+          ),
+          TextButton(
+            onPressed: () {
+              Navigator.pop(dialogContext); // Use dialogContext here too
+              _navigateToChangePassword();
+            },
+            child: const Text('Нууц үг солих'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _navigateToChangePassword() {
+    // TODO: Navigate to change password screen
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Нууц үг солих хэсэг удахгүй нэмэгдэнэ'),
+        backgroundColor: Colors.blue,
+      ),
+    );
   }
 
   void _onTabTapped(int index) {
@@ -46,30 +167,30 @@ class _MainScreenState extends State<MainScreen> {
     final shouldLogout = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Logout Confirmation'),
-        content: const Text('Do you want to logout?'),
+        title: const Text('Гарах'),
+        content: Text('$_employeeFullName, та системээс гарахыг хүсч байна уу?'),
         actions: [
           TextButton(
-            onPressed: () => Navigator.of(context).pop(false), // Do not logout
-            child: const Text('Cancel'),
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('Цуцлах'),
           ),
           TextButton(
-            onPressed: () => Navigator.of(context).pop(true), // Confirm logout
-            child: const Text('Logout'),
+            onPressed: () => Navigator.of(context).pop(true),
+            child: const Text('Гарах'),
           ),
         ],
       ),
     );
 
     if (shouldLogout == true) {
-      // Navigate to login screen by popping all and pushing login
+      // Navigate back to login selection
       Navigator.of(context).pushNamedAndRemoveUntil(
-        Routes.loginScreen, // Adjust to your login route name
-            (route) => false,
+        '/login',
+        (route) => false,
       );
-      return false; // Do not pop automatically, we handled navigation
+      return false;
     } else {
-      return false; // Prevent popping if user cancels
+      return false;
     }
   }
 
@@ -96,6 +217,12 @@ class _MainScreenState extends State<MainScreen> {
     );
   }
 
+  // getSalary(x=2000, weekDays
+  //   x*11.5*/100/weekDays) {
+  //   // Example calculation, replace with actual logic
+  //   return x
+  // }
+
   Widget _buildSegmentedTabBar() {
     final tabs = [
       {'icon': Icons.home, 'label': 'Нүүр'},
@@ -118,14 +245,24 @@ class _MainScreenState extends State<MainScreen> {
                 child: Container(
                   padding: const EdgeInsets.symmetric(vertical: 7, horizontal: 21),
                   decoration: BoxDecoration(
-                    color: isSelected ? const Color(0xFFC7BBE1) : Colors.transparent, // Pink container
+                    color: isSelected ? const Color(0xFFC7BBE1) : Colors.transparent,
                     borderRadius: BorderRadius.circular(20),
                   ),
                   child: Row(
                     children: [
-                      Icon(tabs[index]['icon'] as IconData, color: isSelected ? Colors.black : Colors.white.withOpacity(0.6), size: 24),
+                      Icon(
+                        tabs[index]['icon'] as IconData,
+                        color: isSelected ? Colors.black : Colors.white.withOpacity(0.6),
+                        size: 24,
+                      ),
                       const SizedBox(width: 6),
-                      txt(tabs[index]['label'] as String, style: TxtStl.bodyText1(color: isSelected ? Colors.black : Colors.white.withOpacity(0.6), fontSize: 11)),
+                      txt(
+                        tabs[index]['label'] as String,
+                        style: TxtStl.bodyText1(
+                          color: isSelected ? Colors.black : Colors.white.withOpacity(0.6),
+                          fontSize: 11,
+                        ),
+                      ),
                     ],
                   ),
                 ),
@@ -135,5 +272,11 @@ class _MainScreenState extends State<MainScreen> {
         ),
       ),
     );
+  }
+
+  @override
+  void dispose() {
+    _pageController.dispose();
+    super.dispose();
   }
 }

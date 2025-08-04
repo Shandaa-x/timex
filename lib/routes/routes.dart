@@ -22,7 +22,6 @@ class Routes {
         final args = settings.arguments as Map<String, dynamic>? ?? {};
         route = MaterialPageRoute(
           builder: (context) => MainScreen(
-            loginMethod: args['loginMethod'] ?? 'unknown',
             userName: args['userName'] ?? 'Guest',
             userImage: args['userImage'],
           ),

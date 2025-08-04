@@ -3,17 +3,20 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:mailer/mailer.dart';
+import 'package:mailer/smtp_server.dart';
+import 'package:crypto/crypto.dart';
+import 'dart:convert';
+import 'dart:math';
 
 // Import the newly created custom table cell widget
+import '../../services/email_service.dart';
 import 'widgets/custom_table_cell.dart';
 
 class AddEmployeeScreen extends StatefulWidget {
   final Map<String, dynamic> organizationData;
 
-  const AddEmployeeScreen({
-    super.key,
-    required this.organizationData,
-  });
+  const AddEmployeeScreen({super.key, required this.organizationData});
 
   @override
   State<AddEmployeeScreen> createState() => _AddEmployeeScreenState();
@@ -33,8 +36,10 @@ class _AddEmployeeScreenState extends State<AddEmployeeScreen> {
   final TextEditingController _departmentController = TextEditingController();
   final TextEditingController _jobTitleController = TextEditingController();
   final TextEditingController _employeeEmailController = TextEditingController();
-  final TextEditingController _registrationNumberController = TextEditingController(); // Added for registration number
-  final TextEditingController _salaryController = TextEditingController(); // Added for monthly salary
+  final TextEditingController _registrationNumberController =
+      TextEditingController(); // Added for registration number
+  final TextEditingController _salaryController =
+      TextEditingController(); // Added for monthly salary
   String? _selectedStatus;
 
   // Status options for the dropdown, based on the image
@@ -47,7 +52,7 @@ class _AddEmployeeScreenState extends State<AddEmployeeScreen> {
     'Гэрээт ажилтан',
     'Дадлагын ажилтан',
     'Сул зогсолт',
-    'Уртaн амралт'
+    'Уртaн амралт',
   ];
 
   @override
@@ -60,7 +65,7 @@ class _AddEmployeeScreenState extends State<AddEmployeeScreen> {
   // Fetches employees from Firestore
   void _fetchEmployees() {
     final user = _auth.currentUser;
-    
+
     if (user == null) {
       debugPrint('Cannot fetch employees - no authenticated user');
       setState(() {
@@ -68,10 +73,10 @@ class _AddEmployeeScreenState extends State<AddEmployeeScreen> {
       });
       return;
     }
-    
+
     // The organization ID should be the user's UID since organizations are stored with their creator's UID
     String organizationId = user.uid;
-    
+
     debugPrint('Fetching employees for organization ID: $organizationId');
 
     // Listen for real-time updates to the 'employees' subcollection
@@ -80,23 +85,26 @@ class _AddEmployeeScreenState extends State<AddEmployeeScreen> {
         .doc(organizationId)
         .collection('employees')
         .snapshots()
-        .listen((snapshot) {
-      final employees = snapshot.docs.map((doc) {
-        final data = doc.data();
-        data['id'] = doc.id; // Add document ID for potential future use
-        return data;
-      }).toList();
-      setState(() {
-        _employees = employees;
-        _isLoading = false;
-      });
-    }, onError: (error) {
-      // Handle any errors
-      debugPrint("Error fetching employees: $error");
-      setState(() {
-        _isLoading = false;
-      });
-    });
+        .listen(
+          (snapshot) {
+            final employees = snapshot.docs.map((doc) {
+              final data = doc.data();
+              data['id'] = doc.id; // Add document ID for potential future use
+              return data;
+            }).toList();
+            setState(() {
+              _employees = employees;
+              _isLoading = false;
+            });
+          },
+          onError: (error) {
+            // Handle any errors
+            debugPrint("Error fetching employees: $error");
+            setState(() {
+              _isLoading = false;
+            });
+          },
+        );
   }
 
   // Toggles the view between the employee list and the add form
@@ -117,32 +125,142 @@ class _AddEmployeeScreenState extends State<AddEmployeeScreen> {
     });
   }
 
+  // Generate a simple 6-character password
+  String _generateSimplePassword() {
+    const chars = 'abcdefghijklmnopqrstuvwxyz0123456789';
+    final random = Random();
+    return String.fromCharCodes(
+      Iterable.generate(6, (_) => chars.codeUnitAt(random.nextInt(chars.length))),
+    );
+  }
+
+  // Send invitation email to the employee
+  Future<bool> _sendInvitationEmail(String employeeEmail, String employeeName, String password) async {
+    try {
+      debugPrint('Attempting to send email to: $employeeEmail');
+
+      // Get organization name from widget data
+      final organizationName = widget.organizationData['organizationName'] ??
+                              widget.organizationData['name'] ??
+                              'Your Organization';
+
+      // Configure SMTP server - Using Gmail as example
+      // For production, you should use environment variables or secure storage
+      const String senderEmail = 'your-gmail@gmail.com'; // Replace with your Gmail
+      const String senderPassword = 'your-app-password'; // Replace with Gmail App Password
+
+      final smtpServer = gmail(senderEmail, senderPassword);
+
+      debugPrint('SMTP server configured for: $senderEmail');
+
+      // Create the email message
+      final message = Message()
+        ..from = Address(senderEmail, organizationName)
+        ..recipients.add(employeeEmail)
+        ..subject = '$organizationName-ээс ажилд урилга'
+        ..text = '''
+Сайн байна уу $employeeName,
+
+$organizationName байгууллагаас таныг тэдний багт нэгдэхийг урьж байна!
+
+Таны нэвтрэх мэдээлэл:
+Имэйл: $employeeEmail
+Нууц үг: $password
+
+Системд нэвтэрснээр та ажлын цагаа бүртгэж, байгууллагынхаа системд хандах боломжтой болно.
+
+Анхаар: Аюулгүй байдлын үүднээс эхний нэвтрэлтийн дараа нууц үгээ солихыг зөвлөж байна.
+
+Хэрэв танд асуулт байвал $organizationName-ын удирдлагатай холбогдоно уу.
+
+Баярлалаа,
+$organizationName
+      '''
+      ..html = '''
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
+          <div style="background-color: #f8f9fa; padding: 30px; border-radius: 10px;">
+            <h2 style="color: #1976d2; text-align: center; margin-bottom: 30px;">Ажилд урилга</h2>
+            
+            <p style="font-size: 16px;">Сайн байна уу <strong>$employeeName</strong>,</p>
+            
+            <p style="font-size: 16px;"><strong>$organizationName</strong> байгууллагаас таныг тэдний багт нэгдэхийг урьж байна!</p>
+            
+            <div style="background-color: white; padding: 25px; border-radius: 8px; margin: 30px 0; border-left: 4px solid #1976d2;">
+              <h3 style="margin-top: 0; color: #1976d2; font-size: 18px;">Таны нэвтрэх мэдээлэл:</h3>
+              <p style="font-size: 16px; margin: 10px 0;"><strong>Имэйл:</strong> $employeeEmail</p>
+              <p style="font-size: 16px; margin: 10px 0;"><strong>Нууц үг:</strong> <span style="background-color: #e3f2fd; padding: 8px 12px; border-radius: 4px; font-family: monospace; font-size: 18px; font-weight: bold; color: #1976d2;">$password</span></p>
+            </div>
+            
+            <div style="text-align: center; margin: 30px 0;">
+              <p style="font-size: 16px; color: #666;">Системд нэвтэрснээр та ажлын цагаа бүртгэж, байгууллагынхаа системд хандах боломжтой болно.</p>
+            </div>
+            
+            <div style="background-color: #fff3cd; padding: 20px; border-radius: 8px; margin: 30px 0; border-left: 4px solid #ffc107;">
+              <p style="margin: 0; color: #856404; font-size: 14px;">
+                <strong>Анхаар:</strong> Аюулгүй байдлын үүднээс эхний нэвтрэлтийн дараа нууц үгээ солихыг зөвлөж байна.
+              </p>
+            </div>
+            
+            <p style="font-size: 16px;">Хэрэв танд асуулт байвал <strong>$organizationName</strong>-ын удирдлагатай холбогдоно уу.</p>
+            
+            <hr style="border: none; border-top: 1px solid #eee; margin: 40px 0 20px 0;">
+            <p style="color: #666; font-size: 12px; text-align: center; margin: 0;">
+              Энэ имэйл нь $organizationName системээс автоматаар илгээгдсэн.<br>
+              ${DateTime.now().toString().split('.')[0]}
+            </p>
+          </div>
+        </div>
+      ''';
+
+      debugPrint('Email message created, attempting to send...');
+
+      // Send the email with timeout
+      final sendReport = await send(message, smtpServer).timeout(
+        const Duration(seconds: 30),
+        onTimeout: () {
+          throw Exception('Email sending timed out after 30 seconds');
+        },
+      );
+
+      debugPrint('Email sent successfully: ${sendReport.toString()}');
+      return true;
+
+    } on MailerException catch (e) {
+      debugPrint('MailerException: ${e.toString()}');
+      for (var p in e.problems) {
+        debugPrint('Problem: ${p.code}: ${p.msg}');
+      }
+      return false;
+    } on Exception catch (e) {
+      debugPrint('General Exception sending email: $e');
+      return false;
+    } catch (e) {
+      debugPrint('Unknown error sending email: $e');
+      return false;
+    }
+  }
+
   // Saves a new employee to Firestore
   Future<void> _saveNewEmployee() async {
     debugPrint('Starting employee save process');
     debugPrint('Organization data: ${widget.organizationData}');
-    
+
     final user = _auth.currentUser;
     debugPrint('Current user: ${user?.uid}');
-    
+
     if (user == null) {
       debugPrint('No authenticated user');
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Та нэвтэрч орох шаардлагатай!'), // You need to log in!
-          backgroundColor: Colors.red,
-        ),
+        const SnackBar(content: Text('Та нэвтэрч орох шаардлагатай!'), backgroundColor: Colors.red),
       );
       return;
     }
-    
-    // The organization ID should be the user's UID since organizations are stored with their creator's UID
+
     String organizationId = user.uid;
     debugPrint('Using organization ID: $organizationId');
 
     debugPrint('User authenticated, checking required fields');
 
-    // Fixed validation logic - check for both first name and last name
     if (_firstNameController.text.isEmpty ||
         _lastNameController.text.isEmpty ||
         _employeeEmailController.text.isEmpty ||
@@ -150,7 +268,7 @@ class _AddEmployeeScreenState extends State<AddEmployeeScreen> {
       debugPrint('Required fields missing');
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Ажилтан нэмэхийн тулд нэр, овог, имэйл хаяг, төлөвийг бөглөнө үү!'), // Please fill in first name, last name, email, and status to add an employee!
+          content: Text('Ажилтан нэмэхийн тулд нэр, овог, имэйл хаяг, төлөвийг бөглөнө үү!'),
           backgroundColor: Colors.red,
         ),
       );
@@ -160,22 +278,42 @@ class _AddEmployeeScreenState extends State<AddEmployeeScreen> {
     debugPrint('All required fields filled, creating employee data');
 
     try {
+      // Generate simple password for the employee
+      final employeePassword = _generateSimplePassword();
+      final fullName = '${_lastNameController.text} ${_firstNameController.text}';
+
+      // Hash the password for storage (you should use proper password hashing)
+      final hashedPassword = sha256.convert(utf8.encode(employeePassword)).toString();
+
       final employeeData = {
         'firstName': _firstNameController.text,
         'lastName': _lastNameController.text,
-        'fullName': '${_lastNameController.text} ${_firstNameController.text}', // Combined full name
-        // 'department': _departmentController.text.isEmpty ? 'N/A' : _departmentController.text,
+        'fullName': fullName,
         'jobTitle': _jobTitleController.text.isEmpty ? 'N/A' : _jobTitleController.text,
         'employeeEmail': _employeeEmailController.text,
-        'registrationNumber': _registrationNumberController.text.isEmpty ? 'N/A' : _registrationNumberController.text,
+        'registrationNumber': _registrationNumberController.text.isEmpty
+            ? 'N/A'
+            : _registrationNumberController.text,
         'salary': _salaryController.text.isEmpty ? 0 : double.tryParse(_salaryController.text) ?? 0,
         'status': _selectedStatus,
+        'hashedPassword': hashedPassword, // Store hashed password
+        'isFirstLogin': true, // Flag to force password change on first login
         'registrationDate': Timestamp.now(),
         'createdBy': user.uid,
         'lastModified': Timestamp.now(),
+        'organizationId': organizationId,
       };
 
       debugPrint('Saving employee data to Firestore');
+
+      // Show loading indicator
+      showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (BuildContext context) {
+          return const Center(child: CircularProgressIndicator());
+        },
+      );
 
       // Use a batch write to ensure both operations succeed or fail together
       final batch = _firestore.batch();
@@ -185,15 +323,13 @@ class _AddEmployeeScreenState extends State<AddEmployeeScreen> {
           .collection('organizations')
           .doc(organizationId)
           .collection('employees')
-          .doc(); // Auto-generate document ID
-      
+          .doc();
+
       batch.set(employeeRef, employeeData);
 
       // Update the organization's totalEmployees count
-      final orgRef = _firestore
-          .collection('organizations')
-          .doc(organizationId);
-      
+      final orgRef = _firestore.collection('organizations').doc(organizationId);
+
       batch.update(orgRef, {
         'totalEmployees': FieldValue.increment(1),
         'lastModified': Timestamp.now(),
@@ -202,21 +338,57 @@ class _AddEmployeeScreenState extends State<AddEmployeeScreen> {
       // Commit the batch
       await batch.commit();
 
-      debugPrint('Employee data saved successfully and totalEmployees updated');
+      debugPrint('Employee data saved successfully');
+
+      // Send invitation email
+      debugPrint('Sending invitation email to ${_employeeEmailController.text}');
+      final emailSent = await EmailService.sendEmployeeInvitation(
+        employeeEmail: _employeeEmailController.text,
+        employeeName: fullName,
+        password: employeePassword,
+        organizationName: widget.organizationData['organizationName'] ??
+            widget.organizationData['name'] ??
+            'Your Organization',
+        provider: 'gmail', // You can change this to 'outlook' or 'yahoo'
+      );
+
+      // Close loading dialog
+      Navigator.of(context).pop();
+
+      if (emailSent) {
+        debugPrint('Invitation email sent successfully');
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Ажилтан амжилттай нэмэгдэж, $fullName-д урилгын имэйл илгээгдлээ!'),
+            backgroundColor: Colors.green,
+            duration: const Duration(seconds: 4),
+          ),
+        );
+      } else {
+        debugPrint('Failed to send invitation email');
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              'Ажилтан нэмэгдсэн боловч $fullName-д имэйл илгээхэд алдаа гарлаа. Нууц үг: $employeePassword',
+            ),
+            backgroundColor: Colors.orange,
+            duration: const Duration(seconds: 6),
+          ),
+        );
+      }
 
       // Clear the form fields and close the form
       _toggleAddEmployeeForm();
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Амжилттай хадгалагдлаа!'), // Successfully saved!
-          backgroundColor: Colors.green,
-        ),
-      );
     } catch (e) {
+      // Close loading dialog if it's open
+      if (Navigator.canPop(context)) {
+        Navigator.of(context).pop();
+      }
+
       debugPrint("Error saving new employee: $e");
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('Ажилтаныг хадгалах үед алдаа гарлаа: $e'), // Error saving employee: $e
+          content: Text('Ажилтаныг хадгалах үед алдаа гарлаа: $e'),
           backgroundColor: Colors.red,
         ),
       );
@@ -228,10 +400,7 @@ class _AddEmployeeScreenState extends State<AddEmployeeScreen> {
     final user = _auth.currentUser;
     if (user == null) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Та нэвтэрч орох шаардлагатай!'),
-          backgroundColor: Colors.red,
-        ),
+        const SnackBar(content: Text('Та нэвтэрч орох шаардлагатай!'), backgroundColor: Colors.red),
       );
       return;
     }
@@ -248,14 +417,12 @@ class _AddEmployeeScreenState extends State<AddEmployeeScreen> {
           .doc(organizationId)
           .collection('employees')
           .doc(employeeId);
-      
+
       batch.delete(employeeRef);
 
       // Update the organization's totalEmployees count
-      final orgRef = _firestore
-          .collection('organizations')
-          .doc(organizationId);
-      
+      final orgRef = _firestore.collection('organizations').doc(organizationId);
+
       batch.update(orgRef, {
         'totalEmployees': FieldValue.increment(-1),
         'lastModified': Timestamp.now(),
@@ -304,9 +471,7 @@ class _AddEmployeeScreenState extends State<AddEmployeeScreen> {
             children: [
               _buildHeader(),
               const SizedBox(height: 20),
-              Expanded(
-                child: _isAddingEmployee ? _buildAddEmployeeForm() : _buildEmployeeTable(),
-              ),
+              Expanded(child: _isAddingEmployee ? _buildAddEmployeeForm() : _buildEmployeeTable()),
             ],
           ),
         ),
@@ -321,11 +486,7 @@ class _AddEmployeeScreenState extends State<AddEmployeeScreen> {
       children: [
         const Text(
           'Ажилтан', // Employees
-          style: TextStyle(
-            color: Colors.black,
-            fontSize: 24,
-            fontWeight: FontWeight.bold,
-          ),
+          style: TextStyle(color: Colors.black, fontSize: 24, fontWeight: FontWeight.bold),
         ),
         ElevatedButton.icon(
           onPressed: _toggleAddEmployeeForm,
@@ -336,9 +497,7 @@ class _AddEmployeeScreenState extends State<AddEmployeeScreen> {
           ),
           style: ElevatedButton.styleFrom(
             backgroundColor: Colors.blue.shade800,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(8),
-            ),
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
           ),
         ),
       ],
@@ -442,7 +601,10 @@ class _AddEmployeeScreenState extends State<AddEmployeeScreen> {
           value: null,
           onChanged: (String? newValue) {},
           items: const [
-            DropdownMenuItem(value: 'value1', child: Text('Сонгох', style: TextStyle(color: Colors.white70))),
+            DropdownMenuItem(
+              value: 'value1',
+              child: Text('Сонгох', style: TextStyle(color: Colors.white70)),
+            ),
           ],
         ),
       ),
@@ -451,11 +613,7 @@ class _AddEmployeeScreenState extends State<AddEmployeeScreen> {
 
   // Builds the table header row
   Widget _buildTableHeader() {
-    const headerStyle = TextStyle(
-      color: Colors.white70,
-      fontWeight: FontWeight.bold,
-      fontSize: 12,
-    );
+    const headerStyle = TextStyle(color: Colors.white70, fontWeight: FontWeight.bold, fontSize: 12);
     const padding = EdgeInsets.symmetric(vertical: 12.0);
 
     return Container(
@@ -496,11 +654,7 @@ class _AddEmployeeScreenState extends State<AddEmployeeScreen> {
       child: Row(
         children: [
           // Index and Name
-          CustomTableCell(
-            text: index.toString(),
-            flex: 1,
-            alignment: Alignment.centerLeft,
-          ),
+          CustomTableCell(text: index.toString(), flex: 1, alignment: Alignment.centerLeft),
           CustomTableCell(
             flex: 4,
             child: Row(
@@ -509,7 +663,9 @@ class _AddEmployeeScreenState extends State<AddEmployeeScreen> {
                   radius: 16,
                   backgroundColor: Colors.blue.shade900,
                   child: Text(
-                    employee['fullName']?.isNotEmpty == true ? employee['fullName'][0].toUpperCase() : '?',
+                    employee['fullName']?.isNotEmpty == true
+                        ? employee['fullName'][0].toUpperCase()
+                        : '?',
                     style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
                   ),
                 ),
@@ -519,7 +675,8 @@ class _AddEmployeeScreenState extends State<AddEmployeeScreen> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        employee['fullName'] ?? '${employee['lastName'] ?? ''} ${employee['firstName'] ?? ''}',
+                        employee['fullName'] ??
+                            '${employee['lastName'] ?? ''} ${employee['firstName'] ?? ''}',
                         style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
                         overflow: TextOverflow.ellipsis,
                       ),
@@ -545,27 +702,18 @@ class _AddEmployeeScreenState extends State<AddEmployeeScreen> {
           //   flex: 3,
           // ),
           // Job Title
-          CustomTableCell(
-            text: employee['jobTitle'] ?? 'N/A',
-            flex: 4,
-          ),
+          CustomTableCell(text: employee['jobTitle'] ?? 'N/A', flex: 4),
           // Salary
           CustomTableCell(
-            text: employee['salary'] != null 
-                ? '₮${(employee['salary'] as num).toStringAsFixed(0)}' 
+            text: employee['salary'] != null
+                ? '₮${(employee['salary'] as num).toStringAsFixed(0)}'
                 : 'N/A',
             flex: 3,
           ),
           // Email
-          CustomTableCell(
-            text: employee['employeeEmail'] ?? 'N/A',
-            flex: 3,
-          ),
+          CustomTableCell(text: employee['employeeEmail'] ?? 'N/A', flex: 3),
           // Status
-          CustomTableCell(
-            flex: 2,
-            child: _buildTag(employee['status'] ?? 'N/A', statusColor),
-          ),
+          CustomTableCell(flex: 2, child: _buildTag(employee['status'] ?? 'N/A', statusColor)),
           // Registration Date
           CustomTableCell(
             text: employee['registrationDate'] != null
@@ -593,7 +741,9 @@ class _AddEmployeeScreenState extends State<AddEmployeeScreen> {
                       builder: (BuildContext context) {
                         return AlertDialog(
                           title: const Text('Ажилтныг устгах'),
-                          content: Text('Та "${employee['fullName'] ?? '${employee['lastName'] ?? ''} ${employee['firstName'] ?? ''}'}" ажилтныг устгахдаа итгэлтэй байна уу?'),
+                          content: Text(
+                            'Та "${employee['fullName'] ?? '${employee['lastName'] ?? ''} ${employee['firstName'] ?? ''}'}" ажилтныг устгахдаа итгэлтэй байна уу?',
+                          ),
                           actions: [
                             TextButton(
                               onPressed: () => Navigator.of(context).pop(),
@@ -677,25 +827,24 @@ class _AddEmployeeScreenState extends State<AddEmployeeScreen> {
                       // TODO: Implement adding another row for another employee
                       ScaffoldMessenger.of(context).showSnackBar(
                         const SnackBar(
-                          content: Text('Одоогоор олон мөр нэмэх боломжгүй!'), // Cannot add multiple rows at the moment!
+                          content: Text('Одоогоор олон мөр нэмэх боломжгүй!'),
+                          // Cannot add multiple rows at the moment!
                           backgroundColor: Colors.blue,
                         ),
                       );
                     },
                     icon: const Icon(Icons.add, color: Colors.white),
-                    label: const Text('Мөр Нэмэх', style: TextStyle(color: Colors.white)), // Add Row
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.blue.shade800,
-                    ),
+                    label: const Text('Мөр Нэмэх', style: TextStyle(color: Colors.white)),
+                    // Add Row
+                    style: ElevatedButton.styleFrom(backgroundColor: Colors.blue.shade800),
                   ),
                   const SizedBox(width: 12),
                   ElevatedButton.icon(
                     onPressed: _saveNewEmployee,
                     icon: const Icon(Icons.save, color: Colors.white),
-                    label: const Text('Баталгаажуулах', style: TextStyle(color: Colors.white)), // Confirm
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.green.shade800,
-                    ),
+                    label: const Text('Баталгаажуулах', style: TextStyle(color: Colors.white)),
+                    // Confirm
+                    style: ElevatedButton.styleFrom(backgroundColor: Colors.green.shade800),
                   ),
                 ],
               ),
@@ -711,10 +860,7 @@ class _AddEmployeeScreenState extends State<AddEmployeeScreen> {
     const headerStyle = TextStyle(color: Colors.white70, fontWeight: FontWeight.bold, fontSize: 12);
     const padding = EdgeInsets.symmetric(vertical: 12.0, horizontal: 8.0);
     return Container(
-      decoration: BoxDecoration(
-        color: Colors.grey,
-        borderRadius: BorderRadius.circular(12),
-      ),
+      decoration: BoxDecoration(color: Colors.grey, borderRadius: BorderRadius.circular(12)),
       padding: padding,
       child: const Row(
         children: [
@@ -737,10 +883,7 @@ class _AddEmployeeScreenState extends State<AddEmployeeScreen> {
     return Container(
       margin: const EdgeInsets.only(top: 8),
       padding: const EdgeInsets.symmetric(vertical: 8.0),
-      decoration: BoxDecoration(
-        color: Colors.grey,
-        borderRadius: BorderRadius.circular(12),
-      ),
+      decoration: BoxDecoration(color: Colors.grey, borderRadius: BorderRadius.circular(12)),
       child: Row(
         children: [
           const CustomTableCell(text: '1', flex: 1),
@@ -750,35 +893,20 @@ class _AddEmployeeScreenState extends State<AddEmployeeScreen> {
             child: _buildInput(null, _employeeEmailController, 'Имэйл хаяг'), // Email address
           ),
           // Last Name Input
-          CustomTableCell(
-            flex: 2,
-            child: _buildInput(null, _lastNameController, 'Овог'),
-          ),
+          CustomTableCell(flex: 2, child: _buildInput(null, _lastNameController, 'Овог')),
           // First Name Input
-          CustomTableCell(
-            flex: 2,
-            child: _buildInput(null, _firstNameController, 'Нэр'),
-          ),
+          CustomTableCell(flex: 2, child: _buildInput(null, _firstNameController, 'Нэр')),
           // Registration Number
           CustomTableCell(
             flex: 3,
             child: _buildInput(null, _registrationNumberController, 'Регистр дугаар'),
           ),
           // Job Title Input
-          CustomTableCell(
-            flex: 4,
-            child: _buildInput(null, _jobTitleController, 'Албан тушаал'),
-          ),
+          CustomTableCell(flex: 4, child: _buildInput(null, _jobTitleController, 'Албан тушаал')),
           // Salary Input
-          CustomTableCell(
-            flex: 3,
-            child: _buildInput('₮', _salaryController, 'Сарын цалин'),
-          ),
+          CustomTableCell(flex: 3, child: _buildInput('₮', _salaryController, 'Сарын цалин')),
           // Status Dropdown
-          CustomTableCell(
-            flex: 2,
-            child: _buildStatusDropdown(),
-          ),
+          CustomTableCell(flex: 2, child: _buildStatusDropdown()),
           // Actions
           CustomTableCell(
             flex: 2,
@@ -787,7 +915,8 @@ class _AddEmployeeScreenState extends State<AddEmployeeScreen> {
                 // TODO: Implement delete row action for new employee
                 ScaffoldMessenger.of(context).showSnackBar(
                   const SnackBar(
-                    content: Text('Мөр устгах функц одоогоор идэвхгүй байна.'), // Delete row function is currently inactive.
+                    content: Text('Мөр устгах функц одоогоор идэвхгүй байна.'),
+                    // Delete row function is currently inactive.
                     backgroundColor: Colors.blue,
                   ),
                 );
@@ -803,7 +932,7 @@ class _AddEmployeeScreenState extends State<AddEmployeeScreen> {
   Widget _buildInput(String? prefixText, TextEditingController? controller, String hintText) {
     // Determine if this is a salary field to set appropriate keyboard type
     final bool isSalaryField = controller == _salaryController;
-    
+
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10),
       decoration: BoxDecoration(

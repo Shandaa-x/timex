@@ -34,10 +34,10 @@ class MyApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return GetMaterialApp(
-      initialRoute: Routes.loginScreen,
+      initialRoute: Routes.main,
       onGenerateRoute: (settings) => Routes().getRoute(settings),
       debugShowCheckedModeBanner: false,
-      home: const LoginScreen(),
+      home: const MainScreen(),
     );
   }
 }

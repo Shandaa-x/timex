@@ -1,0 +1,5 @@
+read collection calendarDays from firebase.  
+- The data has fields month, day, isHoliday, workingHours. 
+- Add filter for month. 
+- Show weeknumbers for the selected Month as a chip. When selected on a week number, the data should be filtered
+- Show total workingHours from the filtered data times
