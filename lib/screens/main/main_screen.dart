@@ -1,14 +1,12 @@
 import 'package:flutter/material.dart';
+import 'package:timex/screens/meal_plan/meal_plan_calendar.dart';
 import 'package:timex/screens/monthly_statistic_screen.dart';
 import 'package:timex/screens/test_screen.dart';
 import 'package:timex/index.dart';
 import 'package:timex/screens/time_track/time_tracking_screen.dart';
 
 class MainScreen extends StatefulWidget {
-
-  const MainScreen({
-    super.key,
-  });
+  const MainScreen({super.key});
 
   @override
   State<MainScreen> createState() => _MainScreenState();
@@ -19,7 +17,7 @@ class _MainScreenState extends State<MainScreen> {
   late final PageController _pageController;
 
   late final List<Widget> _screens;
-  
+
   // Employee data variables
   String _employeeFullName = 'Employee';
   Map<String, dynamic>? _employeeData;
@@ -35,16 +33,17 @@ class _MainScreenState extends State<MainScreen> {
     _screens = [
       TimeTrackScreen(),
       MonthlyStatisticsScreen(),
-      TestScreen(),
+      MealPlanCalendar(),
     ];
   }
 
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
-    
+
     // Check for arguments from ModalRoute
-    final routeArgs = ModalRoute.of(context)?.settings.arguments as Map<String, dynamic>?;
+    final routeArgs =
+        ModalRoute.of(context)?.settings.arguments as Map<String, dynamic>?;
     if (routeArgs != null) {
       _extractEmployeeDataFromRoute(routeArgs);
       // Rebuild screens with updated employee data
@@ -58,27 +57,28 @@ class _MainScreenState extends State<MainScreen> {
     _employeeId = args['employeeId'] as String?;
     _organizationId = args['organizationId'] as String?;
     _isFirstLogin = args['isFirstLogin'] as bool? ?? false;
-    
+
     // Extract employee full name
     if (_employeeData != null) {
       final firstName = _employeeData!['firstName'] as String? ?? '';
       final lastName = _employeeData!['lastName'] as String? ?? '';
       final fullName = _employeeData!['fullName'] as String?;
-      
+
       // Use fullName if available, otherwise construct from firstName and lastName
       if (fullName != null && fullName.isNotEmpty) {
         _employeeFullName = fullName;
       } else if (firstName.isNotEmpty || lastName.isNotEmpty) {
         _employeeFullName = '$lastName $firstName'.trim();
       } else {
-        _employeeFullName = _employeeData!['employeeEmail'] as String? ?? 'Employee';
+        _employeeFullName =
+            _employeeData!['employeeEmail'] as String? ?? 'Employee';
       }
-      
+
       debugPrint('Employee logged in: $_employeeFullName');
       debugPrint('Employee ID: $_employeeId');
       debugPrint('Organization ID: $_organizationId');
       debugPrint('Is first login: $_isFirstLogin');
-      
+
       // Show first login message if needed
       // if (_isFirstLogin) {
       //   WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -91,7 +91,7 @@ class _MainScreenState extends State<MainScreen> {
   void _updateScreensWithEmployeeData() {
     _screens[0] = TimeTrackScreen();
     _screens[1] = MonthlyStatisticsScreen();
-    _screens[2] = TestScreen();
+    _screens[2] = MealPlanCalendar();
   }
 
   void _showFirstLoginWelcome() {
@@ -104,7 +104,8 @@ class _MainScreenState extends State<MainScreen> {
         ),
         actions: [
           TextButton(
-            onPressed: () => Navigator.pop(dialogContext), // Use dialogContext here
+            onPressed: () =>
+                Navigator.pop(dialogContext), // Use dialogContext here
             child: const Text('Ойлголоо'),
           ),
           TextButton(
@@ -141,7 +142,9 @@ class _MainScreenState extends State<MainScreen> {
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('Гарах'),
-        content: Text('$_employeeFullName, та системээс гарахыг хүсч байна уу?'),
+        content: Text(
+          '$_employeeFullName, та системээс гарахыг хүсч байна уу?',
+        ),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(context).pop(false),
@@ -157,10 +160,7 @@ class _MainScreenState extends State<MainScreen> {
 
     if (shouldLogout == true) {
       // Navigate back to login selection
-      Navigator.of(context).pushNamedAndRemoveUntil(
-        '/login',
-        (route) => false,
-      );
+      Navigator.of(context).pushNamedAndRemoveUntil('/login', (route) => false);
       return false;
     } else {
       return false;
@@ -216,23 +216,32 @@ class _MainScreenState extends State<MainScreen> {
               return GestureDetector(
                 onTap: () => _onTabTapped(index),
                 child: Container(
-                  padding: const EdgeInsets.symmetric(vertical: 7, horizontal: 21),
+                  padding: const EdgeInsets.symmetric(
+                    vertical: 7,
+                    horizontal: 21,
+                  ),
                   decoration: BoxDecoration(
-                    color: isSelected ? const Color(0xFFC7BBE1) : Colors.transparent,
+                    color: isSelected
+                        ? const Color(0xFFC7BBE1)
+                        : Colors.transparent,
                     borderRadius: BorderRadius.circular(20),
                   ),
                   child: Row(
                     children: [
                       Icon(
                         tabs[index]['icon'] as IconData,
-                        color: isSelected ? Colors.black : Colors.white.withOpacity(0.6),
+                        color: isSelected
+                            ? Colors.black
+                            : Colors.white.withOpacity(0.6),
                         size: 24,
                       ),
                       const SizedBox(width: 6),
                       txt(
                         tabs[index]['label'] as String,
                         style: TxtStl.bodyText1(
-                          color: isSelected ? Colors.black : Colors.white.withOpacity(0.6),
+                          color: isSelected
+                              ? Colors.black
+                              : Colors.white.withOpacity(0.6),
                           fontSize: 11,
                         ),
                       ),
