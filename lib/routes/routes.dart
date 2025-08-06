@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
-import 'package:timex/index.dart';
+import 'package:timex/screens/main/main_screen.dart';
+import 'package:timex/screens/screens/location/location_screen.dart';
+import 'package:timex/screens/screens/time_track/time_track_screen.dart';
 
 class Routes {
   static const main = 'MainScreen';
@@ -19,44 +21,22 @@ class Routes {
 
     switch (settings.name) {
       case Routes.main:
-        final args = settings.arguments as Map<String, dynamic>? ?? {};
         route = MaterialPageRoute(
-          builder: (context) => MainScreen(
-            userName: args['userName'] ?? 'Guest',
-            userImage: args['userImage'],
-          ),
+          builder: (context) => const MainScreen(),
           settings: settings,
         );
         break;
       case Routes.location:
-        route = MaterialPageRoute(builder: (context) => const LocationScreen(), settings: settings);
-        break;
-      case Routes.loginScreen:
-        route = MaterialPageRoute(builder: (context) => const LoginScreen(), settings: settings);
+        route = MaterialPageRoute(
+          builder: (context) => const LocationScreen(),
+          settings: settings,
+        );
         break;
       case Routes.timeTrack:
-        route = MaterialPageRoute(builder: (context) => const TimeTrackingScreen(), settings: settings);
-        break;
-      case Routes.addEmployee:
-      // Attempt to cast the arguments to Map<String, dynamic> for organizationData
-        if (args is Map<String, dynamic>) {
-          route = MaterialPageRoute(
-            builder: (context) => AddEmployeeScreen(organizationData: args),
-            settings: settings,
-          );
-        } else {
-          // Handle the case where organizationData is missing or of the wrong type
-          route = MaterialPageRoute(
-            builder: (context) => const Scaffold(
-              body: Center(
-                child: Text(
-                  'Error: Organization data not provided for AddEmployeeScreen.',
-                  style: TextStyle(color: Colors.red),
-                ),
-              ),
-            ),
-          );
-        }
+        route = MaterialPageRoute(
+          builder: (context) => const TimeTrackingScreen(),
+          settings: settings,
+        );
         break;
       default:
         route = MaterialPageRoute(
@@ -75,10 +55,17 @@ class AppRouteObserver extends RouteObserver {
   static Route? previous;
 
   static void saveLastRouteSettings(RouteSettings lastRouteSettings) async {
-    last = MaterialPageRoute(builder: (context) => Container(), settings: lastRouteSettings);
+    last = MaterialPageRoute(
+      builder: (context) => Container(),
+      settings: lastRouteSettings,
+    );
   }
 
-  static void saveLastRoute(Route? lastRoute, String from, {Route? previousRoute}) async {
+  static void saveLastRoute(
+    Route? lastRoute,
+    String from, {
+    Route? previousRoute,
+  }) async {
     last = lastRoute;
     previous = previousRoute;
   }
