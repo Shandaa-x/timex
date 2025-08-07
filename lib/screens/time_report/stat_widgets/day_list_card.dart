@@ -376,7 +376,7 @@ class DaysListCard extends StatelessWidget {
     } else if (isConfirmed) {
       return _buildBadge('Батлагдсан', const Color(0xFF10B981), const Color(0xFFD1FAE5), () {});
     } else {
-      return _buildConfirmButton(dateString);
+      return _buildConfirmButton(dateString, weeklyData.firstWhere((day) => day['date'] == dateString, orElse: () => {})['endTime']);
     }
   }
 
@@ -394,15 +394,21 @@ class DaysListCard extends StatelessWidget {
     );
   }
 
-  Widget _buildConfirmButton(String dateString) {
+  Widget _buildConfirmButton(String dateString, dynamic endTime) {
     final isConfirming = confirmingDays.contains(dateString);
+    final isDisabled = endTime == null; // Disable if work day hasn't ended
+    final isInteractionDisabled = isConfirming || isDisabled;
 
     return GestureDetector(
-      onTap: isConfirming ? null : () => onConfirmDay(dateString),
+      onTap: isInteractionDisabled ? null : () => onConfirmDay(dateString),
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
         decoration: BoxDecoration(
-          color: isConfirming ? const Color(0xFF64748B) : const Color(0xFF374151),
+          color: isDisabled 
+              ? const Color(0xFF9CA3AF) // Gray when disabled
+              : isConfirming 
+                  ? const Color(0xFF64748B) 
+                  : const Color(0xFF374151),
           borderRadius: BorderRadius.circular(8),
         ),
         child: Row(
@@ -420,10 +426,14 @@ class DaysListCard extends StatelessWidget {
               const SizedBox(width: 6),
             ],
             Text(
-              isConfirming ? 'Батлаж байна...' : 'Батлах',
-              style: const TextStyle(
+              isDisabled 
+                  ? 'Ажил дуусаагүй' 
+                  : isConfirming 
+                      ? 'Батлаж байна...' 
+                      : 'Батлах',
+              style: TextStyle(
                 fontSize: 12,
-                color: Colors.white,
+                color: isDisabled ? Colors.white70 : Colors.white,
                 fontWeight: FontWeight.w600,
               ),
             ),

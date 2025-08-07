@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:timex/screens/meal_plan/meal_plan_calendar.dart';
-import 'package:timex/screens/monthly_statistic_screen.dart';
+import 'package:timex/screens/time_report/monthly_statistic_screen.dart';
 import 'package:timex/screens/test_screen.dart';
 import 'package:timex/index.dart';
 import 'package:timex/screens/time_track/time_tracking_screen.dart';
@@ -200,7 +200,7 @@ class _MainScreenState extends State<MainScreen> {
     final tabs = [
       {'icon': Icons.home, 'label': 'Нүүр'},
       {'icon': Icons.note, 'label': 'Тайлан'},
-      {'icon': Icons.science, 'label': 'Test'},
+      {'icon': Icons.food_bank, 'label': 'Foods'},
     ];
 
     return Container(

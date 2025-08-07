@@ -1,17 +1,18 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
-import 'package:timex/screens/time_track/status_card.dart';
-import 'package:timex/screens/time_track/time_display_card.dart';
-import 'package:timex/screens/time_track/time_utils.dart';
-import 'package:timex/screens/time_track/work_day.dart';
-import 'package:timex/screens/time_track/working_hours_card.dart';
+import 'package:timex/screens/time_track/widgets/status_card.dart';
+import 'package:timex/screens/time_track/widgets/time_display_card.dart';
+import 'package:timex/screens/time_track/widgets/time_utils.dart';
+import 'package:timex/screens/time_track/widgets/work_day.dart';
+import 'package:timex/screens/time_track/widgets/working_hours_card.dart';
 import 'package:timezone/timezone.dart' as tz;
 import 'package:permission_handler/permission_handler.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 
-import 'action_button.dart';
+import 'widgets/action_button.dart';
 
 class TimeTrackScreen extends StatefulWidget {
   const TimeTrackScreen({super.key});
@@ -39,6 +40,9 @@ class _TimeTrackingScreenState extends State<TimeTrackScreen> with TickerProvide
   List<Map<String, dynamic>> _todayEntries = [];
   Position? _currentLocation;
   GoogleMapController? _mapController;
+  
+  // Food data for today
+  List<Map<String, dynamic>> _todayFoods = [];
 
   late AnimationController _pulseController;
   late Animation<double> _pulseAnimation;
@@ -114,6 +118,9 @@ class _TimeTrackingScreenState extends State<TimeTrackScreen> with TickerProvide
         return timestampA.compareTo(timestampB);
       });
 
+      // Load today's foods
+      await _loadTodayFoods(dateString);
+
       // Determine current status
       if (_todayEntries.isNotEmpty) {
         final lastEntry = _todayEntries.last;
@@ -137,10 +144,54 @@ class _TimeTrackingScreenState extends State<TimeTrackScreen> with TickerProvide
         final data = doc.data()!;
         _todayData = WorkDay.fromMap(data);
       }
+
+      // Schedule daily food notification
+      await _scheduleFoodNotification();
     } catch (e) {
       debugPrint('Error loading today data: $e');
     } finally {
       setState(() => _isLoading = false);
+    }
+  }
+
+  Future<void> _loadTodayFoods(String dateString) async {
+    try {
+      final foodDocId = '$dateString-foods';
+      final foodDoc = await _firestore.collection('foods').doc(foodDocId).get();
+      
+      if (foodDoc.exists) {
+        final data = foodDoc.data();
+        if (data != null && data['foods'] != null) {
+          _todayFoods = List<Map<String, dynamic>>.from(data['foods']);
+        } else {
+          _todayFoods = [];
+        }
+      } else {
+        _todayFoods = [];
+      }
+    } catch (e) {
+      debugPrint('Error loading today foods: $e');
+      _todayFoods = [];
+    }
+  }
+
+  Future<void> _scheduleFoodNotification() async {
+    try {
+      final now = DateTime.now();
+      final foodTime = DateTime(now.year, now.month, now.day, 17, 0); // 5:00 PM
+      
+      // Only schedule if it's in the future
+      if (foodTime.isAfter(now)) {
+        await _scheduleNotification(
+          id: 100, // Different ID from work notifications
+          title: '🍽️ Хоолны цаг болжээ!',
+          body: 'Өнөөдрийн хоолоо идэж, аппликэйшнд бүртгээрэй!',
+          scheduledTime: foodTime,
+        );
+        print('📅 Scheduled food notification for: $foodTime');
+      }
+    } catch (e) {
+      print('❌ Error scheduling food notification: $e');
     }
   }
 
@@ -319,6 +370,7 @@ class _TimeTrackingScreenState extends State<TimeTrackScreen> with TickerProvide
       await _notificationsPlugin.cancel(1); // 10-minute warning
       await _notificationsPlugin.cancel(2); // 5-minute warning
       await _notificationsPlugin.cancel(3); // End time notification
+      await _notificationsPlugin.cancel(100); // Food notification
       print('✅ Cancelled scheduled notifications');
     } catch (e) {
       print('❌ Error cancelling notifications: $e');
@@ -596,7 +648,7 @@ class _TimeTrackingScreenState extends State<TimeTrackScreen> with TickerProvide
               Icon(Icons.location_off, size: 48, color: Colors.grey.shade400),
               const SizedBox(height: 8),
               Text(
-                'GPS байршил олдсонгүй',
+                'Өнөөдөр ажлын байршил оруулаагүй байна',
                 style: TextStyle(color: Colors.grey.shade600),
               ),
             ],
@@ -844,6 +896,316 @@ class _TimeTrackingScreenState extends State<TimeTrackScreen> with TickerProvide
     );
   }
 
+  Widget _buildTodayFoodsList() {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 20),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 10,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Padding(
+            padding: const EdgeInsets.all(20),
+            child: Row(
+              children: [
+                const Icon(Icons.restaurant, color: Color(0xFFEF4444)),
+                const SizedBox(width: 12),
+                const Text(
+                  'Өнөөдрийн хоол',
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.w600,
+                    color: Color(0xFF1F2937),
+                  ),
+                ),
+                const Spacer(),
+                Text(
+                  '${_todayFoods.length} хоол',
+                  style: const TextStyle(
+                    fontSize: 14,
+                    color: Color(0xFF6B7280),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          if (_todayFoods.isEmpty) ...[
+            const Divider(height: 1),
+            Padding(
+              padding: const EdgeInsets.all(20),
+              child: Row(
+                children: [
+                  Icon(Icons.info_outline, color: Colors.grey.shade400),
+                  const SizedBox(width: 12),
+                  Text(
+                    'Өнөөдөр хоол нэмээгүй байна',
+                    style: TextStyle(
+                      color: Colors.grey.shade600,
+                      fontSize: 14,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ] else ...[
+            const Divider(height: 1),
+            ListView.separated(
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              itemCount: _todayFoods.length,
+              separatorBuilder: (context, index) => const Divider(height: 1),
+              itemBuilder: (context, index) {
+                final food = _todayFoods[index];
+                return InkWell(
+                  onTap: () => _showFoodDetailDialog(food),
+                  child: Padding(
+                    padding: const EdgeInsets.all(16),
+                    child: Row(
+                      children: [
+                        // Food image or placeholder
+                        Container(
+                          width: 50,
+                          height: 50,
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFEF4444).withOpacity(0.1),
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: food['image'] != null && food['image'].isNotEmpty
+                              ? ClipRRect(
+                                  borderRadius: BorderRadius.circular(8),
+                                  child: Image.memory(
+                                    base64Decode(food['image']),
+                                    fit: BoxFit.cover,
+                                  ),
+                                )
+                              : const Icon(
+                                  Icons.restaurant,
+                                  color: Color(0xFFEF4444),
+                                  size: 24,
+                                ),
+                        ),
+                        const SizedBox(width: 12),
+                        // Food details
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                food['name'] ?? 'Нэргүй хоол',
+                                style: const TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.w600,
+                                  color: Color(0xFF1F2937),
+                                ),
+                              ),
+                              if (food['description'] != null && food['description'].isNotEmpty)
+                                Text(
+                                  food['description'],
+                                  style: const TextStyle(
+                                    fontSize: 14,
+                                    color: Color(0xFF6B7280),
+                                  ),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              if (food['price'] != null)
+                                Text(
+                                  '₮ ${food['price']}',
+                                  style: const TextStyle(
+                                    fontSize: 14,
+                                    color: Color(0xFF059669),
+                                    fontWeight: FontWeight.w500,
+                                  ),
+                                ),
+                            ],
+                          ),
+                        ),
+                        const Icon(
+                          Icons.arrow_forward_ios,
+                          color: Color(0xFF9CA3AF),
+                          size: 16,
+                        ),
+                      ],
+                    ),
+                  ),
+                );
+              },
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  void _showFoodDetailDialog(Map<String, dynamic> food) {
+    showDialog(
+      context: context,
+      builder: (context) => Dialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        child: Container(
+          constraints: const BoxConstraints(maxWidth: 400, maxHeight: 600),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // Header
+              Container(
+                padding: const EdgeInsets.all(20),
+                decoration: const BoxDecoration(
+                  color: Color(0xFFEF4444),
+                  borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+                ),
+                child: Row(
+                  children: [
+                    const Icon(Icons.restaurant, color: Colors.white, size: 24),
+                    const SizedBox(width: 12),
+                    const Expanded(
+                      child: Text(
+                        'Хоолны дэлгэрэнгүй',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 18,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
+                    IconButton(
+                      onPressed: () => Navigator.of(context).pop(),
+                      icon: const Icon(Icons.close, color: Colors.white),
+                    ),
+                  ],
+                ),
+              ),
+              
+              // Content
+              Flexible(
+                child: SingleChildScrollView(
+                  padding: const EdgeInsets.all(20),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      // Food image
+                      if (food['image'] != null && food['image'].isNotEmpty) ...[
+                        Container(
+                          width: double.infinity,
+                          height: 200,
+                          decoration: BoxDecoration(
+                            borderRadius: BorderRadius.circular(12),
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.black.withOpacity(0.1),
+                                blurRadius: 8,
+                                offset: const Offset(0, 2),
+                              ),
+                            ],
+                          ),
+                          child: ClipRRect(
+                            borderRadius: BorderRadius.circular(12),
+                            child: Image.memory(
+                              base64Decode(food['image']),
+                              fit: BoxFit.cover,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 20),
+                      ],
+                      
+                      // Food name
+                      Text(
+                        food['name'] ?? 'Нэргүй хоол',
+                        style: const TextStyle(
+                          fontSize: 24,
+                          fontWeight: FontWeight.w700,
+                          color: Color(0xFF1F2937),
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      
+                      // Price
+                      if (food['price'] != null)
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFF059669).withOpacity(0.1),
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: Text(
+                            '₮ ${food['price']}',
+                            style: const TextStyle(
+                              fontSize: 18,
+                              color: Color(0xFF059669),
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ),
+                      
+                      const SizedBox(height: 16),
+                      
+                      // Description
+                      if (food['description'] != null && food['description'].isNotEmpty) ...[
+                        const Text(
+                          'Тайлбар:',
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w600,
+                            color: Color(0xFF1F2937),
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          food['description'],
+                          style: const TextStyle(
+                            fontSize: 14,
+                            color: Color(0xFF6B7280),
+                            height: 1.5,
+                          ),
+                        ),
+                        const SizedBox(height: 16),
+                      ],
+                      
+                      // Added time
+                      if (food['createdAt'] != null) ...[
+                        const Text(
+                          'Нэмсэн цаг:',
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w600,
+                            color: Color(0xFF1F2937),
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          _formatTimeFromMillis(food['createdAt']),
+                          style: const TextStyle(
+                            fontSize: 14,
+                            color: Color(0xFF6B7280),
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  String _formatTimeFromMillis(int milliseconds) {
+    final dateTime = DateTime.fromMillisecondsSinceEpoch(milliseconds);
+    return '${dateTime.hour.toString().padLeft(2, '0')}:${dateTime.minute.toString().padLeft(2, '0')}';
+  }
+
   void _showLocationOnMap(Map<String, dynamic> location) {
     showDialog(
       context: context,
@@ -1064,6 +1426,9 @@ class _TimeTrackingScreenState extends State<TimeTrackScreen> with TickerProvide
 
                       // Time Entries List (NEW)
                       _buildTimeEntriesList(),
+
+                      // Today's Foods List (NEW)
+                      _buildTodayFoodsList(),
 
                       // Google Maps Widget (NEW) - Above action buttons
                       _buildMapWidget(),

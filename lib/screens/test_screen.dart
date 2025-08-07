@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:timex/screens/monthly_statistic_screen.dart';
+import 'package:timex/screens/time_report/monthly_statistic_screen.dart';
 import 'package:timex/screens/time_track/time_tracking_screen.dart';
 import 'calendar_uploader.dart';
 

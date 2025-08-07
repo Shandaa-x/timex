@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:timex/screens/time_track/time_utils.dart';
+import 'package:timex/screens/time_track/widgets/time_utils.dart';
 
 class TimeDisplayCard extends StatefulWidget {
   final bool isWorking;

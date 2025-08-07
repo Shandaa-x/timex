@@ -1,5 +1,3 @@
-
-
 import 'monthly_data.dart';
 
 class ChartCalculator {

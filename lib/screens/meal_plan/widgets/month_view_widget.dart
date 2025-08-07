@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../../theme/app_theme.dart';
 
 class MonthViewWidget extends StatelessWidget {
   final DateTime currentMonth;
@@ -85,7 +86,7 @@ class MonthViewWidget extends StatelessWidget {
                       borderRadius: BorderRadius.circular(8),
                       border: Border.all(
                         color: isToday
-                            ? colorScheme.primary
+                            ? AppTheme.primaryLight
                             : colorScheme.outline.withOpacity(0.2),
                         width: isToday ? 2 : 1,
                       ),
@@ -100,7 +101,7 @@ class MonthViewWidget extends StatelessWidget {
                             style: theme.textTheme.labelMedium?.copyWith(
                               color: isCurrentMonth
                                   ? (isToday
-                                      ? colorScheme.primary
+                                      ? AppTheme.primaryLight
                                       : colorScheme.onSurface)
                                   : colorScheme.onSurface.withOpacity(0.4),
                               fontWeight:
@@ -109,12 +110,12 @@ class MonthViewWidget extends StatelessWidget {
                           ),
                         ),
 
-                        // Meal indicators
+                        // Food indicators
                         Expanded(
                           child: Container(
                             padding: const EdgeInsets.symmetric(horizontal: 4),
                             child: dayMeals.isNotEmpty
-                                ? _buildMealIndicators(dayMeals)
+                                ? _buildFoodIndicators(context, dayMeals)
                                 : _buildEmptyIndicator(
                                     context, dateKey, isCurrentMonth),
                           ),
@@ -131,50 +132,79 @@ class MonthViewWidget extends StatelessWidget {
     );
   }
 
-  Widget _buildMealIndicators(List<Map<String, dynamic>> dayMeals) {
-    final mealTypes = ['breakfast', 'lunch', 'dinner'];
-    final mealColors = [
-      Colors.orange,
-      Colors.blue,
-      Colors.purple,
-    ];
-
+  Widget _buildFoodIndicators(BuildContext context, List<Map<String, dynamic>> dayFoods) {
+    final theme = Theme.of(context);
+    
+    // Calculate total likes and comments
+    final totalLikes = dayFoods.fold<int>(0, (sum, food) => sum + ((food['likesCount'] as int?) ?? 0));
+    final totalComments = dayFoods.fold<int>(0, (sum, food) => sum + ((food['commentsCount'] as int?) ?? 0));
+    
     return Column(
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
-        // Show up to 3 meal dots
-        Wrap(
-          spacing: 4,
-          runSpacing: 4,
-          children: mealTypes.asMap().entries.map((entry) {
-            final index = entry.key;
-            final mealType = entry.value;
-            final hasMeal = dayMeals
-                .any((meal) => (meal['mealType'] as String) == mealType);
-
-            return Container(
-              width: 8,
-              height: 8,
-              decoration: BoxDecoration(
-                color: hasMeal
-                    ? mealColors[index]
-                    : Colors.grey.withOpacity(0.3),
-                shape: BoxShape.circle,
-              ),
-            );
-          }).toList(),
-        ),
-
-        // Meal count if more than 3
-        if (dayMeals.length > 3) ...[
-          const SizedBox(height: 4),
-          Text(
-            '+${dayMeals.length - 3}',
-            style: const TextStyle(
-              color: Colors.grey,
-              fontSize: 8,
-              fontWeight: FontWeight.w500,
+        // Show food count as a badge
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+          decoration: BoxDecoration(
+            color: AppTheme.successLight,
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: Text(
+            '${dayFoods.length}',
+            style: theme.textTheme.labelSmall?.copyWith(
+              color: AppTheme.onPrimaryLight,
+              fontWeight: FontWeight.w600,
             ),
+          ),
+        ),
+        
+        const SizedBox(height: 2),
+        
+        // Food icon
+        Icon(
+          Icons.restaurant,
+          color: AppTheme.successLight,
+          size: 12,
+        ),
+        
+        // Show interaction counts if any
+        if (totalLikes > 0 || totalComments > 0) ...[
+          const SizedBox(height: 2),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              if (totalLikes > 0) ...[
+                Icon(
+                  Icons.favorite,
+                  color: Colors.red,
+                  size: 8,
+                ),
+                Text(
+                  '$totalLikes',
+                  style: theme.textTheme.labelSmall?.copyWith(
+                    fontSize: 8,
+                    color: Colors.red,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+              ],
+              if (totalLikes > 0 && totalComments > 0) const SizedBox(width: 2),
+              if (totalComments > 0) ...[
+                Icon(
+                  Icons.chat_bubble,
+                  color: AppTheme.primaryLight,
+                  size: 8,
+                ),
+                Text(
+                  '$totalComments',
+                  style: theme.textTheme.labelSmall?.copyWith(
+                    fontSize: 8,
+                    color: AppTheme.primaryLight,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+              ],
+            ],
           ),
         ],
       ],
@@ -185,13 +215,22 @@ class MonthViewWidget extends StatelessWidget {
       BuildContext context, String dateKey, bool isCurrentMonth) {
     if (!isCurrentMonth) return const SizedBox.shrink();
 
+    // Check if the date is in the past
+    final selectedDate = DateTime.parse(dateKey);
+    final today = DateTime.now();
+    final todayDate = DateTime(today.year, today.month, today.day);
+    final selectedDateOnly = DateTime(selectedDate.year, selectedDate.month, selectedDate.day);
+    final isPastDate = selectedDateOnly.isBefore(todayDate);
+
     return GestureDetector(
-      onTap: () => onAddMeal(dateKey, 'breakfast'),
+      onTap: isPastDate ? null : () => onAddMeal(dateKey, ''), // Disable tap for past dates
       child: Container(
         padding: const EdgeInsets.all(4),
         child: Icon(
-          Icons.add_circle_outline,
-          color: Colors.blue.withOpacity(0.4),
+          isPastDate ? Icons.block : Icons.add_circle_outline,
+          color: isPastDate 
+              ? AppTheme.primaryLight.withOpacity(0.2)
+              : AppTheme.primaryLight.withOpacity(0.4),
           size: 16,
         ),
       ),

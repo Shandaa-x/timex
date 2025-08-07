@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:timex/screens/time_track/time_utils.dart';
-import 'package:timex/screens/time_track/work_day.dart';
+import 'package:timex/screens/time_track/widgets/time_utils.dart';
+import 'package:timex/screens/time_track/widgets/work_day.dart';
 import 'holiday_utils.dart';
 
 class StatusCard extends StatelessWidget {

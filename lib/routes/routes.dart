@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:timex/screens/main/main_screen.dart';
-import 'package:timex/screens/screens/location/location_screen.dart';
-import 'package:timex/screens/screens/time_track/time_track_screen.dart';
+import 'package:timex/screens/time_track/time_tracking_screen.dart';
 
 class Routes {
   static const main = 'MainScreen';
@@ -26,15 +25,9 @@ class Routes {
           settings: settings,
         );
         break;
-      case Routes.location:
-        route = MaterialPageRoute(
-          builder: (context) => const LocationScreen(),
-          settings: settings,
-        );
-        break;
       case Routes.timeTrack:
         route = MaterialPageRoute(
-          builder: (context) => const TimeTrackingScreen(),
+          builder: (context) => const TimeTrackScreen(),
           settings: settings,
         );
         break;

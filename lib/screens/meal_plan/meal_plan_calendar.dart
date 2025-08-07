@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:timex/screens/meal_plan/widgets/custom_app_bar.dart';
-import 'package:timex/screens/meal_plan/widgets/custom_bottom_bar.dart';
-import 'package:timex/screens/meal_plan/widgets/custom_icon_widget.dart';
+import '../../theme/app_theme.dart';
 import './widgets/calendar_header_widget.dart';
-import './widgets/meal_context_menu.dart';
-import './widgets/meal_selection_bottom_sheet.dart';
+import './widgets/add_food_bottom_sheet.dart';
+import './widgets/food_detail_dialog.dart';
 import './widgets/month_view_widget.dart';
 import './widgets/week_view_widget.dart';
 
@@ -25,77 +25,8 @@ class _MealPlanCalendarState extends State<MealPlanCalendar>
   late AnimationController _fabAnimationController;
   late Animation<double> _fabScaleAnimation;
 
-  // Mock meal plan data
-  final Map<String, List<Map<String, dynamic>>> _mealPlanData = {
-    '2025-08-04': [
-      {
-        "id": 1,
-        "name": "Avocado Toast with Poached Egg",
-        "image":
-            "https://images.unsplash.com/photo-1541519227354-08fa5d50c44d?fm=jpg&q=60&w=3000",
-        "cookingTime": 15,
-        "calories": 320,
-        "mealType": "breakfast",
-        "rating": 4.8,
-      },
-      {
-        "id": 2,
-        "name": "Mediterranean Quinoa Bowl",
-        "image":
-            "https://images.unsplash.com/photo-1512621776951-a57141f2eefd?fm=jpg&q=60&w=3000",
-        "cookingTime": 25,
-        "calories": 450,
-        "mealType": "lunch",
-        "rating": 4.6,
-      },
-    ],
-    '2025-08-05': [
-      {
-        "id": 3,
-        "name": "Greek Yogurt Parfait",
-        "image":
-            "https://images.unsplash.com/photo-1488477181946-6428a0291777?fm=jpg&q=60&w=3000",
-        "cookingTime": 5,
-        "calories": 280,
-        "mealType": "breakfast",
-        "rating": 4.7,
-      },
-      {
-        "id": 4,
-        "name": "Grilled Salmon with Asparagus",
-        "image":
-            "https://images.unsplash.com/photo-1467003909585-2f8a72700288?fm=jpg&q=60&w=3000",
-        "cookingTime": 30,
-        "calories": 380,
-        "mealType": "dinner",
-        "rating": 4.9,
-      },
-    ],
-    '2025-08-06': [
-      {
-        "id": 5,
-        "name": "Chicken Caesar Salad",
-        "image":
-            "https://images.unsplash.com/photo-1546793665-c74683f339c1?fm=jpg&q=60&w=3000",
-        "cookingTime": 20,
-        "calories": 420,
-        "mealType": "lunch",
-        "rating": 4.5,
-      },
-    ],
-    '2025-08-07': [
-      {
-        "id": 6,
-        "name": "Beef Stir Fry",
-        "image":
-            "https://images.unsplash.com/photo-1603133872878-684f208fb84b?fm=jpg&q=60&w=3000",
-        "cookingTime": 25,
-        "calories": 520,
-        "mealType": "dinner",
-        "rating": 4.4,
-      },
-    ],
-  };
+  // Food data - map of date string to list of foods
+  final Map<String, List<Map<String, dynamic>>> _foodData = {};
 
   @override
   void initState() {
@@ -113,6 +44,7 @@ class _MealPlanCalendarState extends State<MealPlanCalendar>
     ));
 
     _checkConnectivity();
+    _loadFoodData();
   }
 
   @override
@@ -126,6 +58,146 @@ class _MealPlanCalendarState extends State<MealPlanCalendar>
     setState(() {
       _isOffline = false; // Mock online state
     });
+  }
+
+  Future<void> _loadFoodData() async {
+    setState(() {
+      _isLoading = true;
+    });
+
+    try {
+      final now = DateTime.now();
+      final endOfMonth = DateTime(now.year, now.month + 1, 0);
+      
+      setState(() {
+        _foodData.clear();
+      });
+
+      // Create document ID range for the current month
+      final startDocId = '${now.year}-${now.month.toString().padLeft(2, '0')}-01-foods';
+      final endDocId = '${now.year}-${now.month.toString().padLeft(2, '0')}-${endOfMonth.day.toString().padLeft(2, '0')}-foods';
+
+      try {
+        // Use a range query to get all food documents for the current month
+        final querySnapshot = await FirebaseFirestore.instance
+            .collection('foods')
+            .where(FieldPath.documentId, isGreaterThanOrEqualTo: startDocId)
+            .where(FieldPath.documentId, isLessThanOrEqualTo: endDocId)
+            .get();
+
+        // Process all documents at once
+        for (final doc in querySnapshot.docs) {
+          if (doc.exists) {
+            final data = doc.data();
+            final dateKey = '${data['year']}-${data['month'].toString().padLeft(2, '0')}-${data['day'].toString().padLeft(2, '0')}';
+            
+            // Extract foods array from the document
+            if (data['foods'] != null && data['foods'] is List) {
+              final foods = List<Map<String, dynamic>>.from(data['foods']);
+              
+              // Add backward compatibility for existing foods without new fields
+              final processedFoods = foods.map((food) {
+                return {
+                  'id': food['id'] ?? 'food_${DateTime.now().millisecondsSinceEpoch}_${foods.indexOf(food)}', // Ensure unique ID
+                  'name': food['name'] ?? 'Unknown Food',
+                  'description': food['description'] ?? '',
+                  'price': food['price'] ?? 0,
+                  'image': food['image'] ?? '',
+                  'createdAt': food['createdAt'] ?? DateTime.now().millisecondsSinceEpoch,
+                  'likes': food['likes'] ?? <String>[],
+                  'likesCount': food['likesCount'] ?? 0,
+                  'comments': food['comments'] ?? <Map<String, dynamic>>[],
+                  'commentsCount': food['commentsCount'] ?? 0,
+                };
+              }).toList();
+              
+              if (_foodData[dateKey] == null) {
+                _foodData[dateKey] = [];
+              }
+              _foodData[dateKey]!.addAll(processedFoods);
+            }
+          }
+        }
+
+        print('✅ Loaded ${querySnapshot.docs.length} food documents in a single query');
+      } catch (e) {
+        print('❌ Error loading food data with range query: $e');
+        // Fallback to individual queries if range query fails
+        await _loadFoodDataFallback(now);
+      }
+
+      setState(() {
+        // Update UI after loading all data
+      });
+    } catch (e) {
+      print('❌ Error loading food data: $e');
+    } finally {
+      setState(() {
+        _isLoading = false;
+      });
+    }
+  }
+
+  // Fallback method for individual document queries
+  Future<void> _loadFoodDataFallback(DateTime now) async {
+    print('🔄 Using fallback method with individual queries...');
+    final daysInMonth = DateTime(now.year, now.month + 1, 0).day;
+
+    // Use batch processing to reduce loading time
+    final futures = <Future<void>>[];
+    
+    for (int day = 1; day <= daysInMonth; day++) {
+      final documentId = '${now.year}-${now.month.toString().padLeft(2, '0')}-${day.toString().padLeft(2, '0')}-foods';
+      
+      futures.add(_loadSingleDayFood(documentId));
+    }
+
+    // Wait for all queries to complete
+    await Future.wait(futures);
+    print('✅ Fallback loading completed');
+  }
+
+  Future<void> _loadSingleDayFood(String documentId) async {
+    try {
+      final docSnapshot = await FirebaseFirestore.instance
+          .collection('foods')
+          .doc(documentId)
+          .get();
+
+      if (docSnapshot.exists) {
+        final data = docSnapshot.data()!;
+        final dateKey = '${data['year']}-${data['month'].toString().padLeft(2, '0')}-${data['day'].toString().padLeft(2, '0')}';
+        
+        // Extract foods array from the document
+        if (data['foods'] != null && data['foods'] is List) {
+          final foods = List<Map<String, dynamic>>.from(data['foods']);
+          
+          // Add backward compatibility for existing foods without new fields
+          final processedFoods = foods.map((food) {
+            return {
+              'id': food['id'] ?? 'food_${DateTime.now().millisecondsSinceEpoch}_${foods.indexOf(food)}', // Ensure unique ID
+              'name': food['name'] ?? 'Unknown Food',
+              'description': food['description'] ?? '',
+              'price': food['price'] ?? 0,
+              'image': food['image'] ?? '',
+              'createdAt': food['createdAt'] ?? DateTime.now().millisecondsSinceEpoch,
+              'likes': food['likes'] ?? <String>[],
+              'likesCount': food['likesCount'] ?? 0,
+              'comments': food['comments'] ?? <Map<String, dynamic>>[],
+              'commentsCount': food['commentsCount'] ?? 0,
+            };
+          }).toList();
+          
+          if (_foodData[dateKey] == null) {
+            _foodData[dateKey] = [];
+          }
+          _foodData[dateKey]!.addAll(processedFoods);
+        }
+      }
+    } catch (e) {
+      // Skip documents that don't exist or can't be accessed
+      // Don't print error for each missing document to reduce noise
+    }
   }
 
   void _toggleView() {
@@ -142,6 +214,7 @@ class _MealPlanCalendarState extends State<MealPlanCalendar>
         _currentDate = DateTime(_currentDate.year, _currentDate.month - 1, 1);
       }
     });
+    _loadFoodData(); // Reload data for new date range
   }
 
   void _navigateNext() {
@@ -152,41 +225,51 @@ class _MealPlanCalendarState extends State<MealPlanCalendar>
         _currentDate = DateTime(_currentDate.year, _currentDate.month + 1, 1);
       }
     });
+    _loadFoodData(); // Reload data for new date range
   }
 
-  void _onMealTap(String date, String mealType, Map<String, dynamic> meal) {
-    // Navigate to recipe detail
-    Navigator.pushNamed(context, '/recipe-detail');
+  void _onFoodTap(String date, String mealType, Map<String, dynamic> food) {
+    // Show food details dialog with comments and likes
+    showDialog(
+      context: context,
+      builder: (context) => FoodDetailDialog(
+        food: food,
+        dateKey: date,
+        onFoodUpdated: (updatedFood) => _updateFoodInCalendar(date, updatedFood),
+      ),
+    );
   }
 
-  void _onAddMeal(String date, String mealType) {
+  void _updateFoodInCalendar(String date, Map<String, dynamic> updatedFood) {
+    setState(() {
+      if (_foodData[date] != null) {
+        final foodIndex = _foodData[date]!.indexWhere((f) => f['id'] == updatedFood['id']);
+        if (foodIndex != -1) {
+          _foodData[date]![foodIndex] = updatedFood;
+        }
+      }
+    });
+  }
+
+  void _onAddFood(String date, String mealType) {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
-      builder: (context) => MealSelectionBottomSheet(
+      builder: (context) => AddFoodBottomSheet(
         selectedDate: date,
-        selectedMealType: mealType,
-        onRecipeSelected: (recipe) => _addMealToPlan(date, mealType, recipe),
+        onFoodAdded: (food) => _addFoodToCalendar(date, food),
       ),
     );
   }
 
-  void _onMealLongPress(
-      String date, String mealType, Map<String, dynamic> meal) {
-    showModalBottomSheet(
-      context: context,
-      backgroundColor: Colors.transparent,
-      builder: (context) => MealContextMenu(
-        meal: meal,
-        dateKey: date,
-        mealType: mealType,
-        onEdit: () => _editMeal(date, mealType, meal),
-        onRemove: () => _removeMeal(date, mealType, meal),
-        onDuplicate: () => _duplicateMeal(date, mealType, meal),
-        onFindAlternative: () => _findAlternative(date, mealType, meal),
-      ),
-    );
+  void _addFoodToCalendar(String date, Map<String, dynamic> food) {
+    setState(() {
+      if (_foodData[date] == null) {
+        _foodData[date] = [];
+      }
+      _foodData[date]!.add(food);
+    });
   }
 
   void _onDateTap(DateTime date) {
@@ -198,117 +281,19 @@ class _MealPlanCalendarState extends State<MealPlanCalendar>
     }
   }
 
-  void _addMealToPlan(
-      String date, String mealType, Map<String, dynamic> recipe) {
-    setState(() {
-      if (_mealPlanData[date] == null) {
-        _mealPlanData[date] = [];
-      }
-
-      // Remove existing meal of same type
-      _mealPlanData[date]!
-          .removeWhere((meal) => (meal['mealType'] as String) == mealType);
-
-      // Add new meal
-      final newMeal = Map<String, dynamic>.from(recipe);
-      newMeal['mealType'] = mealType;
-      _mealPlanData[date]!.add(newMeal);
-    });
-
+  Future<void> _refreshFoodData() async {
+    await _loadFoodData();
+    
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content:
-            Text('${recipe['name']} added to ${_getMealTypeLabel(mealType)}'),
+        content: const Text('Food data synced successfully'),
         behavior: SnackBarBehavior.floating,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
       ),
     );
   }
 
-  void _editMeal(String date, String mealType, Map<String, dynamic> meal) {
-    // Navigate to recipe detail for editing
-    Navigator.pushNamed(context, '/recipe-detail');
-  }
-
-  void _removeMeal(String date, String mealType, Map<String, dynamic> meal) {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Remove Meal'),
-        content: Text(
-            'Are you sure you want to remove "${meal['name']}" from your meal plan?'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Cancel'),
-          ),
-          TextButton(
-            onPressed: () {
-              setState(() {
-                _mealPlanData[date]?.removeWhere((m) =>
-                    (m['id'] as int) == (meal['id'] as int) &&
-                    (m['mealType'] as String) == mealType);
-                if (_mealPlanData[date]?.isEmpty == true) {
-                  _mealPlanData.remove(date);
-                }
-              });
-              Navigator.pop(context);
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: Text('${meal['name']} removed from meal plan'),
-                  behavior: SnackBarBehavior.floating,
-                  shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(8)),
-                ),
-              );
-            },
-            child: const Text('Remove'),
-          ),
-        ],
-      ),
-    );
-  }
-
-  void _duplicateMeal(String date, String mealType, Map<String, dynamic> meal) {
-    // Show date picker for duplication
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(
-            'Duplicate meal feature - select dates to copy "${meal['name']}"'),
-        behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-      ),
-    );
-  }
-
-  void _findAlternative(
-      String date, String mealType, Map<String, dynamic> meal) {
-    // Show alternative recipes
-    _onAddMeal(date, mealType);
-  }
-
-  Future<void> _refreshMealPlan() async {
-    setState(() {
-      _isLoading = true;
-    });
-
-    // Simulate API call
-    await Future.delayed(const Duration(seconds: 1));
-
-    setState(() {
-      _isLoading = false;
-    });
-
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: const Text('Meal plan synced successfully'),
-        behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-      ),
-    );
-  }
-
-  void _showAddMealBottomSheet() {
+  void _showAddFoodBottomSheet() {
     _fabAnimationController.forward().then((_) {
       _fabAnimationController.reverse();
     });
@@ -317,38 +302,18 @@ class _MealPlanCalendarState extends State<MealPlanCalendar>
     final todayKey =
         '${today.year}-${today.month.toString().padLeft(2, '0')}-${today.day.toString().padLeft(2, '0')}';
 
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (context) => MealSelectionBottomSheet(
-        selectedDate: todayKey,
-        selectedMealType: 'breakfast',
-        onRecipeSelected: (recipe) =>
-            _addMealToPlan(todayKey, 'breakfast', recipe),
-      ),
-    );
-  }
-
-  String _getMealTypeLabel(String mealType) {
-    switch (mealType.toLowerCase()) {
-      case 'breakfast':
-        return 'Breakfast';
-      case 'lunch':
-        return 'Lunch';
-      case 'dinner':
-        return 'Dinner';
-      default:
-        return 'Meal';
-    }
+    _onAddFood(todayKey, ''); // Pass empty string for mealType since we don't use it
   }
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: colorScheme.surface,
       appBar: const CustomAppBar(
-        title: 'Meal Plan',
+        title: 'Food Plan',
         variant: CustomAppBarVariant.mealPlan,
       ),
       body: Column(
@@ -357,20 +322,19 @@ class _MealPlanCalendarState extends State<MealPlanCalendar>
           if (_isOffline)
             Container(
               width: double.infinity,
-              padding: EdgeInsets.symmetric(vertical: 2),
-              color:
-                  Colors.amber,
+              padding: const EdgeInsets.symmetric(vertical: 8),
+              color: Colors.amber,
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  CustomIconWidget(
-                    iconName: 'cloud_off',
+                  Icon(
+                    Icons.cloud_off,
                     color: Colors.red,
                     size: 16,
                   ),
-                  SizedBox(width: 2),
+                  const SizedBox(width: 8),
                   Text(
-                    'Offline - Showing cached meal plans',
+                    'Offline - Showing cached food data',
                     style: TextStyle(
                       color: Colors.red,
                       fontWeight: FontWeight.w500,
@@ -392,21 +356,21 @@ class _MealPlanCalendarState extends State<MealPlanCalendar>
           // Calendar content
           Expanded(
             child: RefreshIndicator(
-              onRefresh: _refreshMealPlan,
-              color: Colors.white10,
+              onRefresh: _refreshFoodData,
+              color: colorScheme.primary,
               child: _isLoading
                   ? Center(
                       child: Column(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
                           CircularProgressIndicator(
-                            color: Colors.blue,
+                            color: colorScheme.primary,
                           ),
-                          SizedBox(height: 5),
+                          const SizedBox(height: 16),
                           Text(
-                            'Syncing meal plans...',
-                            style: TextStyle(
-                              color: Colors.white.withValues(alpha: 0.6),
+                            'Loading food data...',
+                            style: theme.textTheme.bodyMedium?.copyWith(
+                              color: colorScheme.onSurface.withOpacity(0.6),
                             ),
                           ),
                         ],
@@ -415,16 +379,26 @@ class _MealPlanCalendarState extends State<MealPlanCalendar>
                   : _isWeekView
                       ? WeekViewWidget(
                           currentWeek: _currentDate,
-                          weekMeals: _mealPlanData,
-                          onMealTap: _onMealTap,
-                          onAddMeal: _onAddMeal,
-                          onMealLongPress: _onMealLongPress,
+                          weekMeals: _foodData,
+                          onMealTap: _onFoodTap,
+                          onAddMeal: _onAddFood,
+                          onMealLongPress: (date, mealType, food) {}, // Remove long press functionality
+                          onFoodUpdated: (updatedFood) {
+                            // Find which date this food belongs to and update it
+                            for (final dateKey in _foodData.keys) {
+                              final foodIndex = _foodData[dateKey]!.indexWhere((f) => f['id'] == updatedFood['id']);
+                              if (foodIndex != -1) {
+                                _updateFoodInCalendar(dateKey, updatedFood);
+                                break;
+                              }
+                            }
+                          },
                         )
                       : MonthViewWidget(
                           currentMonth: _currentDate,
-                          monthMeals: _mealPlanData,
+                          monthMeals: _foodData,
                           onDateTap: _onDateTap,
-                          onAddMeal: _onAddMeal,
+                          onAddMeal: _onAddFood,
                         ),
             ),
           ),
@@ -436,23 +410,19 @@ class _MealPlanCalendarState extends State<MealPlanCalendar>
           return Transform.scale(
             scale: _fabScaleAnimation.value,
             child: FloatingActionButton(
-              onPressed: _showAddMealBottomSheet,
-              backgroundColor: Colors.blue,
-              foregroundColor: Colors.red,
+              onPressed: _showAddFoodBottomSheet,
+              backgroundColor: AppTheme.primaryLight,
+              foregroundColor: AppTheme.onPrimaryLight,
               elevation: 6,
-              child: CustomIconWidget(
-                iconName: 'add',
-                color: Colors.red,
+              child: Icon(
+                Icons.add,
+                color: AppTheme.onPrimaryLight,
                 size: 24,
               ),
             ),
           );
         },
       ),
-      // bottomNavigationBar: const CustomBottomBar(
-      //   currentIndex: 2,
-      //   variant: CustomBottomBarVariant.standard,
-      // ),
     );
   }
 }

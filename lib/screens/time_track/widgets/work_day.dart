@@ -1,5 +1,5 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:timex/screens/time_track/time_utils.dart';
+import 'package:timex/screens/time_track/widgets/time_utils.dart';
 
 import 'holiday_utils.dart';
 

@@ -4,15 +4,15 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:image_picker/image_picker.dart';
-import 'package:timex/screens/day_info_screen.dart';
-import 'package:timex/screens/stat_widgets/chart_calculator.dart';
-import 'package:timex/screens/stat_widgets/day_list_card.dart';
-import 'package:timex/screens/stat_widgets/modern_card.dart';
-import 'package:timex/screens/stat_widgets/modern_dropdown.dart';
-import 'package:timex/screens/stat_widgets/monthly_statistics_card.dart';
-import 'package:timex/screens/stat_widgets/total_hours_card.dart';
-import 'package:timex/screens/stat_widgets/weekly_selector_card.dart';
-import 'package:timex/screens/stat_widgets/weekly_statistics_card.dart';
+import 'package:timex/screens/time_report/day_info/day_info_screen.dart';
+import 'package:timex/screens/time_report/stat_widgets/chart_calculator.dart';
+import 'package:timex/screens/time_report/stat_widgets/day_list_card.dart';
+import 'package:timex/screens/time_report/stat_widgets/modern_card.dart';
+import 'package:timex/screens/time_report/stat_widgets/modern_dropdown.dart';
+import 'package:timex/screens/time_report/stat_widgets/monthly_statistics_card.dart';
+import 'package:timex/screens/time_report/stat_widgets/total_hours_card.dart';
+import 'package:timex/screens/time_report/stat_widgets/weekly_selector_card.dart';
+import 'package:timex/screens/time_report/stat_widgets/weekly_statistics_card.dart';
 
 class MonthlyStatisticsScreen extends StatefulWidget {
   const MonthlyStatisticsScreen({super.key});
@@ -348,7 +348,7 @@ class _MonthlyStatisticsScreenState extends State<MonthlyStatisticsScreen> {
 
             // Content
             SliverPadding(
-              padding: EdgeInsets.all(isTablet ? 24.0 : 16.0),
+              padding: EdgeInsets.all(isTablet ? 24.0 : 12.0),
               sliver: _isLoading
                   ? SliverFillRemaining(
                       child: Center(
@@ -537,6 +537,8 @@ class _MonthlyStatisticsScreenState extends State<MonthlyStatisticsScreen> {
                             weeklyHours: _weeklyHours,
                             selectedWeekNumber: _selectedWeekNumber!,
                             chartData: _weeklyChartData,
+                            selectedMonth: _selectedMonth,
+                            selectedYear: _selectedYear,
                           ),
 
                         if (_selectedWeekNumber != null) const SizedBox(height: 20),

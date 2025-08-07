@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../../theme/app_theme.dart';
 
 class CalendarHeaderWidget extends StatelessWidget {
   final DateTime currentDate;
@@ -115,10 +116,10 @@ class CalendarHeaderWidget extends StatelessWidget {
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
               decoration: BoxDecoration(
-                color: colorScheme.primary.withOpacity(0.1),
+                color: AppTheme.primaryLight.withOpacity(0.1),
                 borderRadius: BorderRadius.circular(20),
                 border: Border.all(
-                  color: colorScheme.primary.withOpacity(0.3),
+                  color: AppTheme.primaryLight.withOpacity(0.3),
                   width: 1,
                 ),
               ),
@@ -129,14 +130,14 @@ class CalendarHeaderWidget extends StatelessWidget {
                     isWeekView
                         ? Icons.calendar_view_month
                         : Icons.calendar_view_week,
-                    color: colorScheme.primary,
+                    color: AppTheme.primaryLight,
                     size: 16,
                   ),
                   const SizedBox(width: 8),
                   Text(
                     isWeekView ? 'Month' : 'Week',
                     style: theme.textTheme.labelMedium?.copyWith(
-                      color: colorScheme.primary,
+                      color: AppTheme.primaryLight,
                       fontWeight: FontWeight.w600,
                     ),
                   ),

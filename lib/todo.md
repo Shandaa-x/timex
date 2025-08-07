@@ -4,3 +4,8 @@ gps coordinate hadgalah
 
 delgetsee tsegtsleh
 
+
+
+    UNUUDUR:
+
+- 
