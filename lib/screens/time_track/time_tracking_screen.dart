@@ -1,4 +1,4 @@
-import 'dart:convert';
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
@@ -7,10 +7,15 @@ import 'package:timex/screens/time_track/widgets/time_display_card.dart';
 import 'package:timex/screens/time_track/widgets/time_utils.dart';
 import 'package:timex/screens/time_track/widgets/work_day.dart';
 import 'package:timex/screens/time_track/widgets/working_hours_card.dart';
+import 'package:timex/screens/time_track/widgets/map_widget.dart';
+import 'package:timex/screens/time_track/widgets/time_entries_list_widget.dart';
+import 'package:timex/screens/time_track/widgets/today_foods_list_widget.dart';
+import 'package:timex/screens/time_track/widgets/food_detail_dialog.dart';
+import 'package:timex/screens/time_track/widgets/schedule_info_widget.dart';
+import 'package:timex/screens/time_track/widgets/location_map_dialog.dart';
 import 'package:timezone/timezone.dart' as tz;
 import 'package:permission_handler/permission_handler.dart';
 import 'package:geolocator/geolocator.dart';
-import 'package:google_maps_flutter/google_maps_flutter.dart';
 
 import 'widgets/action_button.dart';
 
@@ -39,13 +44,16 @@ class _TimeTrackingScreenState extends State<TimeTrackScreen> with TickerProvide
   // Multiple check-ins/check-outs with location tracking
   List<Map<String, dynamic>> _todayEntries = [];
   Position? _currentLocation;
-  GoogleMapController? _mapController;
   
   // Food data for today
   List<Map<String, dynamic>> _todayFoods = [];
 
   late AnimationController _pulseController;
   late Animation<double> _pulseAnimation;
+
+  // Auto-end work tracking
+  bool _manuallyEndedWork = false;
+  Timer? _autoEndTimer;
 
   @override
   void initState() {
@@ -359,7 +367,7 @@ class _TimeTrackingScreenState extends State<TimeTrackScreen> with TickerProvide
     } catch (e) {
       print('❌ Fallback scheduling also failed: $e');
       _showErrorMessage(
-        'সूनোটিফিकेशन সেট করতে পারलাম না। Settings এ গিয়ে exact alarm permission চালু করুন।',
+        'সুনোটিফিकेশন সেট করতে পারলাম না। Settings এ গিয়ে exact alarm permission চালু করুন।',
       );
     }
   }
@@ -440,6 +448,7 @@ class _TimeTrackingScreenState extends State<TimeTrackScreen> with TickerProvide
         _todayData = workDay;
         _scheduledEndTime = scheduledEndTime;
         _currentLocation = location;
+        _manuallyEndedWork = false;
       });
 
       // Reload entries to show the new check-in
@@ -447,6 +456,9 @@ class _TimeTrackingScreenState extends State<TimeTrackScreen> with TickerProvide
 
       // Schedule notifications
       await _scheduleEndWorkNotifications(scheduledEndTime);
+
+      // Schedule auto-end work at 10 PM
+      _scheduleAutoEndWork();
 
       _showSuccessMessage(
         'Ажилд ирлээ! 🎉\nБайршил: ${location.latitude.toStringAsFixed(6)}, ${location.longitude.toStringAsFixed(6)}',
@@ -461,6 +473,10 @@ class _TimeTrackingScreenState extends State<TimeTrackScreen> with TickerProvide
 
   Future<void> _handleEndWork() async {
     if (_startTime == null) return;
+
+    // Mark that user manually ended work
+    _manuallyEndedWork = true;
+    _autoEndTimer?.cancel(); // Cancel auto-end timer
 
     setState(() => _isLoading = true);
 
@@ -485,6 +501,8 @@ class _TimeTrackingScreenState extends State<TimeTrackScreen> with TickerProvide
           'longitude': location.longitude,
           'accuracy': location.accuracy,
         },
+        'autoEnded': false, // Flag to indicate this was manual
+        'manualLeave': true, // Flag to indicate user clicked ЯВЛАА
         'createdAt': FieldValue.serverTimestamp(),
       };
 
@@ -554,8 +572,8 @@ class _TimeTrackingScreenState extends State<TimeTrackScreen> with TickerProvide
         'Ажлаас явлаа! Та ${totalHours.toStringAsFixed(1)} цаг ажилласан байна. 👋\nБайршил: ${location.latitude.toStringAsFixed(6)}, ${location.longitude.toStringAsFixed(6)}',
       );
     } catch (e) {
-      print('tryhjtytyjtyj $e');
-      _showErrorMessage(' wregergergergerg: $e');
+      print('❌ Error ending work: $e');
+      _showErrorMessage('Ажлаас гарахад алдаа гарлаа: $e');
     } finally {
       setState(() => _isLoading = false);
     }
@@ -626,697 +644,17 @@ class _TimeTrackingScreenState extends State<TimeTrackScreen> with TickerProvide
       setState(() => _isLoading = false);
     }
   }
-
-  String _formatTime(DateTime time) {
-    return '${time.hour.toString().padLeft(2, '0')}:${time.minute.toString().padLeft(2, '0')}';
-  }
-
-  Widget _buildMapWidget() {
-    if (_currentLocation == null && _todayEntries.isEmpty) {
-      return Container(
-        height: 200,
-        margin: const EdgeInsets.only(bottom: 20),
-        decoration: BoxDecoration(
-          color: Colors.grey.shade100,
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: Colors.grey.shade300),
-        ),
-        child: Center(
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(Icons.location_off, size: 48, color: Colors.grey.shade400),
-              const SizedBox(height: 8),
-              Text(
-                'Өнөөдөр ажлын байршил оруулаагүй байна',
-                style: TextStyle(color: Colors.grey.shade600),
-              ),
-            ],
-          ),
-        ),
-      );
-    }
-
-    // Build markers from all today's entries
-    Set<Marker> markers = {};
-    LatLng? centerPosition;
-
-    // Add markers for each time entry with location
-    for (int i = 0; i < _todayEntries.length; i++) {
-      final entry = _todayEntries[i];
-      final location = entry['location'];
-      if (location != null && location['latitude'] != null && location['longitude'] != null) {
-        final lat = location['latitude'] as double;
-        final lng = location['longitude'] as double;
-        final timestamp = (entry['timestamp'] as Timestamp).toDate();
-        final type = entry['type'] as String;
-        
-        markers.add(
-          Marker(
-            markerId: MarkerId('entry_$i'),
-            position: LatLng(lat, lng),
-            icon: type == 'check_in' 
-                ? BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueGreen)
-                : BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueRed),
-            infoWindow: InfoWindow(
-              title: type == 'check_in' ? 'ИРЛЭЭ' : 'ЯВЛАА',
-              snippet: '${timestamp.hour.toString().padLeft(2, '0')}:${timestamp.minute.toString().padLeft(2, '0')}',
-            ),
-          ),
-        );
-        
-        // Use the latest location as center
-        centerPosition = LatLng(lat, lng);
-      }
-    }
-
-    // If no entries have location, use current location
-    if (centerPosition == null && _currentLocation != null) {
-      centerPosition = LatLng(_currentLocation!.latitude, _currentLocation!.longitude);
-    }
-
-    // Default to Ulaanbaatar if no location data
-    centerPosition ??= const LatLng(47.9184, 106.9177);
-
-    return Container(
-      height: 200,
-      margin: const EdgeInsets.only(bottom: 20),
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.1),
-            blurRadius: 8,
-            offset: const Offset(0, 2),
-          ),
-        ],
-      ),
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(16),
-        child: GoogleMap(
-          onMapCreated: (controller) {
-            _mapController = controller;
-          },
-          initialCameraPosition: CameraPosition(
-            target: centerPosition,
-            zoom: 16,
-          ),
-          markers: markers,
-          myLocationEnabled: true,
-          myLocationButtonEnabled: false,
-          zoomControlsEnabled: false,
-          mapToolbarEnabled: false,
-          compassEnabled: false,
-          scrollGesturesEnabled: true,
-          zoomGesturesEnabled: true,
-          rotateGesturesEnabled: false,
-          tiltGesturesEnabled: false,
-        ),
-      ),
-    );
-  }
-
-  Widget _buildTimeEntriesList() {
-    if (_todayEntries.isEmpty) {
-      return Container(
-        padding: const EdgeInsets.all(12),
-        margin: const EdgeInsets.only(bottom: 20),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(16),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withOpacity(0.05),
-              blurRadius: 10,
-              offset: const Offset(0, 2),
-            ),
-          ],
-        ),
-        child: const Row(
-          children: [
-            Icon(Icons.info_outline, color: Color(0xFF6B7280)),
-            SizedBox(width: 12),
-            Text(
-              'Өнөөдөр ямар ч орсон гарсан байхгүй байна',
-              style: TextStyle(
-                color: Color(0xFF6B7280),
-                fontSize: 14,
-              ),
-              maxLines: 3,
-            ),
-          ],
-        ),
-      );
-    }
-
-    return Container(
-      margin: const EdgeInsets.only(bottom: 20),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.05),
-            blurRadius: 10,
-            offset: const Offset(0, 2),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Padding(
-            padding: const EdgeInsets.all(20),
-            child: Row(
-              children: [
-                const Icon(Icons.access_time, color: Color(0xFF3B82F6)),
-                const SizedBox(width: 12),
-                const Text(
-                  'Өнөөдрийн орсон гарсан',
-                  style: TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.w600,
-                    color: Color(0xFF1F2937),
-                  ),
-                ),
-              ],
-            ),
-          ),
-          const Divider(height: 1),
-          ListView.separated(
-            shrinkWrap: true,
-            physics: const NeverScrollableScrollPhysics(),
-            itemCount: _todayEntries.length,
-            separatorBuilder: (context, index) => const Divider(height: 1),
-            itemBuilder: (context, index) {
-              final entry = _todayEntries[index];
-              final timestamp = (entry['timestamp'] as Timestamp).toDate();
-              final isCheckIn = entry['type'] == 'check_in';
-              final location = entry['location'] as Map<String, dynamic>?;
-
-              return Padding(
-                padding: const EdgeInsets.all(16),
-                child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Container(
-                      width: 40,
-                      height: 40,
-                      decoration: BoxDecoration(
-                        color: isCheckIn
-                            ? const Color(0xFF10B981).withOpacity(0.1)
-                            : const Color(0xFFEF4444).withOpacity(0.1),
-                        borderRadius: BorderRadius.circular(20),
-                      ),
-                      child: Icon(
-                        isCheckIn ? Icons.login : Icons.logout,
-                        color: isCheckIn ? const Color(0xFF10B981) : const Color(0xFFEF4444),
-                        size: 20,
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      flex: 3,
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            isCheckIn ? 'Ирлээ' : 'Явлаа',
-                            style: const TextStyle(
-                              fontSize: 16,
-                              fontWeight: FontWeight.w600,
-                              color: Color(0xFF1F2937),
-                            ),
-                          ),
-                          Text(
-                            _formatTime(timestamp),
-                            style: const TextStyle(
-                              fontSize: 14,
-                              color: Color(0xFF6B7280),
-                            ),
-                          ),
-                          if (location != null)
-                            Text(
-                              'GPS: ${location['latitude'].toStringAsFixed(4)}, ${location['longitude'].toStringAsFixed(4)}',
-                              style: const TextStyle(
-                                fontSize: 11,
-                                color: Color(0xFF9CA3AF),
-                              ),
-                              overflow: TextOverflow.ellipsis,
-                              maxLines: 1,
-                            ),
-                        ],
-                      ),
-                    ),
-                    if (location != null) ...[
-                      const SizedBox(width: 8),
-                      GestureDetector(
-                        onTap: () => _showLocationOnMap(location),
-                        child: Container(
-                          padding: const EdgeInsets.all(8),
-                          decoration: BoxDecoration(
-                            color: const Color(0xFF3B82F6).withOpacity(0.1),
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                          child: const Icon(
-                            Icons.location_on,
-                            color: Color(0xFF3B82F6),
-                            size: 20,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ],
-                ),
-              );
-            },
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildTodayFoodsList() {
-    return Container(
-      margin: const EdgeInsets.only(bottom: 20),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.05),
-            blurRadius: 10,
-            offset: const Offset(0, 2),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Padding(
-            padding: const EdgeInsets.all(20),
-            child: Row(
-              children: [
-                const Icon(Icons.restaurant, color: Color(0xFFEF4444)),
-                const SizedBox(width: 12),
-                const Text(
-                  'Өнөөдрийн хоол',
-                  style: TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.w600,
-                    color: Color(0xFF1F2937),
-                  ),
-                ),
-                const Spacer(),
-                Text(
-                  '${_todayFoods.length} хоол',
-                  style: const TextStyle(
-                    fontSize: 14,
-                    color: Color(0xFF6B7280),
-                  ),
-                ),
-              ],
-            ),
-          ),
-          if (_todayFoods.isEmpty) ...[
-            const Divider(height: 1),
-            Padding(
-              padding: const EdgeInsets.all(20),
-              child: Row(
-                children: [
-                  Icon(Icons.info_outline, color: Colors.grey.shade400),
-                  const SizedBox(width: 12),
-                  Text(
-                    'Өнөөдөр хоол нэмээгүй байна',
-                    style: TextStyle(
-                      color: Colors.grey.shade600,
-                      fontSize: 14,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ] else ...[
-            const Divider(height: 1),
-            ListView.separated(
-              shrinkWrap: true,
-              physics: const NeverScrollableScrollPhysics(),
-              itemCount: _todayFoods.length,
-              separatorBuilder: (context, index) => const Divider(height: 1),
-              itemBuilder: (context, index) {
-                final food = _todayFoods[index];
-                return InkWell(
-                  onTap: () => _showFoodDetailDialog(food),
-                  child: Padding(
-                    padding: const EdgeInsets.all(16),
-                    child: Row(
-                      children: [
-                        // Food image or placeholder
-                        Container(
-                          width: 50,
-                          height: 50,
-                          decoration: BoxDecoration(
-                            color: const Color(0xFFEF4444).withOpacity(0.1),
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                          child: food['image'] != null && food['image'].isNotEmpty
-                              ? ClipRRect(
-                                  borderRadius: BorderRadius.circular(8),
-                                  child: Image.memory(
-                                    base64Decode(food['image']),
-                                    fit: BoxFit.cover,
-                                  ),
-                                )
-                              : const Icon(
-                                  Icons.restaurant,
-                                  color: Color(0xFFEF4444),
-                                  size: 24,
-                                ),
-                        ),
-                        const SizedBox(width: 12),
-                        // Food details
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                food['name'] ?? 'Нэргүй хоол',
-                                style: const TextStyle(
-                                  fontSize: 16,
-                                  fontWeight: FontWeight.w600,
-                                  color: Color(0xFF1F2937),
-                                ),
-                              ),
-                              if (food['description'] != null && food['description'].isNotEmpty)
-                                Text(
-                                  food['description'],
-                                  style: const TextStyle(
-                                    fontSize: 14,
-                                    color: Color(0xFF6B7280),
-                                  ),
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                ),
-                              if (food['price'] != null)
-                                Text(
-                                  '₮ ${food['price']}',
-                                  style: const TextStyle(
-                                    fontSize: 14,
-                                    color: Color(0xFF059669),
-                                    fontWeight: FontWeight.w500,
-                                  ),
-                                ),
-                            ],
-                          ),
-                        ),
-                        const Icon(
-                          Icons.arrow_forward_ios,
-                          color: Color(0xFF9CA3AF),
-                          size: 16,
-                        ),
-                      ],
-                    ),
-                  ),
-                );
-              },
-            ),
-          ],
-        ],
-      ),
-    );
-  }
-
   void _showFoodDetailDialog(Map<String, dynamic> food) {
     showDialog(
       context: context,
-      builder: (context) => Dialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        child: Container(
-          constraints: const BoxConstraints(maxWidth: 400, maxHeight: 600),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              // Header
-              Container(
-                padding: const EdgeInsets.all(20),
-                decoration: const BoxDecoration(
-                  color: Color(0xFFEF4444),
-                  borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
-                ),
-                child: Row(
-                  children: [
-                    const Icon(Icons.restaurant, color: Colors.white, size: 24),
-                    const SizedBox(width: 12),
-                    const Expanded(
-                      child: Text(
-                        'Хоолны дэлгэрэнгүй',
-                        style: TextStyle(
-                          color: Colors.white,
-                          fontSize: 18,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                    ),
-                    IconButton(
-                      onPressed: () => Navigator.of(context).pop(),
-                      icon: const Icon(Icons.close, color: Colors.white),
-                    ),
-                  ],
-                ),
-              ),
-              
-              // Content
-              Flexible(
-                child: SingleChildScrollView(
-                  padding: const EdgeInsets.all(20),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      // Food image
-                      if (food['image'] != null && food['image'].isNotEmpty) ...[
-                        Container(
-                          width: double.infinity,
-                          height: 200,
-                          decoration: BoxDecoration(
-                            borderRadius: BorderRadius.circular(12),
-                            boxShadow: [
-                              BoxShadow(
-                                color: Colors.black.withOpacity(0.1),
-                                blurRadius: 8,
-                                offset: const Offset(0, 2),
-                              ),
-                            ],
-                          ),
-                          child: ClipRRect(
-                            borderRadius: BorderRadius.circular(12),
-                            child: Image.memory(
-                              base64Decode(food['image']),
-                              fit: BoxFit.cover,
-                            ),
-                          ),
-                        ),
-                        const SizedBox(height: 20),
-                      ],
-                      
-                      // Food name
-                      Text(
-                        food['name'] ?? 'Нэргүй хоол',
-                        style: const TextStyle(
-                          fontSize: 24,
-                          fontWeight: FontWeight.w700,
-                          color: Color(0xFF1F2937),
-                        ),
-                      ),
-                      const SizedBox(height: 12),
-                      
-                      // Price
-                      if (food['price'] != null)
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                          decoration: BoxDecoration(
-                            color: const Color(0xFF059669).withOpacity(0.1),
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                          child: Text(
-                            '₮ ${food['price']}',
-                            style: const TextStyle(
-                              fontSize: 18,
-                              color: Color(0xFF059669),
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                        ),
-                      
-                      const SizedBox(height: 16),
-                      
-                      // Description
-                      if (food['description'] != null && food['description'].isNotEmpty) ...[
-                        const Text(
-                          'Тайлбар:',
-                          style: TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.w600,
-                            color: Color(0xFF1F2937),
-                          ),
-                        ),
-                        const SizedBox(height: 8),
-                        Text(
-                          food['description'],
-                          style: const TextStyle(
-                            fontSize: 14,
-                            color: Color(0xFF6B7280),
-                            height: 1.5,
-                          ),
-                        ),
-                        const SizedBox(height: 16),
-                      ],
-                      
-                      // Added time
-                      if (food['createdAt'] != null) ...[
-                        const Text(
-                          'Нэмсэн цаг:',
-                          style: TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.w600,
-                            color: Color(0xFF1F2937),
-                          ),
-                        ),
-                        const SizedBox(height: 8),
-                        Text(
-                          _formatTimeFromMillis(food['createdAt']),
-                          style: const TextStyle(
-                            fontSize: 14,
-                            color: Color(0xFF6B7280),
-                          ),
-                        ),
-                      ],
-                    ],
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
+      builder: (context) => FoodDetailDialog(food: food),
     );
-  }
-
-  String _formatTimeFromMillis(int milliseconds) {
-    final dateTime = DateTime.fromMillisecondsSinceEpoch(milliseconds);
-    return '${dateTime.hour.toString().padLeft(2, '0')}:${dateTime.minute.toString().padLeft(2, '0')}';
   }
 
   void _showLocationOnMap(Map<String, dynamic> location) {
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Байршил'),
-        content: Container(
-          width: 300,
-          height: 300,
-          child: GoogleMap(
-            initialCameraPosition: CameraPosition(
-              target: LatLng(location['latitude'], location['longitude']),
-              zoom: 17,
-            ),
-            markers: {
-              Marker(
-                markerId: const MarkerId('location'),
-                position: LatLng(location['latitude'], location['longitude']),
-                infoWindow: InfoWindow(
-                  title: 'Ажлын байршил',
-                  snippet: 'Нарийвчлал: ${location['accuracy'].toStringAsFixed(1)}м',
-                ),
-              ),
-            },
-            mapType: MapType.normal,
-            myLocationEnabled: false,
-            zoomControlsEnabled: true,
-            compassEnabled: true,
-            scrollGesturesEnabled: true,
-            zoomGesturesEnabled: true,
-            rotateGesturesEnabled: true,
-            tiltGesturesEnabled: true,
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(),
-            child: const Text('Хаах'),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildScheduleInfo() {
-    if (!_isWorking || _scheduledEndTime == null) return const SizedBox.shrink();
-
-    final now = DateTime.now();
-    final timeLeft = _scheduledEndTime!.difference(now);
-
-    if (timeLeft.isNegative) {
-      return Container(
-        margin: const EdgeInsets.only(bottom: 16),
-        padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          color: const Color(0xFFEF4444),
-          borderRadius: BorderRadius.circular(12),
-        ),
-        child: Row(
-          children: [
-            const Icon(Icons.warning, color: Colors.white, size: 24),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Text(
-                'Ажлын цаг дууссан байна! Ажлаа дуусгаарай.',
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontSize: 16,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-            ),
-          ],
-        ),
-      );
-    }
-
-    return Container(
-      margin: const EdgeInsets.only(bottom: 16),
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: const Color(0xFF3B82F6),
-        borderRadius: BorderRadius.circular(12),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              const Icon(Icons.schedule, color: Colors.white, size: 24),
-              const SizedBox(width: 12),
-              Text(
-                'Ажлын цагийн хуваарь',
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontSize: 16,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 8),
-          Text(
-            'Дуусах цаг: ${_formatTime(_scheduledEndTime!)}',
-            style: const TextStyle(color: Colors.white, fontSize: 14),
-          ),
-          Text(
-            'Үлдсэн хугацаа: ${timeLeft.inHours}:${(timeLeft.inMinutes % 60).toString().padLeft(2, '0')}',
-            style: const TextStyle(color: Colors.white, fontSize: 14),
-          ),
-        ],
-      ),
+      builder: (context) => LocationMapDialog(location: location),
     );
   }
 
@@ -1343,9 +681,147 @@ class _TimeTrackingScreenState extends State<TimeTrackScreen> with TickerProvide
     );
   }
 
+  void _scheduleAutoEndWork() {
+    // Cancel any existing timer
+    _autoEndTimer?.cancel();
+    
+    final now = DateTime.now();
+    final autoEndTime = DateTime(now.year, now.month, now.day, 22, 0); // 10:00 PM
+    
+    if (autoEndTime.isAfter(now)) {
+      final duration = autoEndTime.difference(now);
+      _autoEndTimer = Timer(duration, () {
+        if (_isWorking && !_manuallyEndedWork) {
+          _handleAutoEndWork();
+        }
+      });
+      print('📅 Scheduled auto-end work for: $autoEndTime');
+    }
+  }
+
+  Future<void> _handleAutoEndWork() async {
+    if (!_isWorking || _startTime == null) return;
+
+    setState(() {
+      _isLoading = true;
+    });
+
+    try {
+      final now = DateTime.now();
+      final autoEndTime = DateTime(now.year, now.month, now.day, 22, 0); // 10:00 PM
+      final startDate = TimeUtils.formatDateString(_startTime!); // Use start date, not auto-end date
+
+      // Get current location (or use last known location)
+      Position? location = await _getCurrentLocation();
+      
+      // If location fails, use a default/last known location
+      location ??= Position(
+        latitude: 47.9184, // Default Ulaanbaatar coordinates
+        longitude: 106.9177,
+        timestamp: DateTime.now(),
+        accuracy: 0,
+        altitude: 0,
+        altitudeAccuracy: 0,
+        heading: 0,
+        headingAccuracy: 0,
+        speed: 0,
+        speedAccuracy: 0,
+      );
+
+      // Create time entry for automatic check-out - but keep it on the same day as check-in
+      final timeEntryData = {
+        'date': startDate, // Use the same date as when work started
+        'timestamp': Timestamp.fromDate(autoEndTime),
+        'type': 'auto_check_out', // Different type to track auto end
+        'location': {
+          'latitude': location.latitude,
+          'longitude': location.longitude,
+          'accuracy': location.accuracy,
+        },
+        'autoEnded': true, // Flag to indicate this was automatic
+        'manualLeave': false, // Flag to indicate user didn't click ЯВЛАА
+        'incompleteWork': true, // Flag to indicate work was not properly closed
+        'createdAt': FieldValue.serverTimestamp(),
+      };
+
+      // Save to timeEntries collection
+      await _firestore.collection('timeEntries').add(timeEntryData);
+
+      // Update calendar day to mark as incomplete
+      await _firestore.collection('calendarDays').doc(startDate).update({
+        'endTime': Timestamp.fromDate(autoEndTime),
+        'incompleteWork': true, // Mark as incomplete work
+        'autoEnded': true,
+        'updatedAt': FieldValue.serverTimestamp(),
+      });
+
+      // Update UI state - but don't mark as fully ended
+      setState(() {
+        _endTime = autoEndTime;
+        _isWorking = false;
+      });
+
+      // Calculate total working hours
+      final totalHours = autoEndTime.difference(_startTime!).inMinutes / 60.0;
+
+      // Cancel any remaining notifications
+      await _cancelScheduledNotifications();
+
+      // Reload data to reflect changes
+      await _loadTodayData();
+
+      _showAutoEndMessage(totalHours);
+    } catch (e) {
+      print('❌ Error during auto-end work: $e');
+      _showErrorMessage('Автомат дуусгахад алдаа гарлаа: $e');
+    } finally {
+      setState(() => _isLoading = false);
+    }
+  }
+
+  void _showAutoEndMessage(double totalHours) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Row(
+              children: [
+                Icon(Icons.access_time, color: Colors.white),
+                SizedBox(width: 8),
+                Text(
+                  'Ажил автоматаар дууссан!',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 4),
+            Text(
+              '22:00 цагт автоматаар дууссан. Та ${totalHours.toStringAsFixed(1)} цаг ажилласан байна.',
+              style: const TextStyle(color: Colors.white),
+            ),
+            const Text(
+              '⚠️ "ЯВЛАА" товчийг дараагүй байна',
+              style: TextStyle(color: Colors.orange),
+            ),
+          ],
+        ),
+        backgroundColor: Colors.orange,
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        duration: const Duration(seconds: 6),
+      ),
+    );
+  }
+
   @override
   void dispose() {
     _pulseController.dispose();
+    _autoEndTimer?.cancel(); // Cancel auto-end timer
     super.dispose();
   }
 
@@ -1401,8 +877,11 @@ class _TimeTrackingScreenState extends State<TimeTrackScreen> with TickerProvide
 
                       const SizedBox(height: 24),
 
-                      // Schedule Info (NEW)
-                      _buildScheduleInfo(),
+                      // Schedule Info
+                      ScheduleInfoWidget(
+                        isWorking: _isWorking,
+                        scheduledEndTime: _scheduledEndTime,
+                      ),
 
                       // Status Card
                       StatusCard(
@@ -1424,14 +903,24 @@ class _TimeTrackingScreenState extends State<TimeTrackScreen> with TickerProvide
 
                       if (_startTime != null) const SizedBox(height: 24),
 
-                      // Time Entries List (NEW)
-                      _buildTimeEntriesList(),
+                      // Time Entries List
+                      TimeEntriesListWidget(
+                        todayEntries: _todayEntries,
+                        onLocationTap: _showLocationOnMap,
+                      ),
 
-                      // Today's Foods List (NEW)
-                      _buildTodayFoodsList(),
+                      // Today's Foods List
+                      TodayFoodsListWidget(
+                        todayFoods: _todayFoods,
+                        onFoodTap: _showFoodDetailDialog,
+                      ),
 
-                      // Google Maps Widget (NEW) - Above action buttons
-                      _buildMapWidget(),
+                      // Google Maps Widget
+                      MapWidget(
+                        currentLocation: _currentLocation,
+                        todayEntries: _todayEntries,
+                        onLocationTap: _showLocationOnMap,
+                      ),
 
                       // Action Buttons
                       if (!_isWorking && _endTime == null)

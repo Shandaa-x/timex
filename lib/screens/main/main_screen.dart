@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:timex/screens/meal_plan/meal_plan_calendar.dart';
 import 'package:timex/screens/time_report/monthly_statistic_screen.dart';
-import 'package:timex/screens/test_screen.dart';
+import 'package:timex/screens/food_report/food_report_screen.dart';
 import 'package:timex/index.dart';
 import 'package:timex/screens/time_track/time_tracking_screen.dart';
 
@@ -34,6 +34,7 @@ class _MainScreenState extends State<MainScreen> {
       TimeTrackScreen(),
       MonthlyStatisticsScreen(),
       MealPlanCalendar(),
+      FoodReportScreen(),
     ];
   }
 
@@ -92,42 +93,7 @@ class _MainScreenState extends State<MainScreen> {
     _screens[0] = TimeTrackScreen();
     _screens[1] = MonthlyStatisticsScreen();
     _screens[2] = MealPlanCalendar();
-  }
-
-  void _showFirstLoginWelcome() {
-    showDialog(
-      context: context,
-      builder: (dialogContext) => AlertDialog(
-        title: Text('Тавтай морил, $_employeeFullName!'),
-        content: const Text(
-          'Та анх удаа нэвтэрч байна. Аюулгүй байдлын үүднээс нууц үгээ солихыг зөвлөж байна.',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () =>
-                Navigator.pop(dialogContext), // Use dialogContext here
-            child: const Text('Ойлголоо'),
-          ),
-          TextButton(
-            onPressed: () {
-              Navigator.pop(dialogContext); // Use dialogContext here too
-              _navigateToChangePassword();
-            },
-            child: const Text('Нууц үг солих'),
-          ),
-        ],
-      ),
-    );
-  }
-
-  void _navigateToChangePassword() {
-    // TODO: Navigate to change password screen
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Нууц үг солих хэсэг удахгүй нэмэгдэнэ'),
-        backgroundColor: Colors.blue,
-      ),
-    );
+    _screens[3] = FoodReportScreen();
   }
 
   void _onTabTapped(int index) {
@@ -200,52 +166,59 @@ class _MainScreenState extends State<MainScreen> {
     final tabs = [
       {'icon': Icons.home, 'label': 'Нүүр'},
       {'icon': Icons.note, 'label': 'Тайлан'},
-      {'icon': Icons.food_bank, 'label': 'Foods'},
+      {'icon': Icons.food_bank, 'label': 'Хоол'},
+      {'icon': Icons.analytics, 'label': 'Хоолны тайлан'},
     ];
 
     return Container(
       color: const Color(0xFF3f3f3f),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 15, vertical: 15),
-        child: SafeArea(
-          top: false,
+      child: SafeArea(
+        top: false,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
           child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
             children: List.generate(tabs.length, (index) {
               final isSelected = _currentIndex == index;
-              return GestureDetector(
-                onTap: () => _onTabTapped(index),
-                child: Container(
-                  padding: const EdgeInsets.symmetric(
-                    vertical: 7,
-                    horizontal: 21,
-                  ),
-                  decoration: BoxDecoration(
-                    color: isSelected
-                        ? const Color(0xFFC7BBE1)
-                        : Colors.transparent,
-                    borderRadius: BorderRadius.circular(20),
-                  ),
-                  child: Row(
-                    children: [
-                      Icon(
-                        tabs[index]['icon'] as IconData,
-                        color: isSelected
-                            ? Colors.black
-                            : Colors.white.withOpacity(0.6),
-                        size: 24,
-                      ),
-                      const SizedBox(width: 6),
-                      txt(
-                        tabs[index]['label'] as String,
-                        style: TxtStl.bodyText1(
+              return Expanded(
+                child: GestureDetector(
+                  onTap: () => _onTabTapped(index),
+                  child: Container(
+                    margin: const EdgeInsets.symmetric(horizontal: 2),
+                    padding: const EdgeInsets.symmetric(
+                      vertical: 2,
+                      horizontal: 2,
+                    ),
+                    decoration: BoxDecoration(
+                      color: isSelected
+                          ? const Color(0xFFC7BBE1)
+                          : Colors.transparent,
+                      borderRadius: BorderRadius.circular(16),
+                    ),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          tabs[index]['icon'] as IconData,
                           color: isSelected
                               ? Colors.black
                               : Colors.white.withOpacity(0.6),
-                          fontSize: 11,
+                          size: 20,
                         ),
-                      ),
-                    ],
+                        txt(
+                          tabs[index]['label'] as String,
+                          style: TxtStl.bodyText1(
+                            color: isSelected
+                                ? Colors.black
+                                : Colors.white.withOpacity(0.6),
+                            fontSize: 8,
+                          ),
+                          textAlign: TextAlign.center,
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ],
+                    ),
                   ),
                 ),
               );
