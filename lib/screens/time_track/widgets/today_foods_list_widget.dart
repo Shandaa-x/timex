@@ -33,7 +33,7 @@ class TodayFoodsListWidget extends StatelessWidget {
             padding: const EdgeInsets.all(20),
             child: Row(
               children: [
-                const Icon(Icons.restaurant, color: Color(0xFFEF4444)),
+                const Icon(Icons.restaurant, color: Colors.green),
                 const SizedBox(width: 12),
                 const Text(
                   'Өнөөдрийн хоол',

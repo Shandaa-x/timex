@@ -40,7 +40,7 @@ class WeeklyStatisticsCard extends StatelessWidget {
               ),
               const SizedBox(width: 12),
               const Text(
-                'Weekly Hours',
+                '7 хоногийн ажилласан цаг',
                 style: TextStyle(
                   fontSize: 18,
                   fontWeight: FontWeight.w600,
@@ -51,7 +51,7 @@ class WeeklyStatisticsCard extends StatelessWidget {
           ),
           const SizedBox(height: 16),
           Text(
-            '${weeklyHours.toStringAsFixed(1)}h',
+            '${weeklyHours.toStringAsFixed(1)}ц',
             style: const TextStyle(
               fontSize: 32,
               fontWeight: FontWeight.bold,
@@ -60,7 +60,7 @@ class WeeklyStatisticsCard extends StatelessWidget {
           ),
           const SizedBox(height: 4),
           Text(
-            'Week $selectedWeekNumber',
+            '$selectedWeekNumber-р долоо хоног',
             style: const TextStyle(fontSize: 14, color: Color(0xFF64748B)),
           ),
           SizedBox(height: 120, child: _buildWeeklyChart()),

@@ -22,11 +22,17 @@ class _MealPlanCalendarState extends State<MealPlanCalendar>
   bool _isLoading = false;
   bool _isOffline = false;
 
+  // Filtering state
+  bool _isFilterMode = false;
+  String? _selectedFilter;
+  final List<String> _filterOptions = ['All', 'High Price', 'Popular', 'Recent', 'With Comments'];
+
   late AnimationController _fabAnimationController;
   late Animation<double> _fabScaleAnimation;
 
   // Food data - map of date string to list of foods
   final Map<String, List<Map<String, dynamic>>> _foodData = {};
+  Map<String, List<Map<String, dynamic>>> _filteredFoodData = {};
 
   @override
   void initState() {
@@ -43,6 +49,9 @@ class _MealPlanCalendarState extends State<MealPlanCalendar>
       curve: Curves.easeInOut,
     ));
 
+    // Initialize filtered data with all data
+    _filteredFoodData = Map.from(_foodData);
+    
     _checkConnectivity();
     _loadFoodData();
   }
@@ -128,6 +137,12 @@ class _MealPlanCalendarState extends State<MealPlanCalendar>
 
       setState(() {
         // Update UI after loading all data
+        // Update filtered data after loading
+        if (_isFilterMode) {
+          _applyFilter();
+        } else {
+          _filteredFoodData = Map.from(_foodData);
+        }
       });
     } catch (e) {
       print('❌ Error loading food data: $e');
@@ -202,7 +217,74 @@ class _MealPlanCalendarState extends State<MealPlanCalendar>
 
   void _toggleView() {
     setState(() {
-      _isWeekView = !_isWeekView;
+      if (_isFilterMode) {
+        // If in filter mode, cycle through filter options
+        _cycleFilter();
+      } else {
+        // Toggle between week and month view
+        _isWeekView = !_isWeekView;
+      }
+    });
+  }
+
+  void _cycleFilter() {
+    if (_selectedFilter == null) {
+      _selectedFilter = _filterOptions[1]; // Start with 'High Price'
+    } else {
+      final currentIndex = _filterOptions.indexOf(_selectedFilter!);
+      final nextIndex = (currentIndex + 1) % _filterOptions.length;
+      _selectedFilter = _filterOptions[nextIndex];
+      
+      if (_selectedFilter == 'All') {
+        _selectedFilter = null; // Reset to show all
+      }
+    }
+    _applyFilter();
+  }
+
+  void _applyFilter() {
+    _filteredFoodData.clear();
+    
+    if (_selectedFilter == null) {
+      // Show all foods
+      _filteredFoodData = Map.from(_foodData);
+      return;
+    }
+
+    for (final entry in _foodData.entries) {
+      final filteredFoods = entry.value.where((food) {
+        switch (_selectedFilter) {
+          case 'High Price':
+            return (food['price'] as int? ?? 0) >= 8000; // Foods 8000₮ and above
+          case 'Popular':
+            return (food['likesCount'] as int? ?? 0) >= 3; // Foods with 3+ likes
+          case 'Recent':
+            final createdAt = food['createdAt'] as int? ?? 0;
+            final foodDate = DateTime.fromMillisecondsSinceEpoch(createdAt);
+            final daysDiff = DateTime.now().difference(foodDate).inDays;
+            return daysDiff <= 7; // Foods added in last 7 days
+          case 'With Comments':
+            return (food['commentsCount'] as int? ?? 0) > 0; // Foods with comments
+          default:
+            return true;
+        }
+      }).toList();
+
+      if (filteredFoods.isNotEmpty) {
+        _filteredFoodData[entry.key] = filteredFoods;
+      }
+    }
+  }
+
+  void _toggleFilterMode() {
+    setState(() {
+      _isFilterMode = !_isFilterMode;
+      if (!_isFilterMode) {
+        _selectedFilter = null;
+        _filteredFoodData = Map.from(_foodData);
+      } else {
+        _applyFilter();
+      }
     });
   }
 
@@ -269,6 +351,13 @@ class _MealPlanCalendarState extends State<MealPlanCalendar>
         _foodData[date] = [];
       }
       _foodData[date]!.add(food);
+      
+      // Update filtered data if in filter mode
+      if (_isFilterMode) {
+        _applyFilter();
+      } else {
+        _filteredFoodData = Map.from(_foodData);
+      }
     });
   }
 
@@ -351,6 +440,9 @@ class _MealPlanCalendarState extends State<MealPlanCalendar>
             onPreviousPressed: _navigatePrevious,
             onNextPressed: _navigateNext,
             onViewToggle: _toggleView,
+            onFilterModeToggle: _toggleFilterMode,
+            isFilterMode: _isFilterMode,
+            selectedFilter: _selectedFilter,
           ),
 
           // Calendar content
@@ -379,7 +471,7 @@ class _MealPlanCalendarState extends State<MealPlanCalendar>
                   : _isWeekView
                       ? WeekViewWidget(
                           currentWeek: _currentDate,
-                          weekMeals: _foodData,
+                          weekMeals: _isFilterMode ? _filteredFoodData : _foodData,
                           onMealTap: _onFoodTap,
                           onAddMeal: _onAddFood,
                           onMealLongPress: (date, mealType, food) {}, // Remove long press functionality
@@ -396,7 +488,7 @@ class _MealPlanCalendarState extends State<MealPlanCalendar>
                         )
                       : MonthViewWidget(
                           currentMonth: _currentDate,
-                          monthMeals: _foodData,
+                          monthMeals: _isFilterMode ? _filteredFoodData : _foodData,
                           onDateTap: _onDateTap,
                           onAddMeal: _onAddFood,
                         ),

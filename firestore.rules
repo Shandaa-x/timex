@@ -1,0 +1,40 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Allow login email lookups (no auth required)
+    match /{parent=**}/employees/{employeeId} {
+      allow get, list: if true;
+    }
+
+    // Allow public read AND write access to calendarDays collection (NO AUTH REQUIRED)
+    match /calendarDays/{document} {
+      allow read, write: if true;
+      
+      // Allow access to timeEntries subcollection
+      match /timeEntries/{timeEntryId} {
+        allow read, write: if true;
+      }
+    }
+
+    // Allow public read AND write access to foods collection (NO AUTH REQUIRED)
+    match /foods/{document} {
+      allow read, write: if true;
+    }
+
+    // Allow public read AND write access to payments collection (NO AUTH REQUIRED)
+    match /payments/{document} {
+      allow read, write: if true;
+    }
+
+    // Allow public read AND write access to userSettings collection (NO AUTH REQUIRED)
+    match /userSettings/{document} {
+      allow read, write: if true;
+    }
+
+    // Everything else requires user to be signed in
+    match /{document=**} {
+      allow read, write: if request.auth != null;
+    }
+  }
+}

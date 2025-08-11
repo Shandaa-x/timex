@@ -18,7 +18,7 @@ class _TimeDisplayCardState extends State<TimeDisplayCard> {
     super.initState();
     _timeStream = Stream.periodic(
       const Duration(seconds: 1),
-          (_) => DateTime.now(),
+      (_) => DateTime.now(),
     );
   }
 
@@ -32,13 +32,16 @@ class _TimeDisplayCardState extends State<TimeDisplayCard> {
           end: Alignment.bottomRight,
           colors: widget.isWorking
               ? [const Color(0xFF059669), const Color(0xFF047857)]
-              : [const Color(0xFF3B82F6), const Color(0xFF1D4ED8)],
+              : [Colors.red, Colors.red],
         ),
         borderRadius: BorderRadius.circular(20),
         boxShadow: [
           BoxShadow(
-            color: (widget.isWorking ? const Color(0xFF059669) : const Color(0xFF3B82F6))
-                .withOpacity(0.3),
+            color:
+                (widget.isWorking
+                        ? const Color(0xFF059669)
+                        : const Color(0xFF3B82F6))
+                    .withOpacity(0.3),
             blurRadius: 20,
             offset: const Offset(0, 8),
           ),
@@ -69,7 +72,7 @@ class _TimeDisplayCardState extends State<TimeDisplayCard> {
                 '${TimeUtils.getWeekdayName(now.weekday)}, ${now.day} ${TimeUtils.getMonthName(now.month)} ${now.year}',
                 style: const TextStyle(
                   fontSize: 16,
-                  color: Colors.white70,
+                  color: Colors.white,
                   fontWeight: FontWeight.w500,
                 ),
               ),
@@ -78,7 +81,10 @@ class _TimeDisplayCardState extends State<TimeDisplayCard> {
 
               // Status indicator
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 8,
+                ),
                 decoration: BoxDecoration(
                   color: Colors.white.withOpacity(0.2),
                   borderRadius: BorderRadius.circular(20),

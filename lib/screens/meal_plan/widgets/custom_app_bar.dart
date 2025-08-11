@@ -55,7 +55,6 @@ class CustomAppBar extends StatelessWidget implements PreferredSizeWidget {
       case CustomAppBarVariant.mealPlan:
         return _buildMealPlanAppBar(context, theme, colorScheme);
       case CustomAppBarVariant.standard:
-      default:
         return _buildStandardAppBar(context, theme, colorScheme);
     }
   }

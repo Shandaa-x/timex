@@ -135,8 +135,16 @@ class _MainScreenState extends State<MainScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return WillPopScope(
-      onWillPop: _onWillPop,
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, result) async {
+        if (!didPop) {
+          final shouldPop = await _onWillPop();
+          if (shouldPop && context.mounted) {
+            Navigator.of(context).pop();
+          }
+        }
+      },
       child: Scaffold(
         body: PageView.builder(
           physics: const NeverScrollableScrollPhysics(),
@@ -166,7 +174,7 @@ class _MainScreenState extends State<MainScreen> {
     final tabs = [
       {'icon': Icons.home, 'label': 'Нүүр'},
       {'icon': Icons.note, 'label': 'Тайлан'},
-      {'icon': Icons.food_bank, 'label': 'Хоол'},
+      {'icon': Icons.food_bank, 'label': 'Хоолны хуваарь'},
       {'icon': Icons.analytics, 'label': 'Хоолны тайлан'},
     ];
 
@@ -193,7 +201,7 @@ class _MainScreenState extends State<MainScreen> {
                       color: isSelected
                           ? const Color(0xFFC7BBE1)
                           : Colors.transparent,
-                      borderRadius: BorderRadius.circular(16),
+                      borderRadius: BorderRadius.circular(12),
                     ),
                     child: Column(
                       mainAxisSize: MainAxisSize.min,
@@ -202,7 +210,7 @@ class _MainScreenState extends State<MainScreen> {
                           tabs[index]['icon'] as IconData,
                           color: isSelected
                               ? Colors.black
-                              : Colors.white.withOpacity(0.6),
+                              : Colors.white.withValues(alpha: 0.6),
                           size: 20,
                         ),
                         txt(
@@ -210,7 +218,7 @@ class _MainScreenState extends State<MainScreen> {
                           style: TxtStl.bodyText1(
                             color: isSelected
                                 ? Colors.black
-                                : Colors.white.withOpacity(0.6),
+                                : Colors.white.withValues(alpha: 0.6),
                             fontSize: 8,
                           ),
                           textAlign: TextAlign.center,

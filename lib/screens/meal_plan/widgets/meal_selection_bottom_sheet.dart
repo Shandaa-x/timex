@@ -516,7 +516,6 @@ class _MealSelectionBottomSheetState extends State<MealSelectionBottomSheet> {
       final year = int.parse(parts[0]);
       final month = int.parse(parts[1]);
       final day = int.parse(parts[2]);
-      final date = DateTime(year, month, day);
 
       const months = [
         'January',

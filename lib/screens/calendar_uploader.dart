@@ -60,7 +60,6 @@ class CalendarUploader {
           final DateTime currentDate = startDate.add(Duration(days: j));
           final String documentId = _formatDateAsId(currentDate);
           final bool isHoliday = holidays.contains(documentId);
-          final bool isWeekend = currentDate.weekday == 6 || currentDate.weekday == 7; // Sat or Sun
 
           // Determine if this day should be confirmed (roughly 50/50 split)
           final bool isConfirmed = confirmedDays.contains(j);

@@ -7,6 +7,9 @@ class CalendarHeaderWidget extends StatelessWidget {
   final VoidCallback onPreviousPressed;
   final VoidCallback onNextPressed;
   final VoidCallback onViewToggle;
+  final VoidCallback? onFilterModeToggle;
+  final bool isFilterMode;
+  final String? selectedFilter;
 
   const CalendarHeaderWidget({
     super.key,
@@ -15,6 +18,9 @@ class CalendarHeaderWidget extends StatelessWidget {
     required this.onPreviousPressed,
     required this.onNextPressed,
     required this.onViewToggle,
+    this.onFilterModeToggle,
+    this.isFilterMode = false,
+    this.selectedFilter,
   });
 
   @override
@@ -113,13 +119,18 @@ class CalendarHeaderWidget extends StatelessWidget {
           // View toggle button
           GestureDetector(
             onTap: onViewToggle,
+            onLongPress: onFilterModeToggle,
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
               decoration: BoxDecoration(
-                color: AppTheme.primaryLight.withOpacity(0.1),
+                color: isFilterMode 
+                  ? Colors.orange.withOpacity(0.1)
+                  : AppTheme.primaryLight.withOpacity(0.1),
                 borderRadius: BorderRadius.circular(20),
                 border: Border.all(
-                  color: AppTheme.primaryLight.withOpacity(0.3),
+                  color: isFilterMode 
+                    ? Colors.orange.withOpacity(0.3)
+                    : AppTheme.primaryLight.withOpacity(0.3),
                   width: 1,
                 ),
               ),
@@ -127,17 +138,21 @@ class CalendarHeaderWidget extends StatelessWidget {
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   Icon(
-                    isWeekView
-                        ? Icons.calendar_view_month
-                        : Icons.calendar_view_week,
-                    color: AppTheme.primaryLight,
+                    isFilterMode
+                        ? Icons.filter_alt
+                        : isWeekView
+                            ? Icons.calendar_view_month
+                            : Icons.calendar_view_week,
+                    color: isFilterMode ? Colors.orange : AppTheme.primaryLight,
                     size: 16,
                   ),
                   const SizedBox(width: 8),
                   Text(
-                    isWeekView ? 'Month' : 'Week',
+                    isFilterMode 
+                        ? (selectedFilter ?? 'All')
+                        : isWeekView ? 'Month' : 'Week',
                     style: theme.textTheme.labelMedium?.copyWith(
-                      color: AppTheme.primaryLight,
+                      color: isFilterMode ? Colors.orange : AppTheme.primaryLight,
                       fontWeight: FontWeight.w600,
                     ),
                   ),
@@ -167,7 +182,9 @@ class CalendarHeaderWidget extends StatelessWidget {
   }
 
   String _getSubtitle() {
-    if (isWeekView) {
+    if (isFilterMode) {
+      return selectedFilter != null ? 'Filtered: $selectedFilter' : 'Filter Mode';
+    } else if (isWeekView) {
       return 'Week View';
     } else {
       final today = DateTime.now();

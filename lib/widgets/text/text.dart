@@ -1,4 +1,3 @@
-import 'package:timex/index.dart';
 import 'package:flutter/material.dart';
 
 class TxtStl {

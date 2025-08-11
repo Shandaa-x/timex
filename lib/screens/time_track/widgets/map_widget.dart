@@ -33,7 +33,7 @@ class MapWidget extends StatelessWidget {
               Icon(Icons.location_off, size: 48, color: Colors.grey.shade400),
               const SizedBox(height: 8),
               Text(
-                'Өнөөдөр ажлын байршил оруулаагүй байна',
+                'Ажлын цаг, байршил бүртгэгдээгүй байна!',
                 style: TextStyle(color: Colors.grey.shade600),
               ),
             ],

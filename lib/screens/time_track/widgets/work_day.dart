@@ -15,6 +15,7 @@ class WorkDay {
   final double workingHours;
   final bool confirmed;
   final List<String> attachmentImages;
+  final bool eatenForDay; // New field to track if food was eaten that day
 
   WorkDay({
     required this.date,
@@ -28,6 +29,7 @@ class WorkDay {
     this.workingHours = 0.0,
     this.confirmed = false,
     this.attachmentImages = const [],
+    this.eatenForDay = false, // Default to false (not eaten)
   });
 
   factory WorkDay.createNew(DateTime dateTime) {
@@ -55,6 +57,7 @@ class WorkDay {
       workingHours: (map['workingHours'] ?? 0.0).toDouble(),
       confirmed: map['confirmed'] ?? false,
       attachmentImages: List<String>.from(map['attachmentImages'] ?? []),
+      eatenForDay: map['eatenForDay'] ?? false, // New field
     );
   }
 
@@ -71,6 +74,7 @@ class WorkDay {
       'workingHours': workingHours,
       'confirmed': confirmed,
       'attachmentImages': attachmentImages,
+      'eatenForDay': eatenForDay, // New field
       'createdAt': FieldValue.serverTimestamp(),
     };
   }
@@ -89,6 +93,7 @@ class WorkDay {
     double? workingHours,
     bool? confirmed,
     List<String>? attachmentImages,
+    bool? eatenForDay, // New field
   }) {
     return WorkDay(
       date: date ?? this.date,
@@ -102,6 +107,7 @@ class WorkDay {
       workingHours: workingHours ?? this.workingHours,
       confirmed: confirmed ?? this.confirmed,
       attachmentImages: attachmentImages ?? this.attachmentImages,
+      eatenForDay: eatenForDay ?? this.eatenForDay, // New field
     );
   }
 }

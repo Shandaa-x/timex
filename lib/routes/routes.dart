@@ -16,8 +16,6 @@ class Routes {
   Route<dynamic> getRoute(RouteSettings settings) {
     Route<dynamic> route;
 
-    final args = settings.arguments;
-
     switch (settings.name) {
       case Routes.main:
         route = MaterialPageRoute(

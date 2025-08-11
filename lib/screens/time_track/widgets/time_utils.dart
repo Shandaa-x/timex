@@ -23,12 +23,6 @@ class TimeUtils {
   }
 
   static int getWeekNumber(DateTime date) {
-    // Get January 1st of the year
-    final jan1 = DateTime(date.year, 1, 1);
-
-    // Find the first Monday of the year (or the Monday of the week containing Jan 1)
-    final firstMonday = jan1.subtract(Duration(days: jan1.weekday - 1));
-
     // Special handling for 2025 - week 1 starts on December 30, 2024
     DateTime weekOneStart;
     if (date.year == 2025) {

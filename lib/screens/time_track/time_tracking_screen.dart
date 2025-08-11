@@ -9,8 +9,7 @@ import 'package:timex/screens/time_track/widgets/work_day.dart';
 import 'package:timex/screens/time_track/widgets/working_hours_card.dart';
 import 'package:timex/screens/time_track/widgets/map_widget.dart';
 import 'package:timex/screens/time_track/widgets/time_entries_list_widget.dart';
-import 'package:timex/screens/time_track/widgets/today_foods_list_widget.dart';
-import 'package:timex/screens/time_track/widgets/food_detail_dialog.dart';
+  import 'package:timex/screens/time_track/widgets/food_eaten_status_widget.dart';
 import 'package:timex/screens/time_track/widgets/schedule_info_widget.dart';
 import 'package:timex/screens/time_track/widgets/location_map_dialog.dart';
 import 'package:timezone/timezone.dart' as tz;
@@ -31,8 +30,8 @@ class _TimeTrackingScreenState extends State<TimeTrackScreen> with TickerProvide
   late FlutterLocalNotificationsPlugin _notificationsPlugin;
 
   // Set work end time to 1:50 PM (13:50)
-  static const int workEndHour = 20;
-  static const int workEndMinute = 50;
+  static const int workEndHour = 17;
+  static const int workEndMinute = 00;
 
   DateTime? _startTime;
   DateTime? _endTime;
@@ -47,6 +46,8 @@ class _TimeTrackingScreenState extends State<TimeTrackScreen> with TickerProvide
   
   // Food data for today
   List<Map<String, dynamic>> _todayFoods = [];
+  bool _eatenForToday = false; // Track if food was eaten today
+  double _totalWorkingHours = 0.0; // Track total working hours for the day
 
   late AnimationController _pulseController;
   late Animation<double> _pulseAnimation;
@@ -100,6 +101,20 @@ class _TimeTrackingScreenState extends State<TimeTrackScreen> with TickerProvide
     _pulseController.repeat(reverse: true);
   }
 
+  // Helper method to ensure calendar day document exists
+  Future<void> _ensureCalendarDayExists(String dateString) async {
+    final calendarDayRef = _firestore.collection('calendarDays').doc(dateString);
+    final calendarDayDoc = await calendarDayRef.get();
+    
+    if (!calendarDayDoc.exists) {
+      // Create the calendar day document first
+      final now = DateTime.now();
+      final workDay = WorkDay.createNew(now);
+      await calendarDayRef.set(workDay.toMap());
+      debugPrint('✅ Created calendar day document: $dateString');
+    }
+  }
+
   Future<void> _loadTodayData() async {
     setState(() => _isLoading = true);
 
@@ -109,8 +124,9 @@ class _TimeTrackingScreenState extends State<TimeTrackScreen> with TickerProvide
 
       // Load today's entries (no user filter needed)
       final entriesSnapshot = await _firestore
+          .collection('calendarDays')
+          .doc(dateString)
           .collection('timeEntries')
-          .where('date', isEqualTo: dateString)
           .get();
 
       _todayEntries = entriesSnapshot.docs.map((doc) {
@@ -146,11 +162,18 @@ class _TimeTrackingScreenState extends State<TimeTrackScreen> with TickerProvide
         }
       }
 
+      // Calculate total working hours from all entries
+      _totalWorkingHours = _calculateTotalWorkingHours(_todayEntries, 
+        currentSessionStart: _isWorking ? _startTime : null);
+
       // Also load legacy calendar data for compatibility
       final doc = await _firestore.collection('calendarDays').doc(dateString).get();
       if (doc.exists) {
         final data = doc.data()!;
         _todayData = WorkDay.fromMap(data);
+        _eatenForToday = data['eatenForDay'] as bool? ?? false;
+      } else {
+        _eatenForToday = false;
       }
 
       // Schedule daily food notification
@@ -386,18 +409,28 @@ class _TimeTrackingScreenState extends State<TimeTrackScreen> with TickerProvide
   }
 
   Future<void> _handleStartWork() async {
+    print('🚀 Starting work process...');
     setState(() => _isLoading = true);
 
     try {
       final now = DateTime.now();
       final dateString = TimeUtils.formatDateString(now);
+      print('📅 Working with date: $dateString');
 
       // Get current location
+      print('📍 Getting current location...');
       final location = await _getCurrentLocation();
       if (location == null) {
+        print('❌ Location is null, aborting');
         setState(() => _isLoading = false);
         return;
       }
+      print('✅ Location obtained: ${location.latitude}, ${location.longitude}');
+
+      // Ensure calendar day document exists
+      print('📝 Ensuring calendar day exists...');
+      await _ensureCalendarDayExists(dateString);
+      print('✅ Calendar day document ready');
 
       // Create time entry for check-in (no userId needed)
       final timeEntryData = {
@@ -412,18 +445,24 @@ class _TimeTrackingScreenState extends State<TimeTrackScreen> with TickerProvide
         'createdAt': FieldValue.serverTimestamp(),
       };
 
-      // Save to timeEntries collection
+      // Save to timeEntries subcollection
+      print('💾 Saving time entry to Firestore...');
       try {
-        await _firestore.collection('timeEntries').add(timeEntryData);
-        debugPrint('✅ Successfully saved check-in time entry to Firestore');
+        await _firestore
+            .collection('calendarDays')
+            .doc(dateString)
+            .collection('timeEntries')
+            .add(timeEntryData);
+        print('✅ Successfully saved check-in time entry to Firestore');
       } catch (firestoreError) {
-        debugPrint('❌ Firestore error during check-in: $firestoreError');
+        print('❌ Firestore error during check-in: $firestoreError');
         _showErrorMessage('Өгөгдөл хадгалахад алдаа гарлаа: $firestoreError');
         setState(() => _isLoading = false);
         return;
       }
 
       // Update calendar day - add to existing hours instead of overwriting
+      print('📝 Updating calendar day document...');
       final workDay = WorkDay.createNew(now);
       final existingDoc = await _firestore.collection('calendarDays').doc(workDay.documentId).get();
       
@@ -433,9 +472,11 @@ class _TimeTrackingScreenState extends State<TimeTrackScreen> with TickerProvide
           'lastCheckIn': Timestamp.fromDate(now),
           'updatedAt': FieldValue.serverTimestamp(),
         });
+        print('✅ Updated existing calendar day document');
       } else {
         // Create new document
         await _firestore.collection('calendarDays').doc(workDay.documentId).set(workDay.toMap());
+        print('✅ Created new calendar day document');
       }
 
       // Calculate scheduled end time
@@ -451,10 +492,13 @@ class _TimeTrackingScreenState extends State<TimeTrackScreen> with TickerProvide
         _manuallyEndedWork = false;
       });
 
-      // Reload entries to show the new check-in
+      // Reload entries to show the new check-in and update total working hours
+      print('🔄 Reloading today\'s data...');
       await _loadTodayData();
+      print('✅ Data reloaded successfully');
 
       // Schedule notifications
+      print('⏰ Scheduling notifications...');
       await _scheduleEndWorkNotifications(scheduledEndTime);
 
       // Schedule auto-end work at 10 PM
@@ -463,9 +507,12 @@ class _TimeTrackingScreenState extends State<TimeTrackScreen> with TickerProvide
       _showSuccessMessage(
         'Ажилд ирлээ! 🎉\nБайршил: ${location.latitude.toStringAsFixed(6)}, ${location.longitude.toStringAsFixed(6)}',
       );
+      print('🎉 Work started successfully!');
     } catch (e) {
       print('❌ Error starting work: $e');
-      _showErrorMessage('Алдаа гарлаацбцббц: $e');
+      print('❌ Error type: ${e.runtimeType}');
+      print('❌ Stack trace: ${StackTrace.current}');
+      _showErrorMessage('Алдаа гарлаа: $e');
     } finally {
       setState(() => _isLoading = false);
     }
@@ -491,6 +538,9 @@ class _TimeTrackingScreenState extends State<TimeTrackScreen> with TickerProvide
         return;
       }
 
+      // Ensure calendar day document exists
+      await _ensureCalendarDayExists(dateString);
+
       // Create time entry for check-out (no userId needed)
       final timeEntryData = {
         'date': dateString,
@@ -506,9 +556,13 @@ class _TimeTrackingScreenState extends State<TimeTrackScreen> with TickerProvide
         'createdAt': FieldValue.serverTimestamp(),
       };
 
-      // Save to timeEntries collection
+      // Save to timeEntries subcollection
       try {
-        await _firestore.collection('timeEntries').add(timeEntryData);
+        await _firestore
+            .collection('calendarDays')
+            .doc(dateString)
+            .collection('timeEntries')
+            .add(timeEntryData);
         debugPrint('✅ Successfully saved check-out time entry to Firestore');
       } catch (firestoreError) {
         debugPrint('❌ Firestore error during check-out: $firestoreError');
@@ -519,8 +573,9 @@ class _TimeTrackingScreenState extends State<TimeTrackScreen> with TickerProvide
 
       // Update calendar day - calculate total working hours from all entries
       final allEntries = await _firestore
+          .collection('calendarDays')
+          .doc(dateString)
           .collection('timeEntries')
-          .where('date', isEqualTo: dateString)
           .get();
 
       // Convert to list and sort by timestamp
@@ -531,20 +586,14 @@ class _TimeTrackingScreenState extends State<TimeTrackScreen> with TickerProvide
         return timestampA.compareTo(timestampB);
       });
 
-      double totalHours = 0.0;
-      DateTime? sessionStart;
-      
-      for (final entry in entryDocs) {
-        final data = entry.data();
-        final timestamp = (data['timestamp'] as Timestamp).toDate();
-        
-        if (data['type'] == 'check_in') {
-          sessionStart = timestamp;
-        } else if (data['type'] == 'check_out' && sessionStart != null) {
-          totalHours += timestamp.difference(sessionStart).inMinutes / 60.0;
-          sessionStart = null;
-        }
-      }
+      // Convert to our format for calculation
+      final allEntriesData = entryDocs.map((doc) {
+        final data = doc.data();
+        data['id'] = doc.id;
+        return data;
+      }).toList();
+
+      final totalHours = _calculateTotalWorkingHours(allEntriesData);
 
       await _firestore.collection('calendarDays').doc(dateString).update({
         'endTime': Timestamp.fromDate(now),
@@ -560,6 +609,7 @@ class _TimeTrackingScreenState extends State<TimeTrackScreen> with TickerProvide
         _isWorking = false;
         _scheduledEndTime = null;
         _currentLocation = location;
+        _totalWorkingHours = totalHours;
         if (_todayData != null) {
           _todayData = _todayData!.copyWith(endTime: now, workingHours: totalHours);
         }
@@ -593,6 +643,9 @@ class _TimeTrackingScreenState extends State<TimeTrackScreen> with TickerProvide
         return;
       }
 
+      // Ensure calendar day document exists
+      await _ensureCalendarDayExists(dateString);
+
       // Create time entry for additional check-in (no userId needed)
       final timeEntryData = {
         'date': dateString,
@@ -606,9 +659,13 @@ class _TimeTrackingScreenState extends State<TimeTrackScreen> with TickerProvide
         'createdAt': FieldValue.serverTimestamp(),
       };
 
-      // Save to timeEntries collection
+      // Save to timeEntries subcollection
       try {
-        await _firestore.collection('timeEntries').add(timeEntryData);
+        await _firestore
+            .collection('calendarDays')
+            .doc(dateString)
+            .collection('timeEntries')
+            .add(timeEntryData);
         debugPrint('✅ Successfully saved additional check-in time entry to Firestore');
       } catch (firestoreError) {
         debugPrint('❌ Firestore error during additional check-in: $firestoreError');
@@ -628,7 +685,7 @@ class _TimeTrackingScreenState extends State<TimeTrackScreen> with TickerProvide
         _currentLocation = location;
       });
 
-      // Reload entries to show the new check-in
+      // Reload entries to show the new check-in and update total working hours
       await _loadTodayData();
 
       // Schedule notifications
@@ -643,12 +700,6 @@ class _TimeTrackingScreenState extends State<TimeTrackScreen> with TickerProvide
     } finally {
       setState(() => _isLoading = false);
     }
-  }
-  void _showFoodDetailDialog(Map<String, dynamic> food) {
-    showDialog(
-      context: context,
-      builder: (context) => FoodDetailDialog(food: food),
-    );
   }
 
   void _showLocationOnMap(Map<String, dynamic> location) {
@@ -711,6 +762,9 @@ class _TimeTrackingScreenState extends State<TimeTrackScreen> with TickerProvide
       final autoEndTime = DateTime(now.year, now.month, now.day, 22, 0); // 10:00 PM
       final startDate = TimeUtils.formatDateString(_startTime!); // Use start date, not auto-end date
 
+      // Ensure calendar day document exists
+      await _ensureCalendarDayExists(startDate);
+
       // Get current location (or use last known location)
       Position? location = await _getCurrentLocation();
       
@@ -744,8 +798,12 @@ class _TimeTrackingScreenState extends State<TimeTrackScreen> with TickerProvide
         'createdAt': FieldValue.serverTimestamp(),
       };
 
-      // Save to timeEntries collection
-      await _firestore.collection('timeEntries').add(timeEntryData);
+      // Save to timeEntries subcollection
+      await _firestore
+          .collection('calendarDays')
+          .doc(startDate)
+          .collection('timeEntries')
+          .add(timeEntryData);
 
       // Update calendar day to mark as incomplete
       await _firestore.collection('calendarDays').doc(startDate).update({
@@ -816,6 +874,31 @@ class _TimeTrackingScreenState extends State<TimeTrackScreen> with TickerProvide
         duration: const Duration(seconds: 6),
       ),
     );
+  }
+
+  // Method to calculate total working hours from all time entries
+  double _calculateTotalWorkingHours(List<Map<String, dynamic>> entries, {DateTime? currentSessionStart}) {
+    double totalHours = 0.0;
+    DateTime? sessionStart;
+    
+    // Process all completed sessions from entries
+    for (final entry in entries) {
+      final timestamp = (entry['timestamp'] as Timestamp).toDate();
+      
+      if (entry['type'] == 'check_in') {
+        sessionStart = timestamp;
+      } else if ((entry['type'] == 'check_out' || entry['type'] == 'auto_check_out') && sessionStart != null) {
+        totalHours += timestamp.difference(sessionStart).inMinutes / 60.0;
+        sessionStart = null;
+      }
+    }
+    
+    // Add current session if working
+    if (currentSessionStart != null && _isWorking) {
+      totalHours += DateTime.now().difference(currentSessionStart).inMinutes / 60.0;
+    }
+    
+    return totalHours;
   }
 
   @override
@@ -899,6 +982,7 @@ class _TimeTrackingScreenState extends State<TimeTrackScreen> with TickerProvide
                           startTime: _startTime!,
                           endTime: _endTime,
                           isWorking: _isWorking,
+                          totalWorkingHours: _totalWorkingHours,
                         ),
 
                       if (_startTime != null) const SizedBox(height: 24),
@@ -909,10 +993,15 @@ class _TimeTrackingScreenState extends State<TimeTrackScreen> with TickerProvide
                         onLocationTap: _showLocationOnMap,
                       ),
 
-                      // Today's Foods List
-                      TodayFoodsListWidget(
+                      // Food Eaten Status Widget
+                      FoodEatenStatusWidget(
                         todayFoods: _todayFoods,
-                        onFoodTap: _showFoodDetailDialog,
+                        eatenForDay: _eatenForToday,
+                        dateString: TimeUtils.formatDateString(DateTime.now()),
+                        onStatusChanged: () {
+                          // Reload today's data when status changes
+                          _loadTodayData();
+                        },
                       ),
 
                       // Google Maps Widget
@@ -962,31 +1051,6 @@ class _TimeTrackingScreenState extends State<TimeTrackScreen> with TickerProvide
                               isLoading: _isLoading,
                             ),
                           ],
-                        ),
-
-                      if (_endTime != null)
-                        Container(
-                          padding: const EdgeInsets.all(20),
-                          decoration: BoxDecoration(
-                            color: const Color(0xFF10B981),
-                            borderRadius: BorderRadius.circular(16),
-                          ),
-                          child: Row(
-                            children: [
-                              const Icon(Icons.check_circle, color: Colors.white, size: 24),
-                              const SizedBox(width: 12),
-                              Expanded(
-                                child: Text(
-                                  'Өнөөдрийн ажил дууссан байна!',
-                                  style: const TextStyle(
-                                    color: Colors.white,
-                                    fontSize: 16,
-                                    fontWeight: FontWeight.w600,
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
                         ),
 
                       const SizedBox(height: 32),

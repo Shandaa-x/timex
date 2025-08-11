@@ -5,12 +5,14 @@ class WorkingHoursCard extends StatefulWidget {
   final DateTime startTime;
   final DateTime? endTime;
   final bool isWorking;
+  final double totalWorkingHours; // Total accumulated hours for the day
 
   const WorkingHoursCard({
     super.key,
     required this.startTime,
     this.endTime,
     required this.isWorking,
+    required this.totalWorkingHours,
   });
 
   @override
@@ -73,13 +75,14 @@ class _WorkingHoursCardState extends State<WorkingHoursCard> {
               stream: _timeStream,
               builder: (context, snapshot) {
                 final now = snapshot.data ?? DateTime.now();
-                final duration = now.difference(widget.startTime);
-                final hours = TimeUtils.calculateWorkingHours(widget.startTime, now);
+                final currentSessionDuration = now.difference(widget.startTime);
+                final currentSessionHours = currentSessionDuration.inMinutes / 60.0;
+                final totalHoursWithCurrent = widget.totalWorkingHours + currentSessionHours;
 
                 return Column(
                   children: [
                     Text(
-                      TimeUtils.formatDuration(duration),
+                      TimeUtils.formatDuration(Duration(minutes: (totalHoursWithCurrent * 60).round())),
                       style: const TextStyle(
                         fontSize: 32,
                         fontWeight: FontWeight.w700,
@@ -88,7 +91,7 @@ class _WorkingHoursCardState extends State<WorkingHoursCard> {
                     ),
                     const SizedBox(height: 8),
                     Text(
-                      '${hours.toStringAsFixed(1)} цаг',
+                      '${totalHoursWithCurrent.toStringAsFixed(1)}ц',
                       style: const TextStyle(
                         fontSize: 16,
                         color: Color(0xFF64748B),
@@ -101,7 +104,7 @@ class _WorkingHoursCardState extends State<WorkingHoursCard> {
             )
           else if (widget.endTime != null) ...[
             Text(
-              TimeUtils.formatDuration(widget.endTime!.difference(widget.startTime)),
+              TimeUtils.formatDuration(Duration(minutes: (widget.totalWorkingHours * 60).round())),
               style: const TextStyle(
                 fontSize: 32,
                 fontWeight: FontWeight.w700,
@@ -110,7 +113,7 @@ class _WorkingHoursCardState extends State<WorkingHoursCard> {
             ),
             const SizedBox(height: 8),
             Text(
-              '${TimeUtils.calculateWorkingHours(widget.startTime, widget.endTime!).toStringAsFixed(1)} цаг',
+              '${widget.totalWorkingHours.toStringAsFixed(1)}ц',
               style: const TextStyle(
                 fontSize: 16,
                 color: Color(0xFF64748B),

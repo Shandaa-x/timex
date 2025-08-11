@@ -35,12 +35,12 @@ class TimeEntriesListWidget extends StatelessWidget {
         child: const Row(
           children: [
             Icon(Icons.info_outline, color: Color(0xFF6B7280)),
-            SizedBox(width: 12),
+            SizedBox(width: 5),
             Text(
               'Өнөөдөр ямар ч орсон гарсан байхгүй байна',
               style: TextStyle(
                 color: Color(0xFF6B7280),
-                fontSize: 14,
+                fontSize: 12,
               ),
               maxLines: 3,
             ),

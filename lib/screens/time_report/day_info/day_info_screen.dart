@@ -21,7 +21,6 @@ class _DayInfoScreenState extends State<DayInfoScreen> {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   List<Map<String, dynamic>> _timeEntries = [];
   bool _isLoading = true;
-  GoogleMapController? _mapController;
 
   @override
   void initState() {
@@ -32,8 +31,9 @@ class _DayInfoScreenState extends State<DayInfoScreen> {
   Future<void> _loadTimeEntries() async {
     try {
       final entriesSnapshot = await _firestore
+          .collection('calendarDays')
+          .doc(widget.dateString)
           .collection('timeEntries')
-          .where('date', isEqualTo: widget.dateString)
           .get();
 
       _timeEntries = entriesSnapshot.docs.map((doc) {
@@ -549,7 +549,7 @@ class _DayInfoScreenState extends State<DayInfoScreen> {
               borderRadius: BorderRadius.circular(12),
               child: GoogleMap(
                 onMapCreated: (controller) {
-                  _mapController = controller;
+                  // Map controller setup if needed
                 },
                 initialCameraPosition: CameraPosition(
                   target: centerPosition,

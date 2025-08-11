@@ -101,7 +101,6 @@ class _CustomBottomBarState extends State<CustomBottomBar>
       case CustomBottomBarVariant.minimal:
         return _buildMinimalBottomBar(context, theme, colorScheme);
       case CustomBottomBarVariant.standard:
-      default:
         return _buildStandardBottomBar(context, theme, colorScheme);
     }
   }

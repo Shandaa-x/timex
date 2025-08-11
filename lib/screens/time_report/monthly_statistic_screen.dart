@@ -69,6 +69,47 @@ class _MonthlyStatisticsScreenState extends State<MonthlyStatisticsScreen> {
     _loadMonthlyData();
   }
 
+  // Helper method to get current week number (ISO 8601 week numbering)
+  // This matches the exact implementation used in calendar_uploader.dart
+  int _getCurrentWeekNumber() {
+    final date = DateTime.now();
+    
+    // ISO 8601 week numbering:
+    // - Week starts on Monday (weekday 1)
+    // - Week 1 is the first week with at least 4 days in the new year
+    // - Week 1 contains January 4th
+
+    // Find January 4th of the same year
+    final DateTime jan4 = DateTime(date.year, 1, 4);
+
+    // Find the Monday of the week containing January 4th
+    final DateTime firstMonday = jan4.subtract(Duration(days: jan4.weekday - 1));
+
+    // Calculate days since first Monday
+    final int daysSinceFirstMonday = date.difference(firstMonday).inDays;
+
+    // Calculate week number
+    final int weekNumber = (daysSinceFirstMonday / 7).floor() + 1;
+
+    // Handle edge cases for beginning and end of year
+    if (weekNumber < 1) {
+      // This date belongs to the last week of the previous year
+      return _getCurrentWeekNumber(); // Should use previous year calc, but for now return 1
+    } else if (weekNumber > 52) {
+      // Check if this should be week 1 of next year
+      final DateTime nextJan4 = DateTime(date.year + 1, 1, 4);
+      final DateTime nextFirstMonday = nextJan4.subtract(Duration(days: nextJan4.weekday - 1));
+
+      if (date.isAfter(nextFirstMonday) || date.isAtSameMomentAs(nextFirstMonday)) {
+        return 1; // This is week 1 of next year
+      } else {
+        return weekNumber; // This is week 53 of current year (rare)
+      }
+    }
+
+    return weekNumber;
+  }
+
   Future<void> _loadMonthlyData() async {
     setState(() {
       _isLoading = true;
@@ -93,6 +134,30 @@ class _MonthlyStatisticsScreenState extends State<MonthlyStatisticsScreen> {
 
         print('Processing day: $dateString, data: $calendarDay');
 
+        // Check if there are time entries for this day to determine if work was actually done
+        final timeEntriesSnapshot = await _firestore
+            .collection('calendarDays')
+            .doc(dateString)
+            .collection('timeEntries')
+            .get();
+
+        // Check if there's at least one check-out entry (indicating work was completed)
+        bool hasWorkEnded = false;
+        if (timeEntriesSnapshot.docs.isNotEmpty) {
+          final entries = timeEntriesSnapshot.docs.map((doc) => doc.data()).toList();
+          entries.sort((a, b) {
+            final timestampA = (a['timestamp'] as Timestamp).toDate();
+            final timestampB = (b['timestamp'] as Timestamp).toDate();
+            return timestampA.compareTo(timestampB);
+          });
+          
+          // Check if the last entry is a check-out type
+          if (entries.isNotEmpty) {
+            final lastEntry = entries.last;
+            hasWorkEnded = lastEntry['type'] == 'check_out' || lastEntry['type'] == 'auto_check_out';
+          }
+        }
+
         final Map<String, dynamic> dayData = {
           'date': dateString,
           'day': calendarDay['day'],
@@ -101,6 +166,7 @@ class _MonthlyStatisticsScreenState extends State<MonthlyStatisticsScreen> {
           'confirmed': calendarDay['confirmed'] ?? false,
           'isHoliday': calendarDay['isHoliday'] ?? false,
           'attachmentImages': calendarDay['attachmentImages'] ?? [],
+          'hasWorkEnded': hasWorkEnded, // New field to indicate if work was completed
         };
 
         // Only count confirmed days that are not holidays and have working hours
@@ -131,11 +197,39 @@ class _MonthlyStatisticsScreenState extends State<MonthlyStatisticsScreen> {
 
       print('Processed ${processedDays.length} days, filtered to ${filteredData.length}');
 
+      // Auto-select current week if we're viewing current month/year and haven't manually selected a week
+      int? autoSelectedWeek = _selectedWeekNumber;
+      if (_selectedMonth == DateTime.now().month && 
+          _selectedYear == DateTime.now().year && 
+          _selectedWeekNumber == null) {
+        final currentWeek = _getCurrentWeekNumber();
+        print('Current date: ${DateTime.now()}');
+        print('Calculated current week: $currentWeek');
+        print('Available weeks in month: ${weekNumbers.toList()..sort()}');
+        
+        if (weekNumbers.contains(currentWeek)) {
+          print('Auto-selecting current week: $currentWeek');
+          autoSelectedWeek = currentWeek;
+          filteredData = processedDays
+              .where((day) => day['weekNumber'] == currentWeek)
+              .toList();
+          
+          // Recalculate chart data for the auto-selected week
+          final chartData = ChartCalculator.calculateChartData(processedDays, autoSelectedWeek);
+          _monthlyChartData = chartData.monthlyChartData;
+          _weeklyChartData = chartData.weeklyChartData;
+          _weeklyHours = chartData.weeklyHours;
+        } else {
+          print('Current week $currentWeek not found in available weeks');
+        }
+      }
+
       setState(() {
         _monthlyData = {'days': processedDays, 'weekNumbers': weekNumbers.toList()..sort()};
         _weeklyData = filteredData;
         _totalHours = totalWorkedHours;
         _monthlyHours = totalWorkedHours;
+        _selectedWeekNumber = autoSelectedWeek; // Set the auto-selected week
         _isLoading = false;
       });
     } catch (e) {
@@ -315,7 +409,7 @@ class _MonthlyStatisticsScreenState extends State<MonthlyStatisticsScreen> {
 
     return PopScope(
       canPop: true,
-      onPopInvoked: (bool didPop) {
+      onPopInvokedWithResult: (bool didPop, dynamic result) {
         if (didPop) {
           // Handle back navigation if needed
           return;
@@ -336,8 +430,8 @@ class _MonthlyStatisticsScreenState extends State<MonthlyStatisticsScreen> {
               elevation: 0,
               flexibleSpace: FlexibleSpaceBar(
                 title: const Text(
-                  'Сарын статистик',
-                  style: TextStyle(fontWeight: FontWeight.w600, fontSize: 15),
+                  'Тайлан',
+                  style: TextStyle(fontWeight: FontWeight.w600, fontSize: 15, color: Colors.white),
                 ),
                 background: Container(decoration: const BoxDecoration(color: Colors.blueAccent)),
               ),
@@ -439,11 +533,11 @@ class _MonthlyStatisticsScreenState extends State<MonthlyStatisticsScreen> {
                                       onChanged: (value) {
                                         setState(() {
                                           _selectedMonth = value!;
-                                          _selectedWeekNumber = null;
+                                          _selectedWeekNumber = null; // Reset week selection
                                           _expandedDays.clear();
                                           _selectedImages.clear();
                                         });
-                                        _loadMonthlyData();
+                                        _loadMonthlyData(); // This will auto-select current week if applicable
                                       },
                                     ),
                                   ),
@@ -463,11 +557,11 @@ class _MonthlyStatisticsScreenState extends State<MonthlyStatisticsScreen> {
                                       onChanged: (value) {
                                         setState(() {
                                           _selectedYear = value!;
-                                          _selectedWeekNumber = null;
+                                          _selectedWeekNumber = null; // Reset week selection
                                           _expandedDays.clear();
                                           _selectedImages.clear();
                                         });
-                                        _loadMonthlyData();
+                                        _loadMonthlyData(); // This will auto-select current week if applicable
                                       },
                                     ),
                                   ),

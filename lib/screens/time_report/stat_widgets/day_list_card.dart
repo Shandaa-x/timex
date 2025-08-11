@@ -48,7 +48,7 @@ class DaysListCard extends StatelessWidget {
               ),
               const SizedBox(width: 12),
               const Text(
-                'Өдрийн жагсаалт',
+                'Ажилласан өдрүүд',
                 style: TextStyle(
                   fontSize: 18,
                   fontWeight: FontWeight.w600,
@@ -161,7 +161,7 @@ class DaysListCard extends StatelessWidget {
                 const Spacer(),
 
                 // Status Badge
-                _buildStatusBadge(isHoliday, workingHours, isConfirmed, dateString),
+                _buildStatusBadge(isHoliday, workingHours, isConfirmed, dateString, dayData),
 
                 const SizedBox(width: 8),
 
@@ -370,13 +370,13 @@ class DaysListCard extends StatelessWidget {
     );
   }
 
-  Widget _buildStatusBadge(bool isHoliday, double workingHours, bool isConfirmed, String dateString) {
+  Widget _buildStatusBadge(bool isHoliday, double workingHours, bool isConfirmed, String dateString, Map<String, dynamic> dayData) {
     if (isHoliday) {
       return _buildBadge('Баяр', const Color(0xFFFB923C), const Color(0xFFFED7AA), () {});
     } else if (isConfirmed) {
       return _buildBadge('Батлагдсан', const Color(0xFF10B981), const Color(0xFFD1FAE5), () {});
     } else {
-      return _buildConfirmButton(dateString, weeklyData.firstWhere((day) => day['date'] == dateString, orElse: () => {})['endTime']);
+      return _buildConfirmButton(dateString, dayData);
     }
   }
 
@@ -394,9 +394,13 @@ class DaysListCard extends StatelessWidget {
     );
   }
 
-  Widget _buildConfirmButton(String dateString, dynamic endTime) {
+  Widget _buildConfirmButton(String dateString, Map<String, dynamic> dayData) {
     final isConfirming = confirmingDays.contains(dateString);
-    final isDisabled = endTime == null; // Disable if work day hasn't ended
+    final workingHours = dayData['workingHours']?.toDouble() ?? 0.0;
+    final hasWorkEnded = dayData['hasWorkEnded'] ?? false;
+    
+    // Check if work day has ended (has working hours AND work was actually completed)
+    final isDisabled = workingHours <= 0.0 || !hasWorkEnded;
     final isInteractionDisabled = isConfirming || isDisabled;
 
     return GestureDetector(
