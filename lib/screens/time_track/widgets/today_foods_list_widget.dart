@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
+import '../../../services/money_format.dart';
 
 class TodayFoodsListWidget extends StatelessWidget {
   final List<Map<String, dynamic>> todayFoods;
@@ -135,7 +136,7 @@ class TodayFoodsListWidget extends StatelessWidget {
                                 ),
                               if (food['price'] != null)
                                 Text(
-                                  '₮ ${food['price']}',
+                                  MoneyFormatService.formatWithSymbol(food['price'] ?? 0),
                                   style: const TextStyle(
                                     fontSize: 14,
                                     color: Color(0xFF059669),

@@ -79,6 +79,3 @@ delgetsee tsegtsleh
 - ✅ ajildaa irsen bol hool idsen gsn vg, ircheed ideegvi bol yah we
 - ✅ hool idsen huwisagch eatenForDay
 - ✅ hool => udriin zadargaandeer tulsun gdg towch tawih, tuluugvi hoolnii jagsaalt geh met filter hiih
-- ✅ **NEW**: Payment tracking for individual meals with "Төлөх" buttons
-- ✅ **NEW**: Updated UI to focus on unpaid meals instead of uneaten meals
-- ✅ **NEW**: Summary cards show payment status breakdown

@@ -14,6 +14,7 @@ class DaysListCard extends StatelessWidget {
   final Function(String) onPickImage;
   final Function(String, int) onRemoveSelectedImage;
   final Function(String, Map<String, dynamic>)? onImageTap; // New parameter for navigation
+  final Map<String, bool>? eatenForDayData; // New parameter for food eaten status
 
   const DaysListCard({
     super.key,
@@ -28,6 +29,7 @@ class DaysListCard extends StatelessWidget {
     required this.onPickImage,
     required this.onRemoveSelectedImage,
     this.onImageTap, // New optional parameter
+    this.eatenForDayData, // New optional parameter for food status
   });
 
   @override
@@ -162,6 +164,12 @@ class DaysListCard extends StatelessWidget {
 
                 // Status Badge
                 _buildStatusBadge(isHoliday, workingHours, isConfirmed, dateString, dayData),
+
+                // Food eaten status for confirmed days
+                if (isConfirmed && eatenForDayData != null) ...[
+                  const SizedBox(width: 8),
+                  _buildFoodStatusBadge(dateString),
+                ],
 
                 const SizedBox(width: 8),
 
@@ -443,6 +451,34 @@ class DaysListCard extends StatelessWidget {
             ),
           ],
         ),
+      ),
+    );
+  }
+
+  Widget _buildFoodStatusBadge(String dateString) {
+    final eatenForDay = eatenForDayData?[dateString] ?? false;
+    
+    // Only show badge if food was eaten
+    if (!eatenForDay) {
+      return const SizedBox.shrink();
+    }
+    
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        color: const Color(0xFF10B981).withOpacity(0.1),
+        borderRadius: BorderRadius.circular(6),
+        border: Border.all(color: const Color(0xFF10B981).withOpacity(0.3)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(
+            Icons.restaurant,
+            size: 12,
+            color: const Color(0xFF10B981),
+          ),
+        ],
       ),
     );
   }

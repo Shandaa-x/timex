@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../../theme/app_theme.dart';
 import '../../widgets/common_app_bar.dart';
+import '../../services/money_format.dart';
 import 'widgets/month_navigation_widget.dart';
 import 'widgets/summary_section_widget.dart';
 import 'widgets/food_frequency_section_widget.dart';

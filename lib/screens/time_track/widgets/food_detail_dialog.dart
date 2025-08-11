@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
+import '../../../services/money_format.dart';
 
 class FoodDetailDialog extends StatelessWidget {
   final Map<String, dynamic> food;
@@ -105,7 +106,7 @@ class FoodDetailDialog extends StatelessWidget {
                           borderRadius: BorderRadius.circular(8),
                         ),
                         child: Text(
-                          '₮ ${food['price']}',
+                          MoneyFormatService.formatWithSymbol(food['price'] ?? 0),
                           style: const TextStyle(
                             fontSize: 18,
                             color: Color(0xFF059669),

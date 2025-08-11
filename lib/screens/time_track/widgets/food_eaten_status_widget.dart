@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import '../../../services/money_format.dart';
 
 class FoodEatenStatusWidget extends StatefulWidget {
   final List<Map<String, dynamic>> todayFoods;
@@ -202,7 +203,7 @@ class _FoodEatenStatusWidgetState extends State<FoodEatenStatusWidget> {
                         ),
                       ),
                       Text(
-                        '${widget.todayFoods.length} хоол • ₮$_totalFoodPrice',
+                        '${widget.todayFoods.length} хоол • ${MoneyFormatService.formatWithSymbol(_totalFoodPrice)}',
                         style: TextStyle(
                           fontSize: 14,
                           color: widget.eatenForDay ? Colors.green[600] : Colors.grey[600],
@@ -356,7 +357,7 @@ class _FoodEatenStatusWidgetState extends State<FoodEatenStatusWidget> {
                   const SizedBox(height: 16),
                 ],
                 
-                _buildDetailRow('Үнэ', '₮${food['price'] ?? 0}', Icons.monetization_on),
+                _buildDetailRow('Үнэ', MoneyFormatService.formatWithSymbol(food['price'] ?? 0), Icons.monetization_on),
                 const SizedBox(height: 16),
                 
                 if (food['category'] != null && food['category'].isNotEmpty) ...[
@@ -549,7 +550,7 @@ class _FoodEatenStatusWidgetState extends State<FoodEatenStatusWidget> {
               mainAxisSize: MainAxisSize.min,
               children: [
                 Text(
-                  '₮${food['price'] ?? 0}',
+                  MoneyFormatService.formatWithSymbol(food['price'] ?? 0),
                   style: TextStyle(
                     fontSize: 16,
                     fontWeight: FontWeight.w600,

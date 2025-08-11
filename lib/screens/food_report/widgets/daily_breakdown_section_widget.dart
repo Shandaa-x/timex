@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../../theme/app_theme.dart';
+import '../../../services/money_format.dart';
 
 class DailyBreakdownSectionWidget extends StatelessWidget {
   final Map<String, List<Map<String, dynamic>>> unpaidFoodData;
@@ -132,7 +133,7 @@ class DailyBreakdownSectionWidget extends StatelessWidget {
                             ),
                             const SizedBox(width: 4),
                             Text(
-                              '₮$dayTotal',
+                              MoneyFormatService.formatWithSymbol(dayTotal),
                               style: theme.textTheme.bodyMedium?.copyWith(
                                 fontWeight: FontWeight.w600,
                                 color: AppTheme.warningLight,
@@ -205,7 +206,7 @@ class DailyBreakdownSectionWidget extends StatelessWidget {
                             crossAxisAlignment: CrossAxisAlignment.end,
                             children: [
                               Text(
-                                '₮$price',
+                                MoneyFormatService.formatWithSymbol(price),
                                 style: theme.textTheme.bodyMedium?.copyWith(
                                   fontWeight: FontWeight.w600,
                                   color: AppTheme.warningLight,

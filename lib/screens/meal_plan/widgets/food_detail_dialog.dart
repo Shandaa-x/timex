@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../../../theme/app_theme.dart';
+import '../../../services/money_format.dart';
 
 class FoodDetailDialog extends StatefulWidget {
   final Map<String, dynamic> food;
@@ -350,7 +351,7 @@ class _FoodDetailDialogState extends State<FoodDetailDialog> {
                   Row(
                     children: [
                       Text(
-                        'Price: ₮${_foodData['price']}',
+                        'Price: ${MoneyFormatService.formatWithSymbol(_foodData['price'] ?? 0)}',
                         style: theme.textTheme.titleMedium?.copyWith(
                           fontWeight: FontWeight.w600,
                           color: AppTheme.successLight,

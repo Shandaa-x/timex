@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../../../theme/app_theme.dart';
+import '../../../services/money_format.dart';
 
 class WeekViewWidget extends StatefulWidget {
   final DateTime currentWeek;
@@ -33,6 +34,85 @@ class _WeekViewWidgetState extends State<WeekViewWidget> {
   final Map<String, bool> _expandedFoods = {};
   final String _currentUserId = 'user_123'; // Mock user ID - in real app, get from auth
   bool _isLoading = false;
+  
+  // Payment and eaten status tracking
+  Map<String, bool> _eatenForDayData = {}; // Track which days food was eaten
+  Map<String, bool> _paidMeals = {}; // Track which individual meals are paid for
+
+  @override
+  void initState() {
+    super.initState();
+    _loadWeekData();
+  }
+
+  Future<void> _loadWeekData() async {
+    await Future.wait([
+      _loadEatenForDayData(),
+      _loadMealPaymentStatus(),
+    ]);
+  }
+
+  // Load eaten for day data for the current week
+  Future<void> _loadEatenForDayData() async {
+    try {
+      final weekStart = widget.currentWeek.subtract(Duration(days: widget.currentWeek.weekday - 1));
+      final weekDays = List.generate(7, (index) => weekStart.add(Duration(days: index)));
+
+      for (final day in weekDays) {
+        final dateKey = _formatDateKey(day);
+        
+        final calendarDoc = await FirebaseFirestore.instance
+            .collection('calendarDays')
+            .doc(dateKey)
+            .get();
+
+        if (calendarDoc.exists) {
+          final data = calendarDoc.data()!;
+          _eatenForDayData[dateKey] = data['eatenForDay'] as bool? ?? false;
+        } else {
+          _eatenForDayData[dateKey] = false;
+        }
+      }
+      
+      if (mounted) setState(() {});
+    } catch (e) {
+      print('Error loading eaten for day data: $e');
+    }
+  }
+
+  // Load meal payment status for the current week
+  Future<void> _loadMealPaymentStatus() async {
+    try {
+      final userId = 'current_user'; // Replace with actual user ID
+      final now = DateTime.now();
+      final monthKey = '${now.year}-${now.month.toString().padLeft(2, '0')}';
+
+      final docSnapshot = await FirebaseFirestore.instance
+          .collection('mealPayments')
+          .doc('$userId-$monthKey')
+          .get();
+
+      if (docSnapshot.exists) {
+        final data = docSnapshot.data()!;
+        _paidMeals = Map<String, bool>.from(data['paidMeals'] ?? {});
+      } else {
+        _paidMeals = {};
+      }
+      
+      if (mounted) setState(() {});
+    } catch (e) {
+      print('Error loading meal payment status: $e');
+      _paidMeals = {};
+    }
+  }
+
+  @override
+  void didUpdateWidget(WeekViewWidget oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.currentWeek != widget.currentWeek) {
+      _loadWeekData();
+    }
+  }
 
   @override
   void dispose() {
@@ -157,16 +237,18 @@ class _WeekViewWidgetState extends State<WeekViewWidget> {
                           ),
                           child: Row(
                             children: [
-                              Text(
-                                '${_getDayName(day.weekday)}, ${_getMonthName(day.month)} ${day.day}',
-                                style: theme.textTheme.titleSmall?.copyWith(
-                                  fontWeight: FontWeight.w600,
-                                  color: _isToday(day)
-                                      ? AppTheme.primaryLight
-                                      : colorScheme.onSurface,
+                              Expanded(
+                                child: Text(
+                                  '${_getDayName(day.weekday)}, ${_getMonthName(day.month)} ${day.day}',
+                                  style: theme.textTheme.titleSmall?.copyWith(
+                                    fontWeight: FontWeight.w600,
+                                    color: _isToday(day)
+                                        ? AppTheme.primaryLight
+                                        : colorScheme.onSurface,
+                                  ),
+                                  overflow: TextOverflow.ellipsis,
                                 ),
                               ),
-                              const Spacer(),
                               if (_isToday(day))
                                 Container(
                                   padding: const EdgeInsets.symmetric(
@@ -201,6 +283,10 @@ class _WeekViewWidgetState extends State<WeekViewWidget> {
                                 const SizedBox(height: 8),
                               if (dayFoods.isNotEmpty)
                                 _buildAddFoodButton(context, dateKey),
+                              
+                              // Payment status section
+                              const SizedBox(height: 12),
+                              _buildPaymentStatusSection(context, dateKey, dayFoods),
                             ],
                           ),
                         ),
@@ -308,7 +394,7 @@ class _WeekViewWidgetState extends State<WeekViewWidget> {
                       borderRadius: BorderRadius.circular(8),
                     ),
                     child: Text(
-                      '₮${food['price']}',
+                      MoneyFormatService.formatWithSymbol(food['price'] ?? 0),
                       style: theme.textTheme.titleSmall?.copyWith(
                         fontWeight: FontWeight.w600,
                         color: AppTheme.successLight,
@@ -952,5 +1038,75 @@ class _WeekViewWidgetState extends State<WeekViewWidget> {
       'Dec'
     ];
     return months[month - 1];
+  }
+
+  Widget _buildPaymentStatusSection(BuildContext context, String dateKey, List<Map<String, dynamic>> dayFoods) {
+    final theme = Theme.of(context);
+    final wasEaten = _eatenForDayData[dateKey] ?? false;
+    
+    if (dayFoods.isEmpty) {
+      return const SizedBox.shrink();
+    }
+
+    // Check payment status
+    bool hasUnpaidMeals = false;
+    bool hasAnyMeals = dayFoods.isNotEmpty;
+    
+    if (hasAnyMeals && wasEaten) {
+      for (int i = 0; i < dayFoods.length; i++) {
+        final mealKey = '${dateKey}_$i';
+        final isPaid = _paidMeals[mealKey] ?? false;
+        if (!isPaid) {
+          hasUnpaidMeals = true;
+          break;
+        }
+      }
+    }
+
+    String statusText;
+    Color statusColor;
+    IconData statusIcon;
+
+    if (!hasAnyMeals) {
+      return const SizedBox.shrink();
+    } else if (!wasEaten) {
+      statusText = 'Хоол идээгүй';
+      statusColor = Colors.grey;
+      statusIcon = Icons.cancel_outlined;
+    } else if (hasUnpaidMeals) {
+      statusText = 'Төлбөр төлөх';
+      statusColor = Colors.orange;
+      statusIcon = Icons.payment;
+    } else {
+      statusText = 'Төлбөр төлсөн';
+      statusColor = Colors.green;
+      statusIcon = Icons.check_circle;
+    }
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      decoration: BoxDecoration(
+        color: statusColor.withOpacity(0.1),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: statusColor.withOpacity(0.3)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(statusIcon, size: 16, color: statusColor),
+          const SizedBox(width: 6),
+          Flexible(
+            child: Text(
+              statusText,
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: statusColor,
+                fontWeight: FontWeight.w600,
+              ),
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
+        ],
+      ),
+    );
   }
 }

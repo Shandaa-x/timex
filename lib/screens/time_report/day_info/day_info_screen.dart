@@ -6,11 +6,13 @@ import 'dart:convert';
 class DayInfoScreen extends StatefulWidget {
   final String dateString;
   final Map<String, dynamic> dayData;
+  final bool? hasFoodEaten;
 
   const DayInfoScreen({
     super.key,
     required this.dateString,
     required this.dayData,
+    this.hasFoodEaten,
   });
 
   @override
@@ -576,6 +578,7 @@ class _DayInfoScreenState extends State<DayInfoScreen> {
   @override
   Widget build(BuildContext context) {
     final isConfirmed = widget.dayData['confirmed'] ?? false;
+    final hasFoodEaten = widget.hasFoodEaten ?? false;
 
     return Scaffold(
       backgroundColor: const Color(0xFFF8FAFC),
@@ -585,6 +588,25 @@ class _DayInfoScreenState extends State<DayInfoScreen> {
         foregroundColor: Colors.white,
         elevation: 0,
         actions: [
+          // Food eaten badge - only show if confirmed and food was eaten
+          if (isConfirmed && hasFoodEaten)
+            Container(
+              margin: const EdgeInsets.only(right: 8),
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+              decoration: BoxDecoration(
+                color: const Color(0xFF10B981),
+                borderRadius: BorderRadius.circular(16),
+              ),
+              child: const Text(
+                'Хоол идсэн',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+          // Confirmation status badge
           Container(
             margin: const EdgeInsets.only(right: 16),
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),

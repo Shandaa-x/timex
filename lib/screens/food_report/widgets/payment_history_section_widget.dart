@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../../services/money_format.dart';
 
 class PaymentHistorySectionWidget extends StatelessWidget {
   final List<Map<String, dynamic>> paymentHistory;
@@ -82,7 +83,7 @@ class PaymentHistorySectionWidget extends StatelessWidget {
                       ),
                     ),
                     Text(
-                      '₮${payment['amount']}',
+                      MoneyFormatService.formatWithSymbol(payment['amount']),
                       style: theme.textTheme.titleMedium?.copyWith(
                         fontWeight: FontWeight.w600,
                         color: Colors.green,

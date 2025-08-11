@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../../theme/app_theme.dart';
+import '../../../services/money_format.dart';
 
 class SummarySectionWidget extends StatelessWidget {
   final int unpaidCount;
@@ -76,7 +77,7 @@ class SummarySectionWidget extends StatelessWidget {
                 theme,
                 colorScheme,
                 'Төлсөн дүн',
-                '₮$paidTotal',
+                MoneyFormatService.formatWithSymbol(paidTotal),
                 Icons.check_circle,
                 AppTheme.successLight,
               ),
@@ -93,7 +94,7 @@ class SummarySectionWidget extends StatelessWidget {
                 theme,
                 colorScheme,
                 'Нийт хоолны зардал',
-                '₮$totalCost',
+                MoneyFormatService.formatWithSymbol(totalCost),
                 Icons.restaurant,
                 colorScheme.primary,
               ),
@@ -104,7 +105,7 @@ class SummarySectionWidget extends StatelessWidget {
                 theme,
                 colorScheme,
                 'Төлбөрийн үлдэгдэл',
-                '₮${paymentBalance.toStringAsFixed(0)}',
+                MoneyFormatService.formatBalance(paymentBalance),
                 Icons.savings,
                 paymentBalance >= 0 ? AppTheme.successLight : Colors.red,
               ),

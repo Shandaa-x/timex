@@ -1,6 +1,5 @@
 import 'dart:convert';
 import 'dart:io';
-
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:image_picker/image_picker.dart';
@@ -41,6 +40,9 @@ class _MonthlyStatisticsScreenState extends State<MonthlyStatisticsScreen> {
 
   // Track selected images for each day
   Map<String, List<String>> _selectedImages = {};
+
+  // Track which days food was eaten
+  Map<String, bool> _eatenForDayData = {};
 
   // Chart data
   double _monthlyHours = 0.0;
@@ -232,11 +234,47 @@ class _MonthlyStatisticsScreenState extends State<MonthlyStatisticsScreen> {
         _selectedWeekNumber = autoSelectedWeek; // Set the auto-selected week
         _isLoading = false;
       });
+
+      // Load eaten food data for the month
+      await _loadEatenFoodData();
     } catch (e) {
       debugPrint('Error loading monthly data: $e');
       setState(() {
         _isLoading = false;
       });
+    }
+  }
+
+  // Load eaten food data for the selected month
+  Future<void> _loadEatenFoodData() async {
+    try {
+      _eatenForDayData.clear();
+      
+      final endOfMonth = DateTime(_selectedYear, _selectedMonth + 1, 0);
+      final startDocId = '$_selectedYear-${_selectedMonth.toString().padLeft(2, '0')}-01';
+      final endDocId = '$_selectedYear-${_selectedMonth.toString().padLeft(2, '0')}-${endOfMonth.day.toString().padLeft(2, '0')}';
+
+      // Use range query to get all calendar days for the month
+      final querySnapshot = await FirebaseFirestore.instance
+          .collection('calendarDays')
+          .where(FieldPath.documentId, isGreaterThanOrEqualTo: startDocId)
+          .where(FieldPath.documentId, isLessThanOrEqualTo: endDocId)
+          .get();
+
+      // Process the results
+      for (final doc in querySnapshot.docs) {
+        final data = doc.data();
+        final dateKey = doc.id;
+        _eatenForDayData[dateKey] = data['eatenForDay'] as bool? ?? false;
+      }
+
+      // Fill in missing days with false (not eaten)
+      for (int day = 1; day <= endOfMonth.day; day++) {
+        final dateKey = '$_selectedYear-${_selectedMonth.toString().padLeft(2, '0')}-${day.toString().padLeft(2, '0')}';
+        _eatenForDayData[dateKey] ??= false;
+      }
+    } catch (e) {
+      print('Error loading eaten food data: $e');
     }
   }
 
@@ -645,6 +683,7 @@ class _MonthlyStatisticsScreenState extends State<MonthlyStatisticsScreen> {
                           expandedDays: _expandedDays,
                           selectedImages: _selectedImages,
                           isTablet: isTablet,
+                          eatenForDayData: _eatenForDayData, // Add the eaten food data
                           onConfirmDay: _confirmDay,
                           onToggleExpand: (dateString) {
                             setState(() {
@@ -671,6 +710,7 @@ class _MonthlyStatisticsScreenState extends State<MonthlyStatisticsScreen> {
                                 builder: (context) => DayInfoScreen(
                                   dateString: dateString,
                                   dayData: dayData,
+                                  hasFoodEaten: _eatenForDayData[dateString],
                                 ),
                               ),
                             );

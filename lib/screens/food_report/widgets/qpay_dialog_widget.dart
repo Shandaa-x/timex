@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../../services/money_format.dart';
 
 class QPayDialogWidget extends StatelessWidget {
   final String type;
@@ -77,7 +78,7 @@ class QPayDialogWidget extends StatelessWidget {
                 borderRadius: BorderRadius.circular(8),
               ),
               child: Text(
-                '₮$amount',
+                MoneyFormatService.formatWithSymbol(amount),
                 style: theme.textTheme.headlineMedium?.copyWith(
                   fontWeight: FontWeight.w700,
                   color: colorScheme.primary,
@@ -107,7 +108,7 @@ class QPayDialogWidget extends StatelessWidget {
                   const SizedBox(height: 16),
                   
                   _buildPaymentInfoRow('Төрөл:', type == 'daily' ? 'Өдрийн төлбөр' : 'Сарын төлбөр', theme, colorScheme),
-                  _buildPaymentInfoRow('Дүн:', '₮$amount', theme, colorScheme),
+                  _buildPaymentInfoRow('Дүн:', MoneyFormatService.formatWithSymbol(amount), theme, colorScheme),
                   _buildPaymentInfoRow('Огноо:', '${DateTime.now().year}/${DateTime.now().month}/${DateTime.now().day}', theme, colorScheme),
                   _buildPaymentInfoRow('Цаг:', '${DateTime.now().hour}:${DateTime.now().minute.toString().padLeft(2, '0')}', theme, colorScheme),
                   _buildPaymentInfoRow('Гүйлгээний дугаар:', 'TXN${DateTime.now().millisecondsSinceEpoch}', theme, colorScheme),
@@ -139,7 +140,7 @@ class QPayDialogWidget extends StatelessWidget {
                             ),
                           ),
                           Text(
-                            '₮${food['price']}',
+                            MoneyFormatService.formatWithSymbol(food['price'] ?? 0),
                             style: theme.textTheme.bodySmall?.copyWith(
                               fontWeight: FontWeight.w600,
                               color: colorScheme.onSurface.withOpacity(0.8),
@@ -164,7 +165,7 @@ class QPayDialogWidget extends StatelessWidget {
                     const SizedBox(height: 8),
                     _buildPaymentInfoRow('Нийт хоол:', '$totalFoodsCount', theme, colorScheme),
                     _buildPaymentInfoRow('Хоолтой өдөр:', '$monthlyFoodDaysCount', theme, colorScheme),
-                    _buildPaymentInfoRow('Өдрийн дундаж:', '₮${averageDailySpending.toStringAsFixed(0)}', theme, colorScheme),
+                    _buildPaymentInfoRow('Өдрийн дундаж:', MoneyFormatService.formatWithSymbol(averageDailySpending.toInt()), theme, colorScheme),
                   ],
                 ],
               ),
