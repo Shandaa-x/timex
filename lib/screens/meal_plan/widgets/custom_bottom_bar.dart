@@ -1,10 +1,6 @@
 import 'package:flutter/material.dart';
 
-enum CustomBottomBarVariant {
-  standard,
-  floating,
-  minimal,
-}
+enum CustomBottomBarVariant { standard, floating, minimal }
 
 class CustomBottomBar extends StatefulWidget {
   final CustomBottomBarVariant variant;
@@ -75,13 +71,9 @@ class _CustomBottomBarState extends State<CustomBottomBar>
       duration: const Duration(milliseconds: 200),
       vsync: this,
     );
-    _scaleAnimation = Tween<double>(
-      begin: 1.0,
-      end: 1.1,
-    ).animate(CurvedAnimation(
-      parent: _animationController,
-      curve: Curves.easeInOut,
-    ));
+    _scaleAnimation = Tween<double>(begin: 1.0, end: 1.1).animate(
+      CurvedAnimation(parent: _animationController, curve: Curves.easeInOut),
+    );
   }
 
   @override
@@ -106,13 +98,16 @@ class _CustomBottomBarState extends State<CustomBottomBar>
   }
 
   Widget _buildStandardBottomBar(
-      BuildContext context, ThemeData theme, ColorScheme colorScheme) {
+    BuildContext context,
+    ThemeData theme,
+    ColorScheme colorScheme,
+  ) {
     return Container(
       decoration: BoxDecoration(
         color: widget.backgroundColor ?? colorScheme.surface,
         boxShadow: [
           BoxShadow(
-            color: colorScheme.shadow.withValues(alpha: 0.1),
+            color: colorScheme.shadow.withOpacity(0.1),
             blurRadius: 8,
             offset: const Offset(0, -2),
           ),
@@ -146,7 +141,10 @@ class _CustomBottomBarState extends State<CustomBottomBar>
   }
 
   Widget _buildFloatingBottomBar(
-      BuildContext context, ThemeData theme, ColorScheme colorScheme) {
+    BuildContext context,
+    ThemeData theme,
+    ColorScheme colorScheme,
+  ) {
     return Container(
       margin: const EdgeInsets.all(16),
       child: ClipRRect(
@@ -157,7 +155,7 @@ class _CustomBottomBarState extends State<CustomBottomBar>
             borderRadius: BorderRadius.circular(24),
             boxShadow: [
               BoxShadow(
-                color: colorScheme.shadow.withValues(alpha: 0.15),
+                color: colorScheme.shadow.withOpacity(0.15),
                 blurRadius: 12,
                 offset: const Offset(0, 4),
               ),
@@ -194,13 +192,16 @@ class _CustomBottomBarState extends State<CustomBottomBar>
   }
 
   Widget _buildMinimalBottomBar(
-      BuildContext context, ThemeData theme, ColorScheme colorScheme) {
+    BuildContext context,
+    ThemeData theme,
+    ColorScheme colorScheme,
+  ) {
     return Container(
       decoration: BoxDecoration(
         color: widget.backgroundColor ?? colorScheme.surface,
         border: Border(
           top: BorderSide(
-            color: colorScheme.outline.withValues(alpha: 0.2),
+            color: colorScheme.outline.withOpacity(0.2),
             width: 1,
           ),
         ),
@@ -239,8 +240,9 @@ class _CustomBottomBarState extends State<CustomBottomBar>
     bool isFloating = false,
   }) {
     final selectedColor = widget.selectedItemColor ?? colorScheme.primary;
-    final unselectedColor = widget.unselectedItemColor ??
-        colorScheme.onSurface.withValues(alpha: 0.6);
+    final unselectedColor =
+        widget.unselectedItemColor ??
+        colorScheme.onSurface.withOpacity(0.6);
 
     return GestureDetector(
       onTap: () => _handleTap(context, index, item.route),
@@ -263,7 +265,7 @@ class _CustomBottomBarState extends State<CustomBottomBar>
                     padding: EdgeInsets.all(isFloating ? 8 : 6),
                     decoration: BoxDecoration(
                       color: isSelected
-                          ? selectedColor.withValues(alpha: 0.1)
+                          ? selectedColor.withOpacity(0.1)
                           : Colors.transparent,
                       borderRadius: BorderRadius.circular(12),
                     ),
@@ -278,8 +280,9 @@ class _CustomBottomBarState extends State<CustomBottomBar>
                     duration: const Duration(milliseconds: 200),
                     style: TextStyle(
                       fontSize: 11,
-                      fontWeight:
-                          isSelected ? FontWeight.w600 : FontWeight.w400,
+                      fontWeight: isSelected
+                          ? FontWeight.w600
+                          : FontWeight.w400,
                       color: isSelected ? selectedColor : unselectedColor,
                       letterSpacing: 0.5,
                     ),
@@ -306,8 +309,9 @@ class _CustomBottomBarState extends State<CustomBottomBar>
     int index,
   ) {
     final selectedColor = widget.selectedItemColor ?? colorScheme.primary;
-    final unselectedColor = widget.unselectedItemColor ??
-        colorScheme.onSurface.withValues(alpha: 0.6);
+    final unselectedColor =
+        widget.unselectedItemColor ??
+        colorScheme.onSurface.withOpacity(0.6);
 
     return GestureDetector(
       onTap: () => _handleTap(context, index, item.route),
@@ -316,7 +320,7 @@ class _CustomBottomBarState extends State<CustomBottomBar>
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
         decoration: BoxDecoration(
           color: isSelected
-              ? selectedColor.withValues(alpha: 0.1)
+              ? selectedColor.withOpacity(0.1)
               : Colors.transparent,
           borderRadius: BorderRadius.circular(20),
         ),
@@ -361,11 +365,7 @@ class _CustomBottomBarState extends State<CustomBottomBar>
     // Navigate to the selected route if it's different from current
     final currentRoute = ModalRoute.of(context)?.settings.name;
     if (currentRoute != route) {
-      Navigator.pushNamedAndRemoveUntil(
-        context,
-        route,
-        (route) => false,
-      );
+      Navigator.pushNamedAndRemoveUntil(context, route, (route) => false);
     }
   }
 }

@@ -5,6 +5,7 @@ import 'package:timex/screens/food_report/food_report_screen.dart';
 import 'package:timex/screens/home/home_screen.dart';
 import 'package:timex/index.dart';
 import 'package:timex/screens/time_track/time_tracking_screen.dart';
+import 'package:timex/screens/qpay/qr_code_screen.dart';
 
 class MainScreen extends StatefulWidget {
   const MainScreen({super.key});
@@ -22,15 +23,16 @@ class _MainScreenState extends State<MainScreen> {
   @override
   void initState() {
     super.initState();
+    print('MainScreen initState called');
     _pageController = PageController(initialPage: _currentIndex);
 
     _screens = [
-      HomeScreen(onNavigateToTab: _onTabTapped),
-      TimeTrackScreen(onNavigateToTab: _onTabTapped),
-      MonthlyStatisticsScreen(onNavigateToTab: _onTabTapped),
-      MealPlanCalendar(onNavigateToTab: _onTabTapped),
-      FoodReportScreen(onNavigateToTab: _onTabTapped),
+      TimeTrackScreen(),
+      MonthlyStatisticsScreen(),
+      MealPlanCalendar(),
+      FoodReportScreen(),
     ];
+    print('Screens initialized: ${_screens.length}');
   }
 
   @override
@@ -48,18 +50,26 @@ class _MainScreenState extends State<MainScreen> {
   }
 
   void _updateScreensWithEmployeeData() {
-    _screens[0] = HomeScreen(onNavigateToTab: _onTabTapped);
-    _screens[1] = TimeTrackScreen(onNavigateToTab: _onTabTapped);
-    _screens[2] = MonthlyStatisticsScreen(onNavigateToTab: _onTabTapped);
-    _screens[3] = MealPlanCalendar(onNavigateToTab: _onTabTapped);
-    _screens[4] = FoodReportScreen(onNavigateToTab: _onTabTapped);
+    _screens[0] = TimeTrackScreen();
+    _screens[1] = MonthlyStatisticsScreen();
+    _screens[2] = MealPlanCalendar();
+    _screens[3] = FoodReportScreen();
   }
 
   void _onTabTapped(int index) {
-    _pageController.jumpToPage(index);
-    setState(() {
-      _currentIndex = index;
-    });
+    print('Tab tapped: $index (QR screen at index 4)'); // Debug output
+    print('Current screen count: ${_screens.length}');
+    if (index < _screens.length) {
+      print('Navigating to screen: ${_screens[index].runtimeType}');
+      _pageController.jumpToPage(index);
+      setState(() {
+        _currentIndex = index;
+      });
+    } else {
+      print(
+        'ERROR: Index $index out of bounds for screens array of length ${_screens.length}',
+      );
+    }
   }
 
   Future<bool> _onWillPop() async {
@@ -67,9 +77,7 @@ class _MainScreenState extends State<MainScreen> {
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('Гарах'),
-        content: Text(
-          'Та системээс гарахыг хүсч байна уу?',
-        ),
+        content: Text('Та системээс гарахыг хүсч байна уу?'),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(context).pop(false),
@@ -105,7 +113,6 @@ class _MainScreenState extends State<MainScreen> {
         }
       },
       child: Scaffold(
-        drawer: _buildDrawer(),
         body: PageView.builder(
           physics: const NeverScrollableScrollPhysics(),
           controller: _pageController,
@@ -137,6 +144,7 @@ class _MainScreenState extends State<MainScreen> {
       {'icon': Icons.note, 'label': 'Тайлан'},
       {'icon': Icons.food_bank, 'label': 'Хоолны хуваарь'},
       {'icon': Icons.analytics, 'label': 'Хоолны тайлан'},
+      {'icon': Icons.qr_code, 'label': 'QR code'},
     ];
 
     return Container(
@@ -150,13 +158,17 @@ class _MainScreenState extends State<MainScreen> {
             children: List.generate(tabs.length, (index) {
               final isSelected = _currentIndex == index;
               return Expanded(
-                child: GestureDetector(
-                  onTap: () => _onTabTapped(index),
+                child: InkWell(
+                  onTap: () {
+                    print('Tab tapped: $index');
+                    _onTabTapped(index);
+                  },
+                  borderRadius: BorderRadius.circular(12),
                   child: Container(
                     margin: const EdgeInsets.symmetric(horizontal: 2),
                     padding: const EdgeInsets.symmetric(
-                      vertical: 2,
-                      horizontal: 2,
+                      vertical: 8, // Increased padding for better tap target
+                      horizontal: 4,
                     ),
                     decoration: BoxDecoration(
                       color: isSelected

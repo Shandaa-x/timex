@@ -7,12 +7,14 @@ class AppTheme {
 
   // Nourishing Neutrals with Organic Accents Color Palette
   static const Color primaryLight = Color(0xFF2D5A27); // Deep forest green
-  static const Color primaryVariantLight =
-      Color(0xFF1E3F1A); // Darker forest green
+  static const Color primaryVariantLight = Color(
+    0xFF1E3F1A,
+  ); // Darker forest green
   static const Color secondaryLight = Color(0xFFF4A261); // Warm amber
   static const Color secondaryVariantLight = Color(0xFFE76F51); // Deeper amber
-  static const Color backgroundLight =
-      Color(0xFFFEFEFE); // Pure white with subtle warmth
+  static const Color backgroundLight = Color(
+    0xFFFEFEFE,
+  ); // Pure white with subtle warmth
   static const Color surfaceLight = Color(0xFFF8F9FA); // Soft gray for cards
   static const Color errorLight = Color(0xFFE74C3C); // Muted red
   static const Color successLight = Color(0xFF27AE60); // Fresh green
@@ -26,8 +28,9 @@ class AppTheme {
 
   // Dark theme colors (adapted for meal planning context)
   static const Color primaryDark = Color(0xFF4A8B3A); // Lighter forest green
-  static const Color primaryVariantDark =
-      Color(0xFF2D5A27); // Original forest green
+  static const Color primaryVariantDark = Color(
+    0xFF2D5A27,
+  ); // Original forest green
   static const Color secondaryDark = Color(0xFFF4A261); // Warm amber (same)
   static const Color secondaryVariantDark = Color(0xFFE76F51); // Deeper amber
   static const Color backgroundDark = Color(0xFF1A1A1A); // Warm dark background
@@ -76,7 +79,7 @@ class AppTheme {
       onSecondaryContainer: onSecondaryLight,
       tertiary: accentLight,
       onTertiary: onPrimaryLight,
-      tertiaryContainer: accentLight.withValues(alpha: 0.1),
+      tertiaryContainer: accentLight.withOpacity(0.1),
       onTertiaryContainer: accentLight,
       error: errorLight,
       onError: onErrorLight,
@@ -109,14 +112,8 @@ class AppTheme {
         color: textPrimaryLight,
         letterSpacing: -0.5,
       ),
-      iconTheme: IconThemeData(
-        color: textPrimaryLight,
-        size: 24,
-      ),
-      actionsIconTheme: IconThemeData(
-        color: textPrimaryLight,
-        size: 24,
-      ),
+      iconTheme: IconThemeData(color: textPrimaryLight, size: 24),
+      actionsIconTheme: IconThemeData(color: textPrimaryLight, size: 24),
     ),
 
     // Card theme with subtle elevation
@@ -125,9 +122,7 @@ class AppTheme {
       elevation: 2,
       shadowColor: shadowLight,
       surfaceTintColor: Colors.transparent,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(12.0),
-      ),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12.0)),
       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
     ),
 
@@ -156,9 +151,7 @@ class AppTheme {
       focusElevation: 8,
       hoverElevation: 8,
       highlightElevation: 12,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(16),
-      ),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
     ),
 
     // Button themes
@@ -169,9 +162,7 @@ class AppTheme {
         elevation: 2,
         shadowColor: shadowLight,
         padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(8.0),
-        ),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8.0)),
         textStyle: GoogleFonts.inter(
           fontSize: 14,
           fontWeight: FontWeight.w500,
@@ -185,9 +176,7 @@ class AppTheme {
         foregroundColor: primaryLight,
         padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
         side: BorderSide(color: borderLight, width: 1),
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(8.0),
-        ),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8.0)),
         textStyle: GoogleFonts.inter(
           fontSize: 14,
           fontWeight: FontWeight.w500,
@@ -200,9 +189,7 @@ class AppTheme {
       style: TextButton.styleFrom(
         foregroundColor: primaryLight,
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(8.0),
-        ),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8.0)),
         textStyle: GoogleFonts.inter(
           fontSize: 14,
           fontWeight: FontWeight.w500,
@@ -266,9 +253,9 @@ class AppTheme {
       }),
       trackColor: WidgetStateProperty.resolveWith((states) {
         if (states.contains(WidgetState.selected)) {
-          return primaryLight.withValues(alpha: 0.3);
+          return primaryLight.withOpacity(0.3);
         }
-        return textDisabledLight.withValues(alpha: 0.3);
+        return textDisabledLight.withOpacity(0.3);
       }),
     ),
 
@@ -282,9 +269,7 @@ class AppTheme {
       }),
       checkColor: WidgetStateProperty.all(onPrimaryLight),
       side: BorderSide(color: borderLight, width: 1),
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(4),
-      ),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(4)),
     ),
 
     // Radio theme
@@ -300,16 +285,16 @@ class AppTheme {
     // Progress indicator theme
     progressIndicatorTheme: ProgressIndicatorThemeData(
       color: primaryLight,
-      linearTrackColor: primaryLight.withValues(alpha: 0.2),
-      circularTrackColor: primaryLight.withValues(alpha: 0.2),
+      linearTrackColor: primaryLight.withOpacity(0.2),
+      circularTrackColor: primaryLight.withOpacity(0.2),
     ),
 
     // Slider theme
     sliderTheme: SliderThemeData(
       activeTrackColor: primaryLight,
       thumbColor: primaryLight,
-      overlayColor: primaryLight.withValues(alpha: 0.2),
-      inactiveTrackColor: primaryLight.withValues(alpha: 0.3),
+      overlayColor: primaryLight.withOpacity(0.2),
+      inactiveTrackColor: primaryLight.withOpacity(0.3),
       trackHeight: 4,
       thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 8),
     ),
@@ -320,10 +305,7 @@ class AppTheme {
       unselectedLabelColor: textSecondaryLight,
       indicatorColor: primaryLight,
       indicatorSize: TabBarIndicatorSize.label,
-      labelStyle: GoogleFonts.inter(
-        fontSize: 14,
-        fontWeight: FontWeight.w600,
-      ),
+      labelStyle: GoogleFonts.inter(fontSize: 14, fontWeight: FontWeight.w600),
       unselectedLabelStyle: GoogleFonts.inter(
         fontSize: 14,
         fontWeight: FontWeight.w400,
@@ -333,7 +315,7 @@ class AppTheme {
     // Tooltip theme
     tooltipTheme: TooltipThemeData(
       decoration: BoxDecoration(
-        color: textPrimaryLight.withValues(alpha: 0.9),
+        color: textPrimaryLight.withOpacity(0.9),
         borderRadius: BorderRadius.circular(8),
       ),
       textStyle: GoogleFonts.inter(
@@ -354,21 +336,16 @@ class AppTheme {
       ),
       actionTextColor: secondaryLight,
       behavior: SnackBarBehavior.floating,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(8.0),
-      ),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8.0)),
       elevation: 6,
     ),
 
     // Chip theme
     chipTheme: ChipThemeData(
       backgroundColor: surfaceLight,
-      selectedColor: primaryLight.withValues(alpha: 0.2),
-      disabledColor: textDisabledLight.withValues(alpha: 0.1),
-      labelStyle: GoogleFonts.inter(
-        fontSize: 12,
-        fontWeight: FontWeight.w500,
-      ),
+      selectedColor: primaryLight.withOpacity(0.2),
+      disabledColor: textDisabledLight.withOpacity(0.1),
+      labelStyle: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w500),
       secondaryLabelStyle: GoogleFonts.inter(
         fontSize: 12,
         fontWeight: FontWeight.w400,
@@ -379,7 +356,8 @@ class AppTheme {
         borderRadius: BorderRadius.circular(16),
         side: BorderSide(color: borderLight, width: 1),
       ),
-    ), dialogTheme: DialogThemeData(backgroundColor: backgroundLight),
+    ),
+    dialogTheme: DialogThemeData(backgroundColor: backgroundLight),
   );
 
   /// Dark theme optimized for meal planning
@@ -397,7 +375,7 @@ class AppTheme {
       onSecondaryContainer: onSecondaryDark,
       tertiary: accentDark,
       onTertiary: onPrimaryDark,
-      tertiaryContainer: accentDark.withValues(alpha: 0.2),
+      tertiaryContainer: accentDark.withOpacity(0.2),
       onTertiaryContainer: accentDark,
       error: errorDark,
       onError: onErrorDark,
@@ -430,14 +408,8 @@ class AppTheme {
         color: textPrimaryDark,
         letterSpacing: -0.5,
       ),
-      iconTheme: IconThemeData(
-        color: textPrimaryDark,
-        size: 24,
-      ),
-      actionsIconTheme: IconThemeData(
-        color: textPrimaryDark,
-        size: 24,
-      ),
+      iconTheme: IconThemeData(color: textPrimaryDark, size: 24),
+      actionsIconTheme: IconThemeData(color: textPrimaryDark, size: 24),
     ),
 
     // Card theme for dark mode
@@ -446,9 +418,7 @@ class AppTheme {
       elevation: 2,
       shadowColor: shadowDark,
       surfaceTintColor: Colors.transparent,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(12.0),
-      ),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12.0)),
       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
     ),
 
@@ -477,9 +447,7 @@ class AppTheme {
       focusElevation: 8,
       hoverElevation: 8,
       highlightElevation: 12,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(16),
-      ),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
     ),
 
     // Button themes for dark mode
@@ -490,9 +458,7 @@ class AppTheme {
         elevation: 2,
         shadowColor: shadowDark,
         padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(8.0),
-        ),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8.0)),
         textStyle: GoogleFonts.inter(
           fontSize: 14,
           fontWeight: FontWeight.w500,
@@ -506,9 +472,7 @@ class AppTheme {
         foregroundColor: primaryDark,
         padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
         side: BorderSide(color: borderDark, width: 1),
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(8.0),
-        ),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8.0)),
         textStyle: GoogleFonts.inter(
           fontSize: 14,
           fontWeight: FontWeight.w500,
@@ -521,9 +485,7 @@ class AppTheme {
       style: TextButton.styleFrom(
         foregroundColor: primaryDark,
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(8.0),
-        ),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8.0)),
         textStyle: GoogleFonts.inter(
           fontSize: 14,
           fontWeight: FontWeight.w500,
@@ -587,9 +549,9 @@ class AppTheme {
       }),
       trackColor: WidgetStateProperty.resolveWith((states) {
         if (states.contains(WidgetState.selected)) {
-          return primaryDark.withValues(alpha: 0.3);
+          return primaryDark.withOpacity(0.3);
         }
-        return textDisabledDark.withValues(alpha: 0.3);
+        return textDisabledDark.withOpacity(0.3);
       }),
     ),
 
@@ -603,9 +565,7 @@ class AppTheme {
       }),
       checkColor: WidgetStateProperty.all(onPrimaryDark),
       side: BorderSide(color: borderDark, width: 1),
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(4),
-      ),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(4)),
     ),
 
     // Radio theme for dark mode
@@ -621,16 +581,16 @@ class AppTheme {
     // Progress indicator theme for dark mode
     progressIndicatorTheme: ProgressIndicatorThemeData(
       color: primaryDark,
-      linearTrackColor: primaryDark.withValues(alpha: 0.2),
-      circularTrackColor: primaryDark.withValues(alpha: 0.2),
+      linearTrackColor: primaryDark.withOpacity(0.2),
+      circularTrackColor: primaryDark.withOpacity(0.2),
     ),
 
     // Slider theme for dark mode
     sliderTheme: SliderThemeData(
       activeTrackColor: primaryDark,
       thumbColor: primaryDark,
-      overlayColor: primaryDark.withValues(alpha: 0.2),
-      inactiveTrackColor: primaryDark.withValues(alpha: 0.3),
+      overlayColor: primaryDark.withOpacity(0.2),
+      inactiveTrackColor: primaryDark.withOpacity(0.3),
       trackHeight: 4,
       thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 8),
     ),
@@ -641,10 +601,7 @@ class AppTheme {
       unselectedLabelColor: textSecondaryDark,
       indicatorColor: primaryDark,
       indicatorSize: TabBarIndicatorSize.label,
-      labelStyle: GoogleFonts.inter(
-        fontSize: 14,
-        fontWeight: FontWeight.w600,
-      ),
+      labelStyle: GoogleFonts.inter(fontSize: 14, fontWeight: FontWeight.w600),
       unselectedLabelStyle: GoogleFonts.inter(
         fontSize: 14,
         fontWeight: FontWeight.w400,
@@ -654,7 +611,7 @@ class AppTheme {
     // Tooltip theme for dark mode
     tooltipTheme: TooltipThemeData(
       decoration: BoxDecoration(
-        color: textPrimaryDark.withValues(alpha: 0.9),
+        color: textPrimaryDark.withOpacity(0.9),
         borderRadius: BorderRadius.circular(8),
       ),
       textStyle: GoogleFonts.inter(
@@ -675,21 +632,16 @@ class AppTheme {
       ),
       actionTextColor: secondaryDark,
       behavior: SnackBarBehavior.floating,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(8.0),
-      ),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8.0)),
       elevation: 6,
     ),
 
     // Chip theme for dark mode
     chipTheme: ChipThemeData(
       backgroundColor: surfaceDark,
-      selectedColor: primaryDark.withValues(alpha: 0.2),
-      disabledColor: textDisabledDark.withValues(alpha: 0.1),
-      labelStyle: GoogleFonts.inter(
-        fontSize: 12,
-        fontWeight: FontWeight.w500,
-      ),
+      selectedColor: primaryDark.withOpacity(0.2),
+      disabledColor: textDisabledDark.withOpacity(0.1),
+      labelStyle: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w500),
       secondaryLabelStyle: GoogleFonts.inter(
         fontSize: 12,
         fontWeight: FontWeight.w400,
@@ -700,14 +652,16 @@ class AppTheme {
         borderRadius: BorderRadius.circular(16),
         side: BorderSide(color: borderDark, width: 1),
       ),
-    ), dialogTheme: DialogThemeData(backgroundColor: surfaceDark),
+    ),
+    dialogTheme: DialogThemeData(backgroundColor: surfaceDark),
   );
 
   /// Helper method to build text theme based on brightness
   static TextTheme _buildTextTheme({required bool isLight}) {
     final Color textPrimary = isLight ? textPrimaryLight : textPrimaryDark;
-    final Color textSecondary =
-        isLight ? textSecondaryLight : textSecondaryDark;
+    final Color textSecondary = isLight
+        ? textSecondaryLight
+        : textSecondaryDark;
     final Color textDisabled = isLight ? textDisabledLight : textDisabledDark;
 
     return TextTheme(

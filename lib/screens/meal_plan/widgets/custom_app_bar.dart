@@ -92,7 +92,7 @@ class CustomAppBar extends StatelessWidget implements PreferredSizeWidget {
           color: colorScheme.surface,
           borderRadius: BorderRadius.circular(20),
           border: Border.all(
-            color: colorScheme.outline.withValues(alpha: 0.3),
+            color: colorScheme.outline.withOpacity(0.3),
             width: 1,
           ),
         ),
@@ -109,11 +109,11 @@ class CustomAppBar extends StatelessWidget implements PreferredSizeWidget {
             hintStyle: TextStyle(
               fontSize: 14,
               fontWeight: FontWeight.w400,
-              color: colorScheme.onSurface.withValues(alpha: 0.6),
+              color: colorScheme.onSurface.withOpacity(0.6),
             ),
             prefixIcon: Icon(
               Icons.search,
-              color: colorScheme.onSurface.withValues(alpha: 0.6),
+              color: colorScheme.onSurface.withOpacity(0.6),
               size: 20,
             ),
             border: InputBorder.none,
