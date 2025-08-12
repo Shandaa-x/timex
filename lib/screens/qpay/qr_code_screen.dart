@@ -133,10 +133,10 @@ class _QRCodeScreenState extends State<QRCodeScreen> {
         'invoice_description': 'TIMEX Order - ${products.keys.join(', ')}',
         'amount': totalPrice,
         'has_ebarimt': false,
-        'callback_url': 'http://localhost:3000/qpay/callback?api_key=$apiKey&invoice_id=$invoiceNo',
+        'callback_url': 'http://localhost:3000/qpay/callback',
       };
 
-      print('Creating QPay invoice with body: ${json.encode(requestBody)}');
+      print('✨ UPDATED VERSION - Creating QPay invoice with body: ${json.encode(requestBody)}');
 
       final response = await http.post(
         Uri.parse('$qpayUrl/invoice'),
