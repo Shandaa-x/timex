@@ -58,11 +58,19 @@ class _MainScreenState extends State<MainScreen> {
   }
 
   void _onTabTapped(int index) {
-    print('Tab tapped: $index'); // Debug output
-    _pageController.jumpToPage(index);
-    setState(() {
-      _currentIndex = index;
-    });
+    print('Tab tapped: $index (QR screen at index 4)'); // Debug output
+    print('Current screen count: ${_screens.length}');
+    if (index < _screens.length) {
+      print('Navigating to screen: ${_screens[index].runtimeType}');
+      _pageController.jumpToPage(index);
+      setState(() {
+        _currentIndex = index;
+      });
+    } else {
+      print(
+        'ERROR: Index $index out of bounds for screens array of length ${_screens.length}',
+      );
+    }
   }
 
   Future<bool> _onWillPop() async {
@@ -113,8 +121,29 @@ class _MainScreenState extends State<MainScreen> {
               controller: _pageController,
               itemCount: _screens.length,
               itemBuilder: (context, index) {
-                print('Building screen at index: $index');
-                return _screens[index];
+                print(
+                  'Building screen at index: $index (${_screens[index].runtimeType})',
+                );
+                try {
+                  return _screens[index];
+                } catch (e, stackTrace) {
+                  print('ERROR building screen at index $index: $e');
+                  print('Stack trace: $stackTrace');
+                  return Scaffold(
+                    body: Center(
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(Icons.error, color: Colors.red, size: 48),
+                          SizedBox(height: 16),
+                          Text('Error loading screen at index $index'),
+                          SizedBox(height: 8),
+                          Text('$e'),
+                        ],
+                      ),
+                    ),
+                  );
+                }
               },
               onPageChanged: (index) {
                 setState(() {
@@ -198,7 +227,7 @@ class _MainScreenState extends State<MainScreen> {
                           tabs[index]['icon'] as IconData,
                           color: isSelected
                               ? Colors.black
-                              : Colors.white.withOpacity(0.6),
+                              : Colors.white.withValues(alpha: 0.6),
                           size: 20,
                         ),
                         txt(
@@ -206,7 +235,7 @@ class _MainScreenState extends State<MainScreen> {
                           style: TxtStl.bodyText1(
                             color: isSelected
                                 ? Colors.black
-                                : Colors.white.withOpacity(0.6),
+                                : Colors.white.withValues(alpha: 0.6),
                             fontSize: 8,
                           ),
                           textAlign: TextAlign.center,
