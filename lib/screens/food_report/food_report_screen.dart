@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import '../../widgets/common_app_bar.dart';
+import '../../services/money_format.dart';
 import 'widgets/month_navigation_widget.dart';
 import 'widgets/summary_section_widget.dart';
-import 'widgets/food_frequency_section_widget.dart';
 import 'widgets/daily_breakdown_section_widget.dart';
 import 'widgets/payment_history_section_widget.dart';
 import 'widgets/filter_bottom_sheet_widget.dart';
@@ -154,6 +154,131 @@ class _FoodReportScreenState extends State<FoodReportScreen> {
     }
   }
 
+  // Mark all unpaid meals for the month as paid
+  Future<void> _payMonthly() async {
+    if (_unpaidFoodData.isEmpty) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Төлөх хоол байхгүй байна'),
+            backgroundColor: Colors.orange,
+          ),
+        );
+      }
+      return;
+    }
+
+    // Calculate total amount
+    final totalAmount = _unpaidTotalAmount;
+    final totalFoods = _unpaidFoodData.values.fold<int>(0, (sum, foods) => sum + foods.length);
+
+    // Show confirmation dialog
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: const Text('Сарын төлбөр төлөх'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text('Сарын нийт төлбөр: ${MoneyFormatService.formatWithSymbol(totalAmount)}'),
+              const SizedBox(height: 8),
+              Text('Нийт хоол: $totalFoods'),
+              const SizedBox(height: 16),
+              const Text('Та энэ сарын бүх хоолны төлбөрийг төлөхийг хүсэж байна уу?'),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(false),
+              child: const Text('Үгүй'),
+            ),
+            ElevatedButton(
+              onPressed: () => Navigator.of(context).pop(true),
+              child: const Text('Тийм'),
+            ),
+          ],
+        );
+      },
+    );
+
+    if (confirmed != true) return;
+
+    try {
+      // Mark all unpaid meals as paid
+      final futures = <Future>[];
+      
+      for (final dateEntry in _unpaidFoodData.entries) {
+        final dateKey = dateEntry.key;
+        final foods = dateEntry.value;
+        
+        for (int i = 0; i < foods.length; i++) {
+          final food = foods[i];
+          final foodIndex = FoodDataService.getFoodIndex(food);
+          final mealKey = '${dateKey}_$foodIndex';
+          
+          futures.add(
+            PaymentService.saveMealPaymentStatus(_selectedMonth, mealKey, true)
+          );
+        }
+      }
+
+      // Wait for all payments to complete
+      final results = await Future.wait(futures);
+      final allSuccessful = results.every((success) => success);
+
+      if (allSuccessful) {
+        // Update local state
+        setState(() {
+          for (final dateEntry in _unpaidFoodData.entries) {
+            final dateKey = dateEntry.key;
+            final foods = dateEntry.value;
+            
+            for (int i = 0; i < foods.length; i++) {
+              final food = foods[i];
+              final foodIndex = FoodDataService.getFoodIndex(food);
+              final mealKey = '${dateKey}_$foodIndex';
+              _paidMeals[mealKey] = true;
+            }
+          }
+        });
+
+        // Show success message
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Сарын төлбөр амжилттай төлөгдлөө! ${MoneyFormatService.formatWithSymbol(totalAmount)}'),
+              backgroundColor: Colors.green,
+              behavior: SnackBarBehavior.floating,
+              duration: const Duration(seconds: 3),
+            ),
+          );
+        }
+      } else {
+        // Show error message
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Төлбөр төлөхөд алдаа гарлаа. Дахин оролдоно уу.'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+      }
+    } catch (e) {
+      print('Error paying monthly: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Алдаа гарлаа: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+  }
+
   // Update food filtering using service
   void _updateFoodFilter() {
     _availableFoodTypes = FoodDataService.getAvailableFoodTypes(_monthlyFoodData);
@@ -173,21 +298,6 @@ class _FoodReportScreenState extends State<FoodReportScreen> {
   // Get paid meals total using service
   int get _paidTotalAmount => FoodCalculationService.calculatePaidTotalAmount(_filteredFoodData, _paidMeals);
 
-  // Get unpaid food stats for frequency chart
-  Map<String, int> _getUnpaidFoodStats() {
-    final unpaidStats = <String, int>{};
-    
-    for (final entry in _unpaidFoodData.entries) {
-      final foods = entry.value;
-      for (final food in foods) {
-        final foodName = FoodDataService.getFoodName(food);
-        unpaidStats[foodName] = (unpaidStats[foodName] ?? 0) + 1;
-      }
-    }
-    
-    return unpaidStats;
-  }
-
   void _showFilterBottomSheet() {
     showModalBottomSheet(
       context: context,
@@ -206,11 +316,14 @@ class _FoodReportScreenState extends State<FoodReportScreen> {
     );
   }
 
+  // Check if any foods exist in the selected month
+  bool get _hasAnyFoodsInMonth => _monthlyFoodData.isNotEmpty;
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Theme.of(context).colorScheme.surface,
-      appBar: const CommonAppBar(title: 'Хоолны тайлан', variant: AppBarVariant.standard),
+      backgroundColor: Colors.white,
+      appBar: const CommonAppBar(title: 'Хоолны тайлан', variant: AppBarVariant.standard, backgroundColor: Colors.white,),
       body: Column(
         children: [
           MonthNavigationWidget(
@@ -251,16 +364,18 @@ class _FoodReportScreenState extends State<FoodReportScreen> {
                       const SizedBox(height: 24),
                     ],
                     // Food frequency chart
-                    FoodFrequencySectionWidget(
-                      foodStats: _getUnpaidFoodStats(),
-                      selectedFoodFilter: _selectedFoodFilter,
-                    ),
-                    const SizedBox(height: 24),
+                    // FoodFrequencySectionWidget(
+                    //   foodStats: _getUnpaidFoodStats(),
+                    //   selectedFoodFilter: _selectedFoodFilter,
+                    // ),
+                    // const SizedBox(height: 24),
                     // Unpaid meals breakdown
                     DailyBreakdownSectionWidget(
                       unpaidFoodData: _unpaidFoodData,
                       selectedFoodFilter: _selectedFoodFilter,
                       onMarkMealAsPaid: _markMealAsPaid,
+                      onPayMonthly: _payMonthly,
+                      hasAnyFoodsInMonth: _hasAnyFoodsInMonth,
                     ),
                     const SizedBox(height: 24),
                   ],

@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:timex/screens/meal_plan/meal_plan_calendar.dart';
 import 'package:timex/screens/time_report/monthly_statistic_screen.dart';
-import 'package:timex/screens/food_report/food_report_screen_refactored.dart';
+import 'package:timex/screens/food_report/food_report_screen.dart';
 import 'package:timex/index.dart';
 import 'package:timex/screens/time_track/time_tracking_screen.dart';
 
