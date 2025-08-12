@@ -4,6 +4,7 @@ import 'package:timex/screens/time_report/monthly_statistic_screen.dart';
 import 'package:timex/screens/food_report/food_report_screen.dart';
 import 'package:timex/index.dart';
 import 'package:timex/screens/time_track/time_tracking_screen.dart';
+import 'package:timex/screens/qpay/qr_code_screen.dart';
 
 class MainScreen extends StatefulWidget {
   const MainScreen({super.key});
@@ -35,6 +36,7 @@ class _MainScreenState extends State<MainScreen> {
       MonthlyStatisticsScreen(),
       MealPlanCalendar(),
       FoodReportScreen(),
+      QRCodeScreen(),
     ];
   }
 
@@ -94,6 +96,7 @@ class _MainScreenState extends State<MainScreen> {
     _screens[1] = MonthlyStatisticsScreen();
     _screens[2] = MealPlanCalendar();
     _screens[3] = FoodReportScreen();
+    _screens[4] = QRCodeScreen();
   }
 
   void _onTabTapped(int index) {
@@ -176,6 +179,7 @@ class _MainScreenState extends State<MainScreen> {
       {'icon': Icons.note, 'label': 'Тайлан'},
       {'icon': Icons.food_bank, 'label': 'Хоолны хуваарь'},
       {'icon': Icons.analytics, 'label': 'Хоолны тайлан'},
+      {'icon': Icons.qr_code, 'label': 'QR Код'},
     ];
 
     return Container(
@@ -210,7 +214,7 @@ class _MainScreenState extends State<MainScreen> {
                           tabs[index]['icon'] as IconData,
                           color: isSelected
                               ? Colors.black
-                              : Colors.white.withValues(alpha: 0.6),
+                              : Colors.white.withOpacity(0.6),
                           size: 20,
                         ),
                         txt(
@@ -218,7 +222,7 @@ class _MainScreenState extends State<MainScreen> {
                           style: TxtStl.bodyText1(
                             color: isSelected
                                 ? Colors.black
-                                : Colors.white.withValues(alpha: 0.6),
+                                : Colors.white.withOpacity(0.6),
                             fontSize: 8,
                           ),
                           textAlign: TextAlign.center,

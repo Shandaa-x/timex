@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:developer';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:get/get_navigation/src/root/get_material_app.dart';
 import 'package:timex/index.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
@@ -13,29 +14,42 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'firebase_options.dart';
 
 final FlutterLocalNotificationsPlugin flutterLocalNotificationsPlugin =
-FlutterLocalNotificationsPlugin();
+    FlutterLocalNotificationsPlugin();
 
 void main() {
-  runZonedGuarded(() async {
-    WidgetsFlutterBinding.ensureInitialized();
-    Assets.refresh();
+  runZonedGuarded(
+    () async {
+      WidgetsFlutterBinding.ensureInitialized();
 
-    await _initializeNotifications(); // 💡 Notification init here
+      // Load environment variables
+      try {
+        await dotenv.load(fileName: '.env');
+        log('✅ Environment variables loaded successfully');
+      } catch (e) {
+        log('⚠️ Warning: Could not load .env file: $e');
+        // Continue with default values
+      }
 
-    try {
-      await Firebase.initializeApp(
-        options: DefaultFirebaseOptions.currentPlatform,
-      );
-      log('✅ Firebase initialized successfully');
-    } catch (e, stackTrace) {
-      log('❌ Firebase initialization failed: $e');
-      log('Stack trace: $stackTrace');
-    }
+      Assets.refresh();
 
-    runApp(const MyApp());
-  }, (error, stackTrace) {
-    log('runZonedGuarded: error: $error, stackTrace: $stackTrace');
-  });
+      await _initializeNotifications(); // 💡 Notification init here
+
+      try {
+        await Firebase.initializeApp(
+          options: DefaultFirebaseOptions.currentPlatform,
+        );
+        log('✅ Firebase initialized successfully');
+      } catch (e, stackTrace) {
+        log('❌ Firebase initialization failed: $e');
+        log('Stack trace: $stackTrace');
+      }
+
+      runApp(const MyApp());
+    },
+    (error, stackTrace) {
+      log('runZonedGuarded: error: $error, stackTrace: $stackTrace');
+    },
+  );
 }
 
 Future<void> _initializeNotifications() async {
@@ -44,14 +58,14 @@ Future<void> _initializeNotifications() async {
   tz.setLocalLocation(tz.getLocation('Asia/Ulaanbaatar')); // or use `local`
 
   const AndroidInitializationSettings androidInitSettings =
-  AndroidInitializationSettings('@mipmap/ic_launcher');
+      AndroidInitializationSettings('@mipmap/ic_launcher');
 
   final DarwinInitializationSettings iosInitSettings =
-  DarwinInitializationSettings(
-    requestSoundPermission: true,
-    requestBadgePermission: true,
-    requestAlertPermission: true,
-  );
+      DarwinInitializationSettings(
+        requestSoundPermission: true,
+        requestBadgePermission: true,
+        requestAlertPermission: true,
+      );
 
   final InitializationSettings initSettings = InitializationSettings(
     android: androidInitSettings,
@@ -73,7 +87,8 @@ Future<void> _initializeNotifications() async {
 Future<void> _requestNotificationPermission() async {
   try {
     final prefs = await SharedPreferences.getInstance();
-    final hasAskedPermission = prefs.getBool('notification_permission_asked') ?? false;
+    final hasAskedPermission =
+        prefs.getBool('notification_permission_asked') ?? false;
 
     if (!hasAskedPermission) {
       PermissionStatus status = await Permission.notification.status;
