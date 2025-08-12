@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../../theme/app_theme.dart';
 import '../../../services/money_format.dart';
+import '../services/food_data_service.dart';
 
 class DailyBreakdownSectionWidget extends StatelessWidget {
   final Map<String, List<Map<String, dynamic>>> unpaidFoodData;
@@ -19,6 +20,23 @@ class DailyBreakdownSectionWidget extends StatelessWidget {
       'Даваа', 'Мягмар', 'Лхагва', 'Пүрэв', 'Баасан', 'Бямба', 'Ням'
     ];
     return weekdays[weekday - 1];
+  }
+
+  List<Widget> _buildCommentsWidget(ThemeData theme, ColorScheme colorScheme, Map<String, dynamic> food) {
+    final comments = FoodDataService.getFoodComments(food);
+    if (comments.isNotEmpty) {
+      return [
+        const SizedBox(height: 4),
+        Text(
+          comments,
+          style: theme.textTheme.bodySmall?.copyWith(
+            color: colorScheme.onSurface.withOpacity(0.6),
+            fontStyle: FontStyle.italic,
+          ),
+        ),
+      ];
+    }
+    return [];
   }
 
   @override
@@ -82,7 +100,7 @@ class DailyBreakdownSectionWidget extends StatelessWidget {
           ...sortedDates.map((dateKey) {
             final foods = unpaidFoodData[dateKey]!;
             final date = DateTime.parse(dateKey);
-            final dayTotal = foods.fold<int>(0, (sum, food) => sum + (food['price'] as int? ?? 0));
+            final dayTotal = foods.fold<int>(0, (sum, food) => sum + FoodDataService.getFoodPrice(food));
             
             return Container(
               margin: const EdgeInsets.only(bottom: 12),
@@ -148,8 +166,8 @@ class DailyBreakdownSectionWidget extends StatelessWidget {
                   
                   // Individual unpaid meals list
                   ...foods.map((food) {
-                    final foodIndex = food['_index'] as int;
-                    final price = food['price'] as int? ?? 0;
+                    final foodIndex = FoodDataService.getFoodIndex(food);
+                    final price = FoodDataService.getFoodPrice(food);
                     
                     return Container(
                       margin: const EdgeInsets.only(bottom: 8),
@@ -178,7 +196,7 @@ class DailyBreakdownSectionWidget extends StatelessWidget {
                                     const SizedBox(width: 8),
                                     Expanded(
                                       child: Text(
-                                        food['name'] as String? ?? 'Unknown',
+                                        FoodDataService.getFoodName(food),
                                         style: theme.textTheme.bodyMedium?.copyWith(
                                           fontWeight: FontWeight.w600,
                                           color: colorScheme.onSurface,
@@ -187,16 +205,7 @@ class DailyBreakdownSectionWidget extends StatelessWidget {
                                     ),
                                   ],
                                 ),
-                                if (food['comments']?.isNotEmpty == true) ...[
-                                  const SizedBox(height: 4),
-                                  Text(
-                                    food['comments'],
-                                    style: theme.textTheme.bodySmall?.copyWith(
-                                      color: colorScheme.onSurface.withOpacity(0.6),
-                                      fontStyle: FontStyle.italic,
-                                    ),
-                                  ),
-                                ],
+                                ..._buildCommentsWidget(theme, colorScheme, food),
                               ],
                             ),
                           ),

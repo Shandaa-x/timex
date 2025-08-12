@@ -31,15 +31,9 @@ class _FoodEatenStatusWidgetState extends State<FoodEatenStatusWidget> {
       barrierDismissible: false, // Cannot dismiss by tapping outside
       builder: (BuildContext context) {
         return AlertDialog(
-          title: const Row(
-            children: [
-              Icon(Icons.help_outline, color: Colors.orange),
-              SizedBox(width: 8),
-              Text('Баталгаажуулах'),
-            ],
-          ),
+          title: Text('Баталгаажуулах'),
           content: const Text(
-            'Та өнөөдөр хоол идсэн гэж баталгаажуулж байна уу?\n\n⚠️ Анхааруулга: Нэгэнт идсэн гэж тэмдэглэсний дараа буцааж өөрчлөх боломжгүй!',
+            'Та өнөөдөр хоол идсэн гэж баталгаажуулж байна уу?\n\nАнхааруулга: Нэгэнт идсэн гэж тэмдэглэсний дараа буцааж өөрчлөх боломжгүй!',
             style: TextStyle(fontSize: 16),
           ),
           shape: RoundedRectangleBorder(

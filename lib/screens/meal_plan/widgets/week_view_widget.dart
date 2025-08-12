@@ -285,8 +285,8 @@ class _WeekViewWidgetState extends State<WeekViewWidget> {
                                 _buildAddFoodButton(context, dateKey),
                               
                               // Payment status section
-                              const SizedBox(height: 12),
-                              _buildPaymentStatusSection(context, dateKey, dayFoods),
+                              // const SizedBox(height: 12),
+                              // _buildPaymentStatusSection(context, dateKey, dayFoods),
                             ],
                           ),
                         ),

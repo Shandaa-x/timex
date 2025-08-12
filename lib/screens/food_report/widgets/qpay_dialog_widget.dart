@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../../services/money_format.dart';
+import '../services/food_data_service.dart';
 
 class QPayDialogWidget extends StatelessWidget {
   final String type;
@@ -133,14 +134,14 @@ class QPayDialogWidget extends StatelessWidget {
                         children: [
                           Expanded(
                             child: Text(
-                              food['name'] as String? ?? 'Unknown',
+                              FoodDataService.getFoodName(food),
                               style: theme.textTheme.bodySmall?.copyWith(
                                 color: colorScheme.onSurface.withOpacity(0.8),
                               ),
                             ),
                           ),
                           Text(
-                            MoneyFormatService.formatWithSymbol(food['price'] ?? 0),
+                            MoneyFormatService.formatWithSymbol(FoodDataService.getFoodPrice(food)),
                             style: theme.textTheme.bodySmall?.copyWith(
                               fontWeight: FontWeight.w600,
                               color: colorScheme.onSurface.withOpacity(0.8),

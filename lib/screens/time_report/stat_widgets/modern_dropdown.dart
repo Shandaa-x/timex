@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 class ModernDropdown<T> extends StatelessWidget {
   final T value;
   final String label;
-  final IconData icon;
+  final IconData? icon;
   final List<DropdownMenuItem<T>> items;
   final void Function(T?) onChanged;
 
@@ -11,12 +11,12 @@ class ModernDropdown<T> extends StatelessWidget {
     super.key,
     required this.value,
     required this.label,
-    required this.icon,
+    this.icon,
     required this.items,
     required this.onChanged,
   });
 
-  @override
+    @override
   Widget build(BuildContext context) {
     return Container(
       decoration: BoxDecoration(
@@ -29,7 +29,7 @@ class ModernDropdown<T> extends StatelessWidget {
         decoration: InputDecoration(
           labelText: label,
           labelStyle: const TextStyle(color: Color(0xFF64748B), fontWeight: FontWeight.w500),
-          prefixIcon: Icon(icon, color: const Color(0xFF64748B), size: 20),
+          prefixIcon: icon != null ? Icon(icon, color: const Color(0xFF64748B), size: 20) : null,
           border: InputBorder.none,
           contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
         ),

@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:timex/screens/meal_plan/meal_plan_calendar.dart';
 import 'package:timex/screens/time_report/monthly_statistic_screen.dart';
-import 'package:timex/screens/food_report/food_report_screen.dart';
+import 'package:timex/screens/food_report/food_report_screen_refactored.dart';
 import 'package:timex/index.dart';
 import 'package:timex/screens/time_track/time_tracking_screen.dart';
 
@@ -17,13 +17,6 @@ class _MainScreenState extends State<MainScreen> {
   late final PageController _pageController;
 
   late final List<Widget> _screens;
-
-  // Employee data variables
-  String _employeeFullName = 'Employee';
-  Map<String, dynamic>? _employeeData;
-  String? _employeeId;
-  String? _organizationId;
-  bool _isFirstLogin = false;
 
   @override
   void initState() {
@@ -46,46 +39,9 @@ class _MainScreenState extends State<MainScreen> {
     final routeArgs =
         ModalRoute.of(context)?.settings.arguments as Map<String, dynamic>?;
     if (routeArgs != null) {
-      _extractEmployeeDataFromRoute(routeArgs);
       // Rebuild screens with updated employee data
       _updateScreensWithEmployeeData();
       setState(() {});
-    }
-  }
-
-  void _extractEmployeeDataFromRoute(Map<String, dynamic> args) {
-    _employeeData = args['employeeData'] as Map<String, dynamic>?;
-    _employeeId = args['employeeId'] as String?;
-    _organizationId = args['organizationId'] as String?;
-    _isFirstLogin = args['isFirstLogin'] as bool? ?? false;
-
-    // Extract employee full name
-    if (_employeeData != null) {
-      final firstName = _employeeData!['firstName'] as String? ?? '';
-      final lastName = _employeeData!['lastName'] as String? ?? '';
-      final fullName = _employeeData!['fullName'] as String?;
-
-      // Use fullName if available, otherwise construct from firstName and lastName
-      if (fullName != null && fullName.isNotEmpty) {
-        _employeeFullName = fullName;
-      } else if (firstName.isNotEmpty || lastName.isNotEmpty) {
-        _employeeFullName = '$lastName $firstName'.trim();
-      } else {
-        _employeeFullName =
-            _employeeData!['employeeEmail'] as String? ?? 'Employee';
-      }
-
-      debugPrint('Employee logged in: $_employeeFullName');
-      debugPrint('Employee ID: $_employeeId');
-      debugPrint('Organization ID: $_organizationId');
-      debugPrint('Is first login: $_isFirstLogin');
-
-      // Show first login message if needed
-      // if (_isFirstLogin) {
-      //   WidgetsBinding.instance.addPostFrameCallback((_) {
-      //     _showFirstLoginWelcome();
-      //   });
-      // }
     }
   }
 
@@ -109,7 +65,7 @@ class _MainScreenState extends State<MainScreen> {
       builder: (context) => AlertDialog(
         title: const Text('Гарах'),
         content: Text(
-          '$_employeeFullName, та системээс гарахыг хүсч байна уу?',
+          'Та системээс гарахыг хүсч байна уу?',
         ),
         actions: [
           TextButton(
