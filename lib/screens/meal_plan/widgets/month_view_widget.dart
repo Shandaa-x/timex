@@ -18,7 +18,7 @@ class MonthViewWidget extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final colorScheme = theme.colorScheme;
+    final colorScheme = Colors.white;
     
     final firstDayOfMonth = DateTime(currentMonth.year, currentMonth.month, 1);
     final lastDayOfMonth =
@@ -48,7 +48,7 @@ class MonthViewWidget extends StatelessWidget {
                     child: Text(
                       day,
                       style: theme.textTheme.labelSmall?.copyWith(
-                        color: colorScheme.onSurface.withOpacity(0.6),
+                        color: Colors.black.withOpacity(0.6),
                         fontWeight: FontWeight.w600,
                       ),
                     ),
@@ -81,13 +81,13 @@ class MonthViewWidget extends StatelessWidget {
                     margin: const EdgeInsets.all(2),
                     decoration: BoxDecoration(
                       color: isCurrentMonth
-                          ? colorScheme.surface
-                          : colorScheme.surface.withOpacity(0.3),
+                          ? Colors.white
+                          : Colors.white.withOpacity(0.1),
                       borderRadius: BorderRadius.circular(8),
                       border: Border.all(
                         color: isToday
                             ? AppTheme.primaryLight
-                            : colorScheme.outline.withOpacity(0.2),
+                            : Colors.black.withOpacity(0.2),
                         width: isToday ? 2 : 1,
                       ),
                     ),
@@ -102,8 +102,8 @@ class MonthViewWidget extends StatelessWidget {
                               color: isCurrentMonth
                                   ? (isToday
                                       ? AppTheme.primaryLight
-                                      : colorScheme.onSurface)
-                                  : colorScheme.onSurface.withOpacity(0.4),
+                                      : Colors.black)
+                                  : Colors.black.withOpacity(0.4),
                               fontWeight:
                                   isToday ? FontWeight.w700 : FontWeight.w500,
                             ),

@@ -31,7 +31,7 @@ class CalendarHeaderWidget extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
       decoration: BoxDecoration(
-        color: colorScheme.surface,
+        color: Colors.white,
         boxShadow: [
           BoxShadow(
             color: Colors.black.withOpacity(0.1),
@@ -52,7 +52,7 @@ class CalendarHeaderWidget extends StatelessWidget {
                   child: Container(
                     padding: const EdgeInsets.all(8),
                     decoration: BoxDecoration(
-                      color: colorScheme.surface,
+                      color: Colors.white,
                       borderRadius: BorderRadius.circular(8),
                       border: Border.all(
                         color: colorScheme.outline.withOpacity(0.3),
@@ -98,7 +98,7 @@ class CalendarHeaderWidget extends StatelessWidget {
                   child: Container(
                     padding: const EdgeInsets.all(8),
                     decoration: BoxDecoration(
-                      color: colorScheme.surface,
+                      color: Colors.white,
                       borderRadius: BorderRadius.circular(8),
                       border: Border.all(
                         color: colorScheme.outline.withOpacity(0.3),

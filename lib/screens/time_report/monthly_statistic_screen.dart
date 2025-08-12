@@ -1,10 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:timex/screens/time_report/day_info/day_info_screen.dart';
+import 'package:timex/widgets/custom_drawer.dart';
 import 'stat_widgets/index.dart';
 import 'functions/index.dart';
 
 class MonthlyStatisticsScreen extends StatefulWidget {
-  const MonthlyStatisticsScreen({super.key});
+  final Function(int)? onNavigateToTab;
+
+  const MonthlyStatisticsScreen({super.key, this.onNavigateToTab});
 
   @override
   State<MonthlyStatisticsScreen> createState() =>
@@ -355,6 +358,10 @@ class _MonthlyStatisticsScreenState extends State<MonthlyStatisticsScreen> {
       },
       child: Scaffold(
         backgroundColor: const Color(0xFFF8FAFC),
+        drawer: CustomDrawer(
+          currentScreen: DrawerScreenType.timeReport,
+          onNavigateToTab: widget.onNavigateToTab,
+        ),
         body: CustomScrollView(
           slivers: [
             // Modern App Bar

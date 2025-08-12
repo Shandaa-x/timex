@@ -4,7 +4,7 @@
 - hool ustgah, editleh  #1
 -  mungun dungee oruulah eswel tuluh songoltoo hiih #1
 
-### Medium Priority:
+### taskuud:
 - jigd theme awch  DONE
 - angli mongol hol
 - hoolon deer olon zurag orj irj magad
@@ -24,3 +24,21 @@
 - tsagiin tailan harahdaa duriin udur songoh
 - ajillaij bui tsag zasah
 - default aar idewhtei bga 7 honog songogdoh
+
+
+
+### 8/12 todo list
+- tulburiin tvvh harah hadgalah
+- hoolnii zardliig hadgalah, hoolnii zardliig tootsooloh. tootsoolson bolon hadgalsan 
+2 dvng haritsuulj zurvv bhgv esehiig shalgah
+- hoolnii tailan => sariin filteriig awah, bvh medeellee haruulah, niit tulsun,
+- tsagiin tailan => banknii huulga shig shvvj harah
+- tabview => tulburiin tvvh (payment statement) 
+- hool nogoon, tsag tsenher
+- niit tsagiig tsag minutii nariiwchlalaar haruulah => time report screen
+
+
+
+### 8/13 todo list
+- google login
+- qpay integration

@@ -39,25 +39,25 @@ class SummarySectionWidget extends StatelessWidget {
               ),
             ),
             // Filter button
-            TextButton.icon(
-              onPressed: onFilterPressed,
-              icon: Icon(
-                selectedFoodFilter != null ? Icons.filter_alt : Icons.filter_alt_outlined,
-                size: 18,
-                color: AppTheme.primaryLight,
-              ),
-              label: Text(
-                selectedFoodFilter ?? 'Бүгд',
-                style: TextStyle(
-                  color: AppTheme.primaryLight,
-                  fontWeight: FontWeight.w500,
-                ),
-              ),
-            ),
+            // TextButton.icon(
+            //   onPressed: onFilterPressed,
+            //   icon: Icon(
+            //     selectedFoodFilter != null ? Icons.filter_alt : Icons.filter_alt_outlined,
+            //     size: 18,
+            //     color: AppTheme.primaryLight,
+            //   ),
+            //   label: Text(
+            //     selectedFoodFilter ?? 'Бүгд',
+            //     style: TextStyle(
+            //       color: AppTheme.primaryLight,
+            //       fontWeight: FontWeight.w500,
+            //     ),
+            //   ),
+            // ),
           ],
         ),
         const SizedBox(height: 12),
-        
+
         // First row: Unpaid meals count and paid amount
         Row(
           children: [
@@ -65,7 +65,7 @@ class SummarySectionWidget extends StatelessWidget {
               child: _buildSummaryCard(
                 theme,
                 colorScheme,
-                selectedFoodFilter != null ? 'Шүүсэн төлөгдөөгүй' : 'Төлөгдөөгүй хоол',
+                selectedFoodFilter != null ? 'Шүүсэн төлөгдөөгүй' : 'Нийт хоол',
                 '$unpaidCount',
                 Icons.schedule,
                 AppTheme.warningLight,
@@ -85,7 +85,7 @@ class SummarySectionWidget extends StatelessWidget {
           ],
         ),
         const SizedBox(height: 12),
-        
+
         // Second row: Total food cost and payment balance
         Row(
           children: [
@@ -155,6 +155,12 @@ class SummarySectionWidget extends StatelessWidget {
             style: theme.textTheme.titleLarge?.copyWith(
               fontWeight: FontWeight.w700,
               color: color,
+            ),
+          ),
+          Text(
+            'wrgwergregerggrge',
+            style: theme.textTheme.bodyMedium?.copyWith(
+              color: colorScheme.onSurface.withOpacity(0.7),
             ),
           ),
         ],

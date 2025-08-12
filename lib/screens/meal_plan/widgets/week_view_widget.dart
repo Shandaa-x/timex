@@ -210,7 +210,7 @@ class _WeekViewWidgetState extends State<WeekViewWidget> {
                   return Container(
                     margin: const EdgeInsets.only(bottom: 16),
                     decoration: BoxDecoration(
-                      color: colorScheme.surface,
+                      color: Colors.white,
                       borderRadius: BorderRadius.circular(12),
                       boxShadow: [
                         BoxShadow(
@@ -592,8 +592,8 @@ class _WeekViewWidgetState extends State<WeekViewWidget> {
         height: 48,
         decoration: BoxDecoration(
           color: isPastDate 
-              ? colorScheme.surface.withOpacity(0.5)
-              : colorScheme.surface,
+              ? Colors.white
+              : Colors.white.withOpacity(0.8),
           borderRadius: BorderRadius.circular(8),
           border: Border.all(
             color: isPastDate 

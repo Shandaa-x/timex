@@ -1,24 +1,26 @@
 import 'package:flutter/material.dart';
 import '../../widgets/common_app_bar.dart';
+import '../../widgets/custom_drawer.dart';
 import '../../services/money_format.dart';
-import 'widgets/month_navigation_widget.dart';
 import 'widgets/summary_section_widget.dart';
-import 'widgets/daily_breakdown_section_widget.dart';
 import 'widgets/payment_history_section_widget.dart';
 import 'widgets/filter_bottom_sheet_widget.dart';
+import 'tabview/daily_tab_screen.dart';
+import 'tabview/history_tab_screen.dart';
 import 'services/food_data_service.dart';
 import 'services/payment_service.dart';
 import 'services/food_calculation_service.dart';
-import 'services/month_navigation_service.dart';
 
 class FoodReportScreen extends StatefulWidget {
-  const FoodReportScreen({super.key});
+  final Function(int)? onNavigateToTab;
+
+  const FoodReportScreen({super.key, this.onNavigateToTab});
 
   @override
   State<FoodReportScreen> createState() => _FoodReportScreenState();
 }
 
-class _FoodReportScreenState extends State<FoodReportScreen> {
+class _FoodReportScreenState extends State<FoodReportScreen> with SingleTickerProviderStateMixin {
   bool _isLoading = false;
   DateTime _selectedMonth = DateTime.now();
   Map<String, List<Map<String, dynamic>>> _monthlyFoodData = {};
@@ -33,9 +35,13 @@ class _FoodReportScreenState extends State<FoodReportScreen> {
   String? _selectedFoodFilter;
   List<String> _availableFoodTypes = [];
 
+  // Tab controller
+  late TabController _tabController;
+
   @override
   void initState() {
     super.initState();
+    _tabController = TabController(length: 2, vsync: this);
     _loadMonthlyFoodData();
     _loadUserSettings();
     _loadPaymentHistory();
@@ -92,24 +98,6 @@ class _FoodReportScreenState extends State<FoodReportScreen> {
       print('Error loading payment history: $e');
       _paymentHistory = [];
     }
-  }
-
-  void _navigatePreviousMonth() {
-    setState(() {
-      _selectedMonth = MonthNavigationService.navigateToPreviousMonth(_selectedMonth);
-      _selectedFoodFilter = null; // Clear filter when changing month
-    });
-    _loadMonthlyFoodData();
-    _loadPaymentHistory();
-  }
-
-  void _navigateNextMonth() {
-    setState(() {
-      _selectedMonth = MonthNavigationService.navigateToNextMonth(_selectedMonth);
-      _selectedFoodFilter = null; // Clear filter when changing month
-    });
-    _loadMonthlyFoodData();
-    _loadPaymentHistory();
   }
 
   // Load user settings (for future use)
@@ -319,18 +307,84 @@ class _FoodReportScreenState extends State<FoodReportScreen> {
   // Check if any foods exist in the selected month
   bool get _hasAnyFoodsInMonth => _monthlyFoodData.isNotEmpty;
 
+  Widget _buildTabbedBreakdownSection() {
+    return Column(
+      children: [
+        // Tab bar
+        Container(
+          decoration: BoxDecoration(
+            color: Colors.grey[100],
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: TabBar(
+            controller: _tabController,
+            indicator: BoxDecoration(
+              color: Colors.blue[600],
+              borderRadius: BorderRadius.circular(12),
+            ),
+            indicatorSize: TabBarIndicatorSize.tab,
+            labelColor: Colors.white,
+            unselectedLabelColor: Colors.grey[600],
+            labelStyle: const TextStyle(
+              fontSize: 14,
+              fontWeight: FontWeight.w600,
+            ),
+            unselectedLabelStyle: const TextStyle(
+              fontSize: 14,
+              fontWeight: FontWeight.w500,
+            ),
+            tabs: const [
+              Tab(
+                icon: Icon(Icons.today, size: 18),
+                text: 'Өдрийн',
+              ),
+              Tab(
+                icon: Icon(Icons.history, size: 18),
+                text: 'Түүх',
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 16),
+        // Tab content
+        SizedBox(
+          height: 600, // Fixed height for the tab content
+          child: TabBarView(
+            controller: _tabController,
+            children: [
+              // Tab 1: Daily Breakdown
+              DailyTabScreen(
+                unpaidFoodData: _unpaidFoodData,
+                selectedFoodFilter: _selectedFoodFilter,
+                onMarkMealAsPaid: _markMealAsPaid,
+                onPayMonthly: _payMonthly,
+                hasAnyFoodsInMonth: _hasAnyFoodsInMonth,
+              ),
+              // Tab 2: History
+              const HistoryTabScreen(),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Colors.white,
+      drawer: CustomDrawer(
+        currentScreen: DrawerScreenType.foodReport,
+        onNavigateToTab: widget.onNavigateToTab,
+      ),
       appBar: const CommonAppBar(title: 'Хоолны тайлан', variant: AppBarVariant.standard, backgroundColor: Colors.white,),
       body: Column(
         children: [
-          MonthNavigationWidget(
-            selectedMonth: _selectedMonth,
-            onPreviousMonth: _navigatePreviousMonth,
-            onNextMonth: _navigateNextMonth,
-          ),
+          // MonthNavigationWidget(
+          //   selectedMonth: _selectedMonth,
+          //   onPreviousMonth: _navigatePreviousMonth,
+          //   onNextMonth: _navigateNextMonth,
+          // ),
           if (_isLoading)
             const Expanded(child: Center(child: CircularProgressIndicator()))
           else
@@ -369,14 +423,8 @@ class _FoodReportScreenState extends State<FoodReportScreen> {
                     //   selectedFoodFilter: _selectedFoodFilter,
                     // ),
                     // const SizedBox(height: 24),
-                    // Unpaid meals breakdown
-                    DailyBreakdownSectionWidget(
-                      unpaidFoodData: _unpaidFoodData,
-                      selectedFoodFilter: _selectedFoodFilter,
-                      onMarkMealAsPaid: _markMealAsPaid,
-                      onPayMonthly: _payMonthly,
-                      hasAnyFoodsInMonth: _hasAnyFoodsInMonth,
-                    ),
+                    // Tabbed breakdown section
+                    _buildTabbedBreakdownSection(),
                     const SizedBox(height: 24),
                   ],
                 ),
@@ -385,5 +433,11 @@ class _FoodReportScreenState extends State<FoodReportScreen> {
         ],
       ),
     );
+  }
+
+  @override
+  void dispose() {
+    _tabController.dispose();
+    super.dispose();
   }
 }

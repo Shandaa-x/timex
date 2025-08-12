@@ -9,9 +9,10 @@ import 'package:timex/screens/time_track/widgets/work_day.dart';
 import 'package:timex/screens/time_track/widgets/working_hours_card.dart';
 import 'package:timex/screens/time_track/widgets/map_widget.dart';
 import 'package:timex/screens/time_track/widgets/time_entries_list_widget.dart';
-  import 'package:timex/screens/time_track/widgets/food_eaten_status_widget.dart';
+import 'package:timex/screens/time_track/widgets/food_eaten_status_widget.dart';
 import 'package:timex/screens/time_track/widgets/schedule_info_widget.dart';
 import 'package:timex/screens/time_track/widgets/location_map_dialog.dart';
+import 'package:timex/widgets/custom_drawer.dart';
 import 'package:timezone/timezone.dart' as tz;
 import 'package:permission_handler/permission_handler.dart';
 import 'package:geolocator/geolocator.dart';
@@ -19,7 +20,9 @@ import 'package:geolocator/geolocator.dart';
 import 'widgets/action_button.dart';
 
 class TimeTrackScreen extends StatefulWidget {
-  const TimeTrackScreen({super.key});
+  final Function(int)? onNavigateToTab;
+
+  const TimeTrackScreen({super.key, this.onNavigateToTab});
 
   @override
   State<TimeTrackScreen> createState() => _TimeTrackingScreenState();
@@ -913,6 +916,10 @@ class _TimeTrackingScreenState extends State<TimeTrackScreen> with TickerProvide
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: const Color(0xFFF8FAFC),
+      drawer: CustomDrawer(
+        currentScreen: DrawerScreenType.timeTracking,
+        onNavigateToTab: widget.onNavigateToTab,
+      ),
       body: CustomScrollView(
         slivers: [
           // App Bar
@@ -923,14 +930,6 @@ class _TimeTrackingScreenState extends State<TimeTrackScreen> with TickerProvide
             backgroundColor: _isWorking ? const Color(0xFF059669) : const Color(0xFF3B82F6),
             elevation: 0,
             flexibleSpace: FlexibleSpaceBar(
-              title: Text(
-                _isWorking ? 'Ажил хийж байна...' : 'Цагийн бүртгэл',
-                style: const TextStyle(
-                  fontWeight: FontWeight.w600,
-                  fontSize: 16,
-                  color: Colors.white,
-                ),
-              ),
               background: Container(
                 decoration: BoxDecoration(
                   gradient: LinearGradient(
@@ -939,6 +938,99 @@ class _TimeTrackingScreenState extends State<TimeTrackScreen> with TickerProvide
                     colors: _isWorking
                         ? [const Color(0xFF059669), const Color(0xFF047857)]
                         : [const Color(0xFF3B82F6), const Color(0xFF1D4ED8)],
+                  ),
+                ),
+                child: SafeArea(
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisAlignment: MainAxisAlignment.end,
+                      children: [
+                        Row(
+                          children: [
+                            // User Profile Image
+                            Container(
+                              width: 50,
+                              height: 50,
+                              decoration: BoxDecoration(
+                                shape: BoxShape.circle,
+                                border: Border.all(
+                                  color: Colors.white.withOpacity(0.3),
+                                  width: 2,
+                                ),
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: Colors.black.withOpacity(0.1),
+                                    blurRadius: 8,
+                                    offset: const Offset(0, 2),
+                                  ),
+                                ],
+                              ),
+                              child: ClipOval(
+                                child: Container(
+                                  color: Colors.white.withOpacity(0.2),
+                                  child: const Icon(
+                                    Icons.person,
+                                    color: Colors.white,
+                                    size: 28,
+                                  ),
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 16),
+                            // Hello text and status
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    'Сайн байна уу!',
+                                    style: TextStyle(
+                                      color: Colors.white.withOpacity(0.9),
+                                      fontSize: 14,
+                                      fontWeight: FontWeight.w400,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 2),
+                                  Text(
+                                    _isWorking ? 'Ажил хийж байна...' : 'Цагийн бүртгэл',
+                                    style: const TextStyle(
+                                      fontWeight: FontWeight.w700,
+                                      fontSize: 18,
+                                      color: Colors.white,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            // Notification Icon
+                            Container(
+                              decoration: BoxDecoration(
+                                shape: BoxShape.circle,
+                                color: Colors.white.withOpacity(0.1),
+                              ),
+                              child: IconButton(
+                                icon: const Icon(
+                                  Icons.notifications_outlined,
+                                  color: Colors.white,
+                                  size: 24,
+                                ),
+                                onPressed: () {
+                                  // TODO: Handle notification tap
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    const SnackBar(
+                                      content: Text('Мэдэгдлүүдийг харах'),
+                                      duration: Duration(seconds: 2),
+                                    ),
+                                  );
+                                },
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
                   ),
                 ),
               ),
