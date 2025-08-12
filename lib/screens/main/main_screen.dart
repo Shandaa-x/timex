@@ -22,6 +22,7 @@ class _MainScreenState extends State<MainScreen> {
   @override
   void initState() {
     super.initState();
+    print('MainScreen initState called');
     _pageController = PageController(initialPage: _currentIndex);
 
     _screens = [
@@ -31,6 +32,7 @@ class _MainScreenState extends State<MainScreen> {
       FoodReportScreen(),
       QRCodeScreen(),
     ];
+    print('Screens initialized: ${_screens.length}');
   }
 
   @override
@@ -56,6 +58,7 @@ class _MainScreenState extends State<MainScreen> {
   }
 
   void _onTabTapped(int index) {
+    print('Tab tapped: $index'); // Debug output
     _pageController.jumpToPage(index);
     setState(() {
       _currentIndex = index;
@@ -67,9 +70,7 @@ class _MainScreenState extends State<MainScreen> {
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('Гарах'),
-        content: Text(
-          'Та системээс гарахыг хүсч байна уу?',
-        ),
+        content: Text('Та системээс гарахыг хүсч байна уу?'),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(context).pop(false),
@@ -105,18 +106,41 @@ class _MainScreenState extends State<MainScreen> {
         }
       },
       child: Scaffold(
-        body: PageView.builder(
-          physics: const NeverScrollableScrollPhysics(),
-          controller: _pageController,
-          itemCount: _screens.length,
-          itemBuilder: (context, index) {
-            return _screens[index];
-          },
-          onPageChanged: (index) {
-            setState(() {
-              _currentIndex = index;
-            });
-          },
+        body: Stack(
+          children: [
+            PageView.builder(
+              physics: const NeverScrollableScrollPhysics(),
+              controller: _pageController,
+              itemCount: _screens.length,
+              itemBuilder: (context, index) {
+                print('Building screen at index: $index');
+                return _screens[index];
+              },
+              onPageChanged: (index) {
+                setState(() {
+                  _currentIndex = index;
+                });
+              },
+            ),
+            // Debug button to test QR screen
+            if (_currentIndex == 0) // Only show on first tab
+              Positioned(
+                top: 100,
+                right: 20,
+                child: FloatingActionButton(
+                  mini: true,
+                  onPressed: () {
+                    print('Debug: Navigating to QR screen');
+                    _pageController.jumpToPage(4); // Jump to QR screen
+                    setState(() {
+                      _currentIndex = 4;
+                    });
+                  },
+                  child: Icon(Icons.qr_code),
+                  backgroundColor: Colors.red,
+                ),
+              ),
+          ],
         ),
         bottomNavigationBar: _buildSegmentedTabBar(),
       ),
@@ -135,7 +159,7 @@ class _MainScreenState extends State<MainScreen> {
       {'icon': Icons.note, 'label': 'Тайлан'},
       {'icon': Icons.food_bank, 'label': 'Хоолны хуваарь'},
       {'icon': Icons.analytics, 'label': 'Хоолны тайлан'},
-      {'icon': Icons.qr_code, 'label': 'QR Код'},
+      {'icon': Icons.qr_code, 'label': 'QR code'},
     ];
 
     return Container(
@@ -149,13 +173,17 @@ class _MainScreenState extends State<MainScreen> {
             children: List.generate(tabs.length, (index) {
               final isSelected = _currentIndex == index;
               return Expanded(
-                child: GestureDetector(
-                  onTap: () => _onTabTapped(index),
+                child: InkWell(
+                  onTap: () {
+                    print('Tab tapped: $index');
+                    _onTabTapped(index);
+                  },
+                  borderRadius: BorderRadius.circular(12),
                   child: Container(
                     margin: const EdgeInsets.symmetric(horizontal: 2),
                     padding: const EdgeInsets.symmetric(
-                      vertical: 2,
-                      horizontal: 2,
+                      vertical: 8, // Increased padding for better tap target
+                      horizontal: 4,
                     ),
                     decoration: BoxDecoration(
                       color: isSelected
