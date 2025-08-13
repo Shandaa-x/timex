@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:timex/screens/login/google_login_screen.dart';
 import 'package:timex/screens/main/main_screen.dart';
 import 'package:timex/screens/time_track/time_tracking_screen.dart';
 
@@ -7,7 +8,7 @@ class Routes {
   static const location = 'LocationScreen';
   static const loginScreen = 'LoginScreen';
   static const timeTrack = 'TimeTracking';
-  static const addEmployee = 'AddEmployeeScreen';
+  static const googleLogin = 'GoogleLoginScreen';
 
   final RouteObserver routeObserver;
 
@@ -17,6 +18,12 @@ class Routes {
     Route<dynamic> route;
 
     switch (settings.name) {
+      case Routes.googleLogin:
+        route = MaterialPageRoute(
+          builder: (context) => const GoogleLoginScreen(),
+          settings: settings,
+        );
+        break;
       case Routes.main:
         route = MaterialPageRoute(
           builder: (context) => const MainScreen(),

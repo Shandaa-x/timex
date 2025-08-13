@@ -72,11 +72,26 @@ class _FoodEatenStatusWidgetState extends State<FoodEatenStatusWidget> {
     setState(() => _isUpdating = true);
 
     try {
+      // Check if calendarDays document exists
+      final docRef = _firestore.collection('calendarDays').doc(widget.dateString);
+      final docSnap = await docRef.get();
+      if (!docSnap.exists) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Та ажлын ирцээ бүртгүүлээгүй байна'),
+              backgroundColor: Colors.orange,
+              behavior: SnackBarBehavior.floating,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.all(Radius.circular(12))),
+            ),
+          );
+        }
+        setState(() => _isUpdating = false);
+        return;
+      }
+
       // Update the calendarDays document
-      await _firestore
-          .collection('calendarDays')
-          .doc(widget.dateString)
-          .update({
+      await docRef.update({
         'eatenForDay': eaten,
         'updatedAt': FieldValue.serverTimestamp(),
       });

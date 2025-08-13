@@ -5,7 +5,7 @@
 -  mungun dungee oruulah eswel tuluh songoltoo hiih #1
 
 ### taskuud:
-- jigd theme awch  DONE
+- jigd theme awch
 - angli mongol hol
 - hoolon deer olon zurag orj irj magad
 - tsag bvrtgel realtime bolgoh

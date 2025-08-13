@@ -1,7 +1,8 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 
 class PaymentService {
-  static const String _currentUserId = 'pNR2EFnrnjqn5KY9RQXQ'; // Updated with actual user ID
+  static String get _currentUserId => FirebaseAuth.instance.currentUser?.uid ?? 'unknown_user';
   static const int _pageSize = 10; // Number of documents per page
 
   // Load payment history from Firestore

@@ -16,6 +16,7 @@ import 'package:timex/widgets/custom_drawer.dart';
 import 'package:timezone/timezone.dart' as tz;
 import 'package:permission_handler/permission_handler.dart';
 import 'package:geolocator/geolocator.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 
 import 'widgets/action_button.dart';
 
@@ -106,7 +107,7 @@ class _TimeTrackingScreenState extends State<TimeTrackScreen> with TickerProvide
 
   // Helper method to ensure calendar day document exists
   Future<void> _ensureCalendarDayExists(String dateString) async {
-    final calendarDayRef = _firestore.collection('calendarDays').doc(dateString);
+    final calendarDayRef = _firestore.collection('users').doc(_userId).collection('calendarDays').doc(dateString);
     final calendarDayDoc = await calendarDayRef.get();
     
     if (!calendarDayDoc.exists) {
@@ -127,6 +128,7 @@ class _TimeTrackingScreenState extends State<TimeTrackScreen> with TickerProvide
 
       // Load today's entries (no user filter needed)
       final entriesSnapshot = await _firestore
+          .collection('users').doc(_userId)
           .collection('calendarDays')
           .doc(dateString)
           .collection('timeEntries')
@@ -191,7 +193,7 @@ class _TimeTrackingScreenState extends State<TimeTrackScreen> with TickerProvide
   Future<void> _loadTodayFoods(String dateString) async {
     try {
       final foodDocId = '$dateString-foods';
-      final foodDoc = await _firestore.collection('foods').doc(foodDocId).get();
+      final foodDoc = await _firestore.collection('users').doc(_userId).collection('foods').doc(foodDocId).get();
       
       if (foodDoc.exists) {
         final data = foodDoc.data();
@@ -411,6 +413,9 @@ class _TimeTrackingScreenState extends State<TimeTrackScreen> with TickerProvide
     }
   }
 
+  // Helper to get current user ID
+  String get _userId => FirebaseAuth.instance.currentUser?.uid ?? 'unknown_user';
+
   Future<void> _handleStartWork() async {
     print('🚀 Starting work process...');
     setState(() => _isLoading = true);
@@ -452,6 +457,7 @@ class _TimeTrackingScreenState extends State<TimeTrackScreen> with TickerProvide
       print('💾 Saving time entry to Firestore...');
       try {
         await _firestore
+            .collection('users').doc(_userId)
             .collection('calendarDays')
             .doc(dateString)
             .collection('timeEntries')
@@ -467,18 +473,18 @@ class _TimeTrackingScreenState extends State<TimeTrackScreen> with TickerProvide
       // Update calendar day - add to existing hours instead of overwriting
       print('📝 Updating calendar day document...');
       final workDay = WorkDay.createNew(now);
-      final existingDoc = await _firestore.collection('calendarDays').doc(workDay.documentId).get();
+      final existingDoc = await _firestore.collection('users').doc(_userId).collection('calendarDays').doc(workDay.documentId).get();
       
       if (existingDoc.exists) {
         // Update existing document - don't overwrite
-        await _firestore.collection('calendarDays').doc(workDay.documentId).update({
+        await _firestore.collection('users').doc(_userId).collection('calendarDays').doc(workDay.documentId).update({
           'lastCheckIn': Timestamp.fromDate(now),
           'updatedAt': FieldValue.serverTimestamp(),
         });
         print('✅ Updated existing calendar day document');
       } else {
         // Create new document
-        await _firestore.collection('calendarDays').doc(workDay.documentId).set(workDay.toMap());
+        await _firestore.collection('users').doc(_userId).collection('calendarDays').doc(workDay.documentId).set(workDay.toMap());
         print('✅ Created new calendar day document');
       }
 
@@ -562,6 +568,7 @@ class _TimeTrackingScreenState extends State<TimeTrackScreen> with TickerProvide
       // Save to timeEntries subcollection
       try {
         await _firestore
+            .collection('users').doc(_userId)
             .collection('calendarDays')
             .doc(dateString)
             .collection('timeEntries')
@@ -576,6 +583,7 @@ class _TimeTrackingScreenState extends State<TimeTrackScreen> with TickerProvide
 
       // Update calendar day - calculate total working hours from all entries
       final allEntries = await _firestore
+          .collection('users').doc(_userId)
           .collection('calendarDays')
           .doc(dateString)
           .collection('timeEntries')
@@ -598,7 +606,7 @@ class _TimeTrackingScreenState extends State<TimeTrackScreen> with TickerProvide
 
       final totalHours = _calculateTotalWorkingHours(allEntriesData);
 
-      await _firestore.collection('calendarDays').doc(dateString).update({
+      await _firestore.collection('users').doc(_userId).collection('calendarDays').doc(dateString).update({
         'endTime': Timestamp.fromDate(now),
         'workingHours': totalHours,
         'updatedAt': FieldValue.serverTimestamp(),
@@ -803,13 +811,14 @@ class _TimeTrackingScreenState extends State<TimeTrackScreen> with TickerProvide
 
       // Save to timeEntries subcollection
       await _firestore
+          .collection('users').doc(_userId)
           .collection('calendarDays')
           .doc(startDate)
           .collection('timeEntries')
           .add(timeEntryData);
 
       // Update calendar day to mark as incomplete
-      await _firestore.collection('calendarDays').doc(startDate).update({
+      await _firestore.collection('users').doc(_userId).collection('calendarDays').doc(startDate).update({
         'endTime': Timestamp.fromDate(autoEndTime),
         'incompleteWork': true, // Mark as incomplete work
         'autoEnded': true,

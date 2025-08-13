@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:timex/screens/meal_plan/widgets/custom_app_bar.dart';
 import '../../theme/app_theme.dart';
 import '../../widgets/custom_drawer.dart';
@@ -36,6 +37,9 @@ class _MealPlanCalendarState extends State<MealPlanCalendar>
   // Food data - map of date string to list of foods
   final Map<String, List<Map<String, dynamic>>> _foodData = {};
   Map<String, List<Map<String, dynamic>>> _filteredFoodData = {};
+
+  // Helper to get current user ID
+  String get _userId => FirebaseAuth.instance.currentUser?.uid ?? 'unknown_user';
 
   @override
   void initState() {
@@ -92,6 +96,8 @@ class _MealPlanCalendarState extends State<MealPlanCalendar>
       try {
         // Use a range query to get all food documents for the current month
         final querySnapshot = await FirebaseFirestore.instance
+            .collection('users')
+            .doc(_userId)
             .collection('foods')
             .where(FieldPath.documentId, isGreaterThanOrEqualTo: startDocId)
             .where(FieldPath.documentId, isLessThanOrEqualTo: endDocId)
@@ -178,6 +184,8 @@ class _MealPlanCalendarState extends State<MealPlanCalendar>
   Future<void> _loadSingleDayFood(String documentId) async {
     try {
       final docSnapshot = await FirebaseFirestore.instance
+          .collection('users')
+          .doc(_userId)
           .collection('foods')
           .doc(documentId)
           .get();

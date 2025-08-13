@@ -6,6 +6,7 @@ import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:get/get_navigation/src/root/get_material_app.dart';
 import 'package:timex/index.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
+import 'package:timex/screens/login/google_login_screen.dart';
 import 'package:timex/screens/main/main_screen.dart';
 import 'package:timezone/data/latest.dart' as tz;
 import 'package:timezone/timezone.dart' as tz;
@@ -120,10 +121,10 @@ class MyApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return GetMaterialApp(
-      initialRoute: Routes.main,
+      initialRoute: Routes.googleLogin,
       onGenerateRoute: (settings) => Routes().getRoute(settings),
       debugShowCheckedModeBanner: false,
-      home: const MainScreen(),
+      home: const GoogleLoginScreen(),
     );
   }
 }

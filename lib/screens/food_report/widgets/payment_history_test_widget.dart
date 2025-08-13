@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 
 // Test widget to demonstrate the payment history structure
 class PaymentHistoryTestWidget extends StatelessWidget {
@@ -7,9 +8,15 @@ class PaymentHistoryTestWidget extends StatelessWidget {
 
   Future<void> _addSamplePayment() async {
     try {
+      // Use the current user's ID from FirebaseAuth
+      final user = FirebaseAuth.instance.currentUser;
+      if (user == null) {
+        print('No user logged in');
+        return;
+      }
       await FirebaseFirestore.instance
           .collection('users')
-          .doc('pNR2EFnrnjqn5KY9RQXQ')
+          .doc(user.uid)
           .collection('historyOfPayment')
           .add({
         'amount': 15000,

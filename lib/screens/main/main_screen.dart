@@ -27,10 +27,12 @@ class _MainScreenState extends State<MainScreen> {
     _pageController = PageController(initialPage: _currentIndex);
 
     _screens = [
+      HomeScreen(),
       TimeTrackScreen(),
       MonthlyStatisticsScreen(),
       MealPlanCalendar(),
       FoodReportScreen(),
+      QRCodeScreen(),
     ];
     print('Screens initialized: ${_screens.length}');
   }
@@ -50,10 +52,12 @@ class _MainScreenState extends State<MainScreen> {
   }
 
   void _updateScreensWithEmployeeData() {
-    _screens[0] = TimeTrackScreen();
-    _screens[1] = MonthlyStatisticsScreen();
-    _screens[2] = MealPlanCalendar();
-    _screens[3] = FoodReportScreen();
+    _screens[0] = HomeScreen();
+    _screens[1] = TimeTrackScreen();
+    _screens[2] = MonthlyStatisticsScreen();
+    _screens[3] = MealPlanCalendar();
+    _screens[4] = FoodReportScreen();
+    _screens[5] = QRCodeScreen();
   }
 
   void _onTabTapped(int index) {
@@ -140,8 +144,8 @@ class _MainScreenState extends State<MainScreen> {
   Widget _buildSegmentedTabBar() {
     final tabs = [
       {'icon': Icons.home, 'label': 'Нүүр'},
-      {'icon': Icons.access_time, 'label': 'Цаг'},
-      {'icon': Icons.note, 'label': 'Тайлан'},
+      {'icon': Icons.access_time, 'label': 'Цаг бүртгэл'},
+      {'icon': Icons.note, 'label': 'Цагийн тайлан'},
       {'icon': Icons.food_bank, 'label': 'Хоолны хуваарь'},
       {'icon': Icons.analytics, 'label': 'Хоолны тайлан'},
       {'icon': Icons.qr_code, 'label': 'QR code'},
@@ -192,7 +196,7 @@ class _MainScreenState extends State<MainScreen> {
                             color: isSelected
                                 ? Colors.white // White text on green
                                 : Colors.white.withValues(alpha: 0.6),
-                            fontSize: 8,
+                            fontSize: 9,
                           ),
                           textAlign: TextAlign.center,
                           maxLines: 2,
@@ -207,186 +211,6 @@ class _MainScreenState extends State<MainScreen> {
           ),
         ),
       ),
-    );
-  }
-
-  Widget _buildDrawer() {
-    return Drawer(
-      backgroundColor: const Color(0xFFF8F9FA),
-      child: Column(
-        children: [
-          // Drawer Header with gradient
-          Container(
-            height: 200,
-            width: double.infinity,
-            decoration: const BoxDecoration(
-              gradient: LinearGradient(
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-                colors: [
-                  Color(0xFF2D5A27), // Forest green
-                  Color(0xFF4A8B3A), // Lighter forest green
-                ],
-              ),
-            ),
-            child: const SafeArea(
-              child: Padding(
-                padding: EdgeInsets.all(20),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisAlignment: MainAxisAlignment.end,
-                  children: [
-                    CircleAvatar(
-                      radius: 35,
-                      backgroundColor: Colors.white,
-                      child: Icon(
-                        Icons.person,
-                        size: 40,
-                        color: Color(0xFF2D5A27),
-                      ),
-                    ),
-                    SizedBox(height: 15),
-                    Text(
-                      'TimeX App',
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontSize: 24,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                    Text(
-                      'Цаг хугацаа болон хоолны менежмент',
-                      style: TextStyle(
-                        color: Colors.white70,
-                        fontSize: 14,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          ),
-          
-          // Drawer Items
-          Expanded(
-            child: ListView(
-              padding: const EdgeInsets.symmetric(vertical: 8),
-              children: [
-                _buildDrawerItem(
-                  icon: Icons.dashboard,
-                  title: 'Хяналтын самбар',
-                  onTap: () {
-                    Navigator.pop(context);
-                    _onTabTapped(0); // Home screen
-                  },
-                ),
-                _buildDrawerItem(
-                  icon: Icons.access_time,
-                  title: 'Цагийн бүртгэл',
-                  onTap: () {
-                    Navigator.pop(context);
-                    _onTabTapped(1); // Time tracking screen
-                  },
-                ),
-                _buildDrawerItem(
-                  icon: Icons.analytics,
-                  title: 'Тайлангууд',
-                  onTap: () {
-                    Navigator.pop(context);
-                    _onTabTapped(2); // Statistics screen
-                  },
-                ),
-                _buildDrawerItem(
-                  icon: Icons.restaurant_menu,
-                  title: 'Хоолны хуваарь',
-                  onTap: () {
-                    Navigator.pop(context);
-                    _onTabTapped(3); // Meal plan screen
-                  },
-                ),
-                _buildDrawerItem(
-                  icon: Icons.receipt_long,
-                  title: 'Хоолны тайлан',
-                  onTap: () {
-                    Navigator.pop(context);
-                    _onTabTapped(4); // Food report screen
-                  },
-                ),
-                const Divider(height: 20),
-                _buildDrawerItem(
-                  icon: Icons.settings,
-                  title: 'Тохиргоо',
-                  onTap: () {
-                    Navigator.pop(context);
-                    // TODO: Navigate to settings
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('Тохиргоо цонх удахгүй нээгдэнэ')),
-                    );
-                  },
-                ),
-                _buildDrawerItem(
-                  icon: Icons.help_outline,
-                  title: 'Тусламж',
-                  onTap: () {
-                    Navigator.pop(context);
-                    // TODO: Navigate to help
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('Тусламжийн цонх удахгүй нээгдэнэ')),
-                    );
-                  },
-                ),
-                _buildDrawerItem(
-                  icon: Icons.info_outline,
-                  title: 'Програмын тухай',
-                  onTap: () {
-                    Navigator.pop(context);
-                    _showAboutDialog();
-                  },
-                ),
-                const Divider(height: 20),
-                _buildDrawerItem(
-                  icon: Icons.logout,
-                  title: 'Гарах',
-                  onTap: () {
-                    Navigator.pop(context);
-                    _onWillPop();
-                  },
-                  textColor: const Color(0xFFE74C3C),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildDrawerItem({
-    required IconData icon,
-    required String title,
-    required VoidCallback onTap,
-    Color? textColor,
-  }) {
-    return ListTile(
-      leading: Icon(
-        icon,
-        color: textColor ?? const Color(0xFF2D5A27),
-        size: 24,
-      ),
-      title: Text(
-        title,
-        style: TextStyle(
-          color: textColor ?? const Color(0xFF2C3E50),
-          fontSize: 16,
-          fontWeight: FontWeight.w500,
-        ),
-      ),
-      onTap: onTap,
-      contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 4),
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(8),
-      ),
-      hoverColor: const Color(0xFF4A8B3A).withOpacity(0.1),
     );
   }
 

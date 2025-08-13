@@ -43,54 +43,17 @@ class _HomeScreenState extends State<HomeScreen> {
 
   Future<void> _loadNews() async {
     try {
-      // Fetch news from both collections
-      final List<Future<QuerySnapshot>> futures = [
-        _firestore.collection('_news').orderBy('publishedAt', descending: true).get(),
-        _firestore.collection('users').doc('pNR2EFnrnjqn5KY9RQXQ').collection('news').orderBy('publishedAt', descending: true).get(),
-      ];
-
-      final results = await Future.wait(futures);
-      
+      // Fetch news from the public 'news' collection only
+      final newsSnapshot = await _firestore.collection('news').orderBy('publishedAt', descending: true).get();
       List<Map<String, dynamic>> allNews = [];
-      
-      // Process news from _news collection
-      for (var doc in results[0].docs) {
-        final data = doc.data() as Map<String, dynamic>;
+      for (var doc in newsSnapshot.docs) {
+        final data = doc.data();
         data['id'] = doc.id;
-        data['source'] = 'global'; // Mark source for identification
-        // Only add public news from global collection
-        if (data['public'] == true) {
-          allNews.add(data);
-        }
+        allNews.add(data);
       }
-      
-      // Process news from user-specific collection
-      for (var doc in results[1].docs) {
-        final data = doc.data() as Map<String, dynamic>;
-        data['id'] = doc.id;
-        data['source'] = 'user'; // Mark source for identification
-        // Only add public news from user collection
-        if (data['public'] == true) {
-          allNews.add(data);
-        }
-      }
-      
-      // Sort by publishedAt field (most recent first)
-      allNews.sort((a, b) {
-        final aTime = a['publishedAt'] as Timestamp?;
-        final bTime = b['publishedAt'] as Timestamp?;
-        
-        if (aTime == null && bTime == null) return 0;
-        if (aTime == null) return 1; // Put null values at the end
-        if (bTime == null) return -1;
-        
-        return bTime.compareTo(aTime); // Descending order (newest first)
-      });
-      
       setState(() {
         _newsList = allNews;
       });
-      
       debugPrint('Loaded ${allNews.length} news items');
     } catch (e) {
       debugPrint('Error loading news: $e');
