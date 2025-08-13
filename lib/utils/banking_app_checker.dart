@@ -9,17 +9,27 @@ class BankingAppChecker {
   /// Common Mongolian banking app schemes based on QPay documentation
   static const Map<String, String> bankingAppSchemes = {
     'Khan Bank': 'khanbank://',
-    'State Bank': 'statebank://',
-    'TDB Bank': 'tdbbank://',
-    'Xac Bank': 'xacbank://',
-    'Most Money': 'most://',
-    'NIB Bank': 'nibank://',
-    'Chinggis Khaan Bank': 'ckbank://',
-    'Capitron Bank': 'capitronbank://',
-    'Bogd Bank': 'bogdbank://',
-    'Candy Pay': 'candypay://',
-    'QPay Wallet': 'qpay://',
+    'Khan Bank Alt': 'khanbankapp://',
     'Social Pay': 'socialpay://',
+    'State Bank': 'statebank://',
+    'State Bank Alt': 'statebankapp://',
+    'TDB Bank': 'tdbbank://',
+    'TDB Alt': 'tdb://',
+    'Xac Bank': 'xacbank://',
+    'Xac Alt': 'xac://',
+    'Most Money': 'most://',
+    'Most Money Alt': 'mostmoney://',
+    'NIB Bank': 'nibank://',
+    'UB Bank': 'ulaanbaatarbank://',
+    'Chinggis Khaan Bank': 'ckbank://',
+    'Chinggis Alt': 'chinggisnbank://',
+    'Capitron Bank': 'capitronbank://',
+    'Capitron Alt': 'capitron://',
+    'Bogd Bank': 'bogdbank://',
+    'Bogd Alt': 'bogd://',
+    'Candy Pay': 'candypay://',
+    'Candy Alt': 'candy://',
+    'QPay Wallet': 'qpay://',
   };
 
   /// Check which banking apps are available on the device
@@ -68,6 +78,70 @@ class BankingAppChecker {
       AppLogger.error('Error testing deep link: $deepLink', error);
       return false;
     }
+  }
+
+  /// Test multiple schemes for a bank and return the working one
+  static Future<String?> findWorkingScheme(List<String> schemes) async {
+    for (final scheme in schemes) {
+      try {
+        final testUri = Uri.parse('${scheme}test');
+        final canLaunch = await canLaunchUrl(testUri);
+        if (canLaunch) {
+          AppLogger.success('Working scheme found: $scheme');
+          return scheme;
+        }
+      } catch (error) {
+        AppLogger.warning('Scheme $scheme failed: $error');
+      }
+    }
+    return null;
+  }
+
+  /// Get optimized deep links for each bank
+  static Future<Map<String, String>> getOptimizedDeepLinks(
+    String qrText,
+    String? invoiceId,
+  ) async {
+    final workingSchemes = <String, String>{};
+    final encodedQR = Uri.encodeComponent(qrText);
+
+    // Test schemes for each bank
+    final bankSchemes = {
+      'Khan Bank': ['khanbank://', 'khanbankapp://', 'socialpay://'],
+      'State Bank': ['statebank://', 'statebankapp://'],
+      'TDB Bank': ['tdbbank://', 'tdb://'],
+      'Xac Bank': ['xacbank://', 'xac://'],
+      'Most Money': ['most://', 'mostmoney://'],
+      'NIB Bank': ['nibank://', 'ulaanbaatarbank://'],
+      'Chinggis Khaan Bank': ['ckbank://', 'chinggisnbank://'],
+      'Capitron Bank': ['capitronbank://', 'capitron://'],
+      'Bogd Bank': ['bogdbank://', 'bogd://'],
+      'Candy Pay': ['candypay://', 'candy://'],
+      'QPay Wallet': ['qpay://'],
+    };
+
+    for (final entry in bankSchemes.entries) {
+      final workingScheme = await findWorkingScheme(entry.value);
+      if (workingScheme != null) {
+        // Create proper deep link based on the working scheme
+        String deepLink;
+        if (workingScheme.startsWith('qpay://') && invoiceId != null) {
+          deepLink = 'qpay://invoice?id=$invoiceId';
+        } else if (workingScheme.startsWith('socialpay://')) {
+          deepLink = 'socialpay://qpay?qr=$encodedQR';
+        } else if (workingScheme.startsWith('khanbank://')) {
+          deepLink = 'khanbank://q?qPay_QRcode=$encodedQR';
+        } else {
+          // Generic format for other banks
+          deepLink = '${workingScheme}qpay?qr=$encodedQR';
+        }
+
+        workingSchemes[entry.key] = deepLink;
+        AppLogger.success('${entry.key}: $deepLink');
+      }
+    }
+
+    return workingSchemes;
   }
 
   /// Get a formatted report of available banking apps

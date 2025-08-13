@@ -445,152 +445,342 @@ class _QRCodeScreenState extends State<QRCodeScreen> {
     }
   }
 
-  /// Show available banking app options
+  /// Show available banking app options with enhanced detection
+  void _showBankingAppOptions() async {
+    if (qpayResult == null) return;
+
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => Center(
+        child: CircularProgressIndicator(),
+      ),
+    );
+
+    try {
+      final qrText = qpayResult!['qr_text'] ?? '';
+      final invoiceId = qpayResult!['invoice_id'];
+
+      // Use optimized banking app detection
+      final optimizedLinks = await BankingAppChecker.getOptimizedDeepLinks(
+        qrText,
+        invoiceId,
+      );
+
+      // Get traditional banking apps from QPay response
+      final bankingApps = QRUtils.extractBankingApps(qpayResult!);
+
+      // Fallback to legacy method
+      Map<String, String> legacyDeepLinks = {};
+      if (bankingApps.isEmpty && optimizedLinks.isEmpty) {
+        String? qpayShortUrl;
+        if (qpayResult!['qpay_shortUrl'] != null) {
+          qpayShortUrl = qpayResult!['qpay_shortUrl'].toString();
+        } else if (qpayResult!['urls'] != null) {
+          final urls = qpayResult!['urls'];
+          if (urls is List && urls.isNotEmpty) {
+            for (final url in urls) {
+              if (url is Map && url['link'] != null) {
+                final link = url['link'].toString();
+                if (link.startsWith('http')) {
+                  qpayShortUrl = link;
+                  break;
+                }
+              }
+            }
+          }
+        }
+
+        legacyDeepLinks = QRUtils.generateDeepLinks(
+          qrText,
+          qpayShortUrl,
+          invoiceId,
+        );
+      }
+
+      Navigator.pop(context); // Close loading dialog
+
+      showModalBottomSheet(
+        context: context,
+        isScrollControlled: true,
+        builder: (BuildContext context) {
+          return Container(
+            padding: const EdgeInsets.all(20),
+            constraints: BoxConstraints(
+              maxHeight: MediaQuery.of(context).size.height * 0.8,
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Choose Banking App',
+                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                ),
+                SizedBox(height: 16),
+
+                // Show optimized banking apps first
+                if (optimizedLinks.isNotEmpty) ...[
+                  Text(
+                    'Available Banking Apps:',
+                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+                  ),
+                  SizedBox(height: 8),
+                  ...optimizedLinks.entries.map((entry) {
+                    return Card(
+                      child: ListTile(
+                        leading: Icon(
+                          _getBankIcon(entry.key),
+                          color: Colors.green,
+                          size: 32,
+                        ),
+                        title: Text(
+                          entry.key,
+                          style: TextStyle(fontWeight: FontWeight.w600),
+                        ),
+                        subtitle: Text('Tap to open'),
+                        trailing: Icon(Icons.arrow_forward_ios),
+                        onTap: () async {
+                          Navigator.pop(context);
+                          await _launchBankingApp(entry.value, entry.key);
+                        },
+                      ),
+                    );
+                  }).toList(),
+                  SizedBox(height: 16),
+                ],
+
+                // Banking apps from QPay response
+                if (bankingApps.isNotEmpty) ...[
+                  Text(
+                    'QPay Suggested Apps:',
+                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+                  ),
+                  SizedBox(height: 8),
+                  ...bankingApps.entries.map((entry) {
+                    final app = entry.value;
+                    return ListTile(
+                      leading: Icon(
+                        _getBankIcon(app.name),
+                        color: Colors.blue,
+                      ),
+                      title: Text(app.name),
+                      subtitle: Text(
+                        app.description.isNotEmpty
+                            ? app.description
+                            : 'Mobile banking app',
+                      ),
+                      onTap: () async {
+                        Navigator.pop(context);
+                        await _launchBankingApp(app.deepLink, app.name);
+                      },
+                    );
+                  }).toList(),
+                  SizedBox(height: 16),
+                ],
+
+                // Legacy deep links as fallback
+                if (legacyDeepLinks.isNotEmpty) ...[
+                  Text(
+                    'Other Options:',
+                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+                  ),
+                  SizedBox(height: 8),
+                  ...legacyDeepLinks.entries.map((entry) {
+                    String appName = _getLegacyAppName(entry.key);
+                    return ListTile(
+                      leading: Icon(
+                        _getBankIcon(appName),
+                        color: Colors.orange,
+                      ),
+                      title: Text(appName),
+                      subtitle: Text(
+                        entry.key == 'banking' ? 'Web browser' : 'Mobile app',
+                      ),
+                      onTap: () async {
+                        Navigator.pop(context);
+                        await _launchBankingApp(entry.value, appName);
+                      },
+                    );
+                  }).toList(),
+                ],
+
+                SizedBox(height: 16),
+                Center(
+                  child: TextButton(
+                    onPressed: () => Navigator.pop(context),
+                    child: Text('Cancel'),
+                  ),
+                ),
+              ],
+            ),
+          );
+        },
+      );
+    } catch (error) {
+      Navigator.pop(context); // Close loading dialog
+      print('Error showing banking app options: $error');
+      _showMessage('Failed to load banking apps: $error', isError: true);
+    }
+  }
+
+  IconData _getBankIcon(String bankName) {
+    switch (bankName.toLowerCase()) {
+      case 'khan bank':
+      case 'khanbank':
+        return Icons.account_balance;
+      case 'qpay wallet':
+      case 'qpay':
+        return Icons.payment;
+      case 'social pay':
+      case 'socialpay':
+        return Icons.people;
+      case 'state bank':
+      case 'statebank':
+        return Icons.account_balance_wallet;
+      case 'tdb bank':
+      case 'tdbbank':
+        return Icons.business;
+      case 'xac bank':
+      case 'xacbank':
+        return Icons.monetization_on;
+      case 'most money':
+      case 'mostmoney':
+        return Icons.money;
+      case 'nib bank':
+      case 'nibbank':
+        return Icons.account_balance;
+      case 'chinggis khaan bank':
+      case 'ckbank':
+        return Icons.castle;
+      case 'capitron bank':
+      case 'capitronbank':
+        return Icons.corporate_fare;
+      case 'bogd bank':
+      case 'bogdbank':
+        return Icons.location_city;
+      case 'candy pay':
+      case 'candypay':
+        return Icons.card_giftcard;
+      default:
+        return Icons.open_in_new;
+    }
+  }
+
+  String _getLegacyAppName(String key) {
+    switch (key) {
+      case 'qpay':
+        return 'QPay App';
+      case 'socialpay':
+        return 'Social Pay (Khan Bank)';
+      case 'khanbank':
+      case 'khanbankalt':
+        return 'Khan Bank';
+      case 'statebank':
+      case 'statebankalt':
+        return 'State Bank';
+      case 'tdbbank':
+      case 'tdb':
+        return 'TDB Bank';
+      case 'xacbank':
+      case 'xac':
+        return 'Xac Bank';
+      case 'most':
+      case 'mostmoney':
+        return 'Most Money';
+      case 'nibank':
+      case 'ulaanbaatarbank':
+        return 'NIB Bank';
+      case 'ckbank':
+      case 'chinggisnbank':
+        return 'Chinggis Khaan Bank';
+      case 'capitronbank':
+      case 'capitron':
+        return 'Capitron Bank';
+      case 'bogdbank':
+      case 'bogd':
+        return 'Bogd Bank';
+      case 'candypay':
+      case 'candy':
+        return 'Candy Pay';
+      default:
+        return 'Banking App';
+    }
+  }
+
+  Future<void> _launchBankingApp(String deepLink, String appName) async {
+    try {
+      final uri = Uri.parse(deepLink);
+      if (await canLaunchUrl(uri)) {
+        await launchUrl(
+          uri,
+          mode: LaunchMode.externalApplication,
+        );
+        _showMessage('Opened $appName', isError: false);
+      } else {
+        _showMessage('$appName not installed', isError: true);
+      }
+    } catch (error) {
+      print('Error launching $appName: $error');
+      _showMessage('Invalid link format for $appName', isError: true);
+    }
+  }
+
+  /// Show available banking app options with improved detection
   void _showBankingAppOptions() {
     if (qpayResult == null) return;
 
     // Use the new banking app extraction method
     final bankingApps = QRUtils.extractBankingApps(qpayResult!);
 
-    // Fallback to legacy method if new method returns empty
-    Map<String, String> legacyDeepLinks = {};
-    if (bankingApps.isEmpty) {
-      final qrText = qpayResult!['qr_text'] ?? '';
-      final invoiceId = qpayResult!['invoice_id'];
-
-      // Extract QPay short URL from different possible fields
-      String? qpayShortUrl;
-      if (qpayResult!['qpay_shortUrl'] != null) {
-        qpayShortUrl = qpayResult!['qpay_shortUrl'].toString();
-      } else if (qpayResult!['urls'] != null) {
-        final urls = qpayResult!['urls'];
-        if (urls is List && urls.isNotEmpty) {
-          // Look for the first valid URL
-          for (final url in urls) {
-            if (url is Map && url['link'] != null) {
-              final link = url['link'].toString();
-              if (link.startsWith('http')) {
-                qpayShortUrl = link;
-                break;
-              }
+    // Get enhanced deep links for more banks
+    final qrText = qpayResult!['qr_text'] ?? '';
+    final invoiceId = qpayResult!['invoice_id'];
+    
+    // Extract QPay short URL from different possible fields
+    String? qpayShortUrl;
+    if (qpayResult!['qpay_shortUrl'] != null) {
+      qpayShortUrl = qpayResult!['qpay_shortUrl'].toString();
+    } else if (qpayResult!['urls'] != null) {
+      final urls = qpayResult!['urls'];
+      if (urls is List && urls.isNotEmpty) {
+        // Look for the first valid URL
+        for (final url in urls) {
+          if (url is Map && url['link'] != null) {
+            final link = url['link'].toString();
+            if (link.startsWith('http')) {
+              qpayShortUrl = link;
+              break;
             }
           }
-        } else if (urls is Map) {
-          final values = urls.values;
-          if (values.isNotEmpty) {
-            qpayShortUrl = values.first.toString();
-          }
+        }
+      } else if (urls is Map) {
+        final values = urls.values;
+        if (values.isNotEmpty) {
+          qpayShortUrl = values.first.toString();
         }
       }
-
-      legacyDeepLinks = QRUtils.generateDeepLinks(
-        qrText,
-        qpayShortUrl,
-        invoiceId,
-      );
     }
+
+    // Get enhanced legacy deep links with more banks
+    final legacyDeepLinks = QRUtils.generateDeepLinks(
+      qrText,
+      qpayShortUrl,
+      invoiceId,
+    );
 
     showModalBottomSheet(
       context: context,
+      isScrollControlled: true,
       builder: (BuildContext context) {
         return Container(
           padding: const EdgeInsets.all(20),
+          constraints: BoxConstraints(
+            maxHeight: MediaQuery.of(context).size.height * 0.7,
+          ),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                'Open in Banking App',
-                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-              ),
-              SizedBox(height: 16),
-              // New banking apps from QPay
-              ...bankingApps.entries.map((entry) {
-                final app = entry.value;
-                IconData icon;
-
-                switch (entry.key) {
-                  case 'qpay':
-                    icon = Icons.payment;
-                    break;
-                  case 'khanbank':
-                  case 'khan':
-                    icon = Icons.account_balance;
-                    break;
-                  case 'statebank':
-                  case 'state':
-                    icon = Icons.account_balance_wallet;
-                    break;
-                  case 'tdb':
-                  case 'tradeanddevelopmentbank':
-                    icon = Icons.business;
-                    break;
-                  default:
-                    icon = Icons.open_in_new;
-                }
-
-                return ListTile(
-                  leading: Icon(icon, color: Colors.blue),
-                  title: Text(app.name),
-                  subtitle: Text(
-                    app.description.isNotEmpty
-                        ? app.description
-                        : 'Mobile banking app',
-                  ),
-                  onTap: () async {
-                    Navigator.pop(context);
-                    try {
-                      final uri = Uri.parse(app.deepLink);
-                      if (await canLaunchUrl(uri)) {
-                        await launchUrl(
-                          uri,
-                          mode: LaunchMode.externalApplication,
-                        );
-                        _showMessage('Opened ${app.name}', isError: false);
-                      } else {
-                        _showMessage(
-                          '${app.name} not installed',
-                          isError: true,
-                        );
-                      }
-                    } catch (uriError) {
-                      print('Error launching ${app.name}: $uriError');
-                      _showMessage(
-                        'Invalid link format for ${app.name}',
-                        isError: true,
-                      );
-                    }
-                  },
-                );
-              }).toList(),
-
-              // Legacy deep links as fallback
-              ...legacyDeepLinks.entries.map((entry) {
-                String appName;
-                IconData icon;
-
-                switch (entry.key) {
-                  case 'qpay':
-                    appName = 'QPay App';
-                    icon = Icons.payment;
-                    break;
-                  case 'socialpay':
-                    appName = 'Social Pay (Khan Bank)';
-                    icon = Icons.account_balance;
-                    break;
-                  case 'khanbank':
-                    appName = 'Khan Bank';
-                    icon = Icons.account_balance;
-                    break;
-                  default:
-                    appName = 'Banking App';
-                    icon = Icons.open_in_new;
-                }
-
-                return ListTile(
-                  leading: Icon(icon, color: Colors.blue),
-                  title: Text(appName),
-                  subtitle: Text(
                     entry.key == 'banking' ? 'Web browser' : 'Mobile app',
                   ),
                   onTap: () async {
