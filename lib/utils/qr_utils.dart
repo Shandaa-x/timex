@@ -16,7 +16,8 @@ class BankingApp {
   });
 
   @override
-  String toString() => 'BankingApp(name: $name, description: $description, deepLink: $deepLink)';
+  String toString() =>
+      'BankingApp(name: $name, description: $description, deepLink: $deepLink)';
 }
 
 /// QR Code generation utilities
@@ -112,35 +113,42 @@ class QRUtils {
   }
 
   /// Extract banking app deep links from QPay response
-  static Map<String, BankingApp> extractBankingApps(Map<String, dynamic> qpayResult) {
+  static Map<String, BankingApp> extractBankingApps(
+    Map<String, dynamic> qpayResult,
+  ) {
     final bankingApps = <String, BankingApp>{};
-    
+
     try {
       AppLogger.info('Extracting banking apps from QPay result');
-      
+
       // Extract deep links from QPay URLs array
       if (qpayResult['urls'] != null) {
         final urls = qpayResult['urls'];
         AppLogger.info('Found URLs field: ${urls.runtimeType}');
-        
+
         if (urls is List) {
           AppLogger.info('Processing ${urls.length} URLs from QPay response');
           for (int i = 0; i < urls.length; i++) {
             final url = urls[i];
             AppLogger.info('Processing URL $i: ${url.runtimeType}');
-            
+
             if (url is Map<String, dynamic>) {
               final name = url['name']?.toString() ?? '';
               final description = url['description']?.toString() ?? '';
               final link = url['link']?.toString() ?? '';
-              
-              AppLogger.info('URL $i - Name: $name, Description: $description, Link: ${link.length > 50 ? '${link.substring(0, 50)}...' : link}');
-              
+
+              AppLogger.info(
+                'URL $i - Name: $name, Description: $description, Link: ${link.length > 50 ? '${link.substring(0, 50)}...' : link}',
+              );
+
               if (name.isNotEmpty && link.isNotEmpty) {
                 // Clean the link to ensure it's valid
                 final cleanLink = _cleanDeepLink(link);
                 if (cleanLink != null) {
-                  final key = name.toLowerCase().replaceAll(' ', '').replaceAll('bank', '');
+                  final key = name
+                      .toLowerCase()
+                      .replaceAll(' ', '')
+                      .replaceAll('bank', '');
                   bankingApps[key] = BankingApp(
                     name: name,
                     description: description,
@@ -157,7 +165,7 @@ class QRUtils {
       } else {
         AppLogger.warning('No URLs field found in QPay result');
       }
-      
+
       // Add QPay app if invoice ID is available
       final invoiceId = qpayResult['invoice_id']?.toString();
       if (invoiceId != null && invoiceId.isNotEmpty) {
@@ -168,13 +176,12 @@ class QRUtils {
         );
         AppLogger.success('Added QPay wallet app');
       }
-      
+
       AppLogger.success('Extracted ${bankingApps.length} banking apps total');
-      
     } catch (error) {
       AppLogger.error('Error extracting banking apps', error);
     }
-    
+
     return bankingApps;
   }
 
@@ -183,10 +190,12 @@ class QRUtils {
     try {
       // Remove any malformed JSON or extra characters
       String cleanedLink = link.trim();
-      
+
       // Check if the link starts with a JSON object (common issue)
       if (cleanedLink.startsWith('{')) {
-        AppLogger.warning('Link starts with JSON, attempting to parse: ${cleanedLink.substring(0, 100)}...');
+        AppLogger.warning(
+          'Link starts with JSON, attempting to parse: ${cleanedLink.substring(0, 100)}...',
+        );
         // Try to extract the actual link from JSON
         try {
           // This could be a JSON object containing the actual link
@@ -198,12 +207,13 @@ class QRUtils {
           return null;
         }
       }
-      
+
       // Check if it looks like a valid scheme
       if (cleanedLink.contains('://')) {
         final schemePart = cleanedLink.split('://')[0];
         // Ensure scheme starts with alphabetic character
-        if (schemePart.isNotEmpty && RegExp(r'^[a-zA-Z][a-zA-Z0-9+.-]*$').hasMatch(schemePart)) {
+        if (schemePart.isNotEmpty &&
+            RegExp(r'^[a-zA-Z][a-zA-Z0-9+.-]*$').hasMatch(schemePart)) {
           AppLogger.success('Valid deep link: $schemePart://...');
           return cleanedLink;
         } else {
@@ -214,7 +224,6 @@ class QRUtils {
         AppLogger.warning('No scheme found in link: $cleanedLink');
         return null;
       }
-      
     } catch (error) {
       AppLogger.error('Error cleaning deep link: $link', error);
       return null;
@@ -222,39 +231,50 @@ class QRUtils {
   }
 
   /// Generate QPay deep links for mobile banking apps (legacy method)
-  static Map<String, String> generateDeepLinks(String qrText, String? qpayShortUrl, String? invoiceId) {
+  static Map<String, String> generateDeepLinks(
+    String qrText,
+    String? qpayShortUrl,
+    String? invoiceId,
+  ) {
     final deepLinks = <String, String>{};
-    
+
     // QPay app deep link
     if (invoiceId != null && invoiceId.isNotEmpty) {
       deepLinks['qpay'] = 'qpay://invoice?id=$invoiceId';
     }
-    
+
     // Social Pay deep link (Khan Bank) - use proper format
     if (qrText.isNotEmpty) {
-      deepLinks['socialpay'] = 'socialpay://qpay?qr=${Uri.encodeComponent(qrText)}';
+      deepLinks['socialpay'] =
+          'socialpay://qpay?qr=${Uri.encodeComponent(qrText)}';
     }
-    
+
     // Khan Bank app deep link - use QR code format from QPay docs
     if (qrText.isNotEmpty) {
-      deepLinks['khanbank'] = 'khanbank://q?qPay_QRcode=${Uri.encodeComponent(qrText)}';
+      deepLinks['khanbank'] =
+          'khanbank://q?qPay_QRcode=${Uri.encodeComponent(qrText)}';
     }
-    
+
     // Generic banking URL (web fallback)
     if (qpayShortUrl != null && qpayShortUrl.isNotEmpty) {
       deepLinks['banking'] = qpayShortUrl;
     } else if (qrText.isNotEmpty) {
       // Fallback to a generic QR code payment URL pattern
-      deepLinks['banking'] = 'https://qpay.mn/pay?qr=${Uri.encodeComponent(qrText)}';
+      deepLinks['banking'] =
+          'https://qpay.mn/pay?qr=${Uri.encodeComponent(qrText)}';
     }
-    
+
     return deepLinks;
   }
 
   /// Get primary deep link for opening in mobile banking app
-  static String? getPrimaryDeepLink(String qrText, String? qpayShortUrl, String? invoiceId) {
+  static String? getPrimaryDeepLink(
+    String qrText,
+    String? qpayShortUrl,
+    String? invoiceId,
+  ) {
     final deepLinks = generateDeepLinks(qrText, qpayShortUrl, invoiceId);
-    
+
     // Priority order: QPay app > Social Pay > Khan Bank > Generic banking
     if (deepLinks.containsKey('qpay')) {
       return deepLinks['qpay'];
@@ -268,27 +288,28 @@ class QRUtils {
     if (deepLinks.containsKey('banking')) {
       return deepLinks['banking'];
     }
-    
+
     return null;
   }
 
   /// Get primary banking app from QPay response
   static BankingApp? getPrimaryBankingApp(Map<String, dynamic> qpayResult) {
     final bankingApps = extractBankingApps(qpayResult);
-    
+
     // Priority order: QPay app > Khan Bank > any other bank
     if (bankingApps.containsKey('qpay')) {
       return bankingApps['qpay'];
     }
-    if (bankingApps.containsKey('khanbank') || bankingApps.containsKey('khan')) {
+    if (bankingApps.containsKey('khanbank') ||
+        bankingApps.containsKey('khan')) {
       return bankingApps['khanbank'] ?? bankingApps['khan'];
     }
-    
+
     // Return first available banking app
     if (bankingApps.isNotEmpty) {
       return bankingApps.values.first;
     }
-    
+
     return null;
   }
 

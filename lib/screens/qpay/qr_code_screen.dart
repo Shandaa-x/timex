@@ -20,15 +20,15 @@ class QRCodeScreen extends StatefulWidget {
 }
 
 class _QRCodeScreenState extends State<QRCodeScreen> {
-
   Map<String, dynamic>? qpayResult;
   bool isLoading = false;
   String? errorMessage;
   double currentFoodAmount = 0.0;
   bool isLoadingBalance = true;
-  
+
   // Payment verification
-  final TextEditingController _paymentAmountController = TextEditingController();
+  final TextEditingController _paymentAmountController =
+      TextEditingController();
   final TextEditingController _verifyAmountController = TextEditingController();
   bool isCheckingPayment = false;
   String? paymentStatus; // 'pending', 'paid', or null
@@ -111,7 +111,6 @@ class _QRCodeScreenState extends State<QRCodeScreen> {
     }
   }
 
-
   Future<void> _createQPayInvoice() async {
     setState(() {
       isLoading = true;
@@ -160,17 +159,18 @@ class _QRCodeScreenState extends State<QRCodeScreen> {
         amount: amount,
         orderId: orderId,
         userId: userUid,
-        invoiceDescription: 'TIMEX Food Payment - ₮${amount.toStringAsFixed(0)}',
+        invoiceDescription:
+            'TIMEX Food Payment - ₮${amount.toStringAsFixed(0)}',
         callbackUrl: 'http://localhost:3000/qpay/webhook',
       );
 
       if (result['success'] == true) {
         final invoice = result['invoice'];
         print('✅ QPay invoice created successfully: ${invoice['invoice_id']}');
-        
+
         // Set payment status to pending in Firebase
         await QPayWebhookService.setPaymentStatusPending(userUid);
-        
+
         // Debug: Print the invoice structure to understand the response
         print('🔍 QPay invoice response structure:');
         invoice.forEach((key, value) {
@@ -180,10 +180,12 @@ class _QRCodeScreenState extends State<QRCodeScreen> {
               print('    [$i]: ${value[i].runtimeType} = ${value[i]}');
             }
           } else {
-            print('  $key: ${value.runtimeType} = ${value.toString().length > 100 ? '${value.toString().substring(0, 100)}...' : value}');
+            print(
+              '  $key: ${value.runtimeType} = ${value.toString().length > 100 ? '${value.toString().substring(0, 100)}...' : value}',
+            );
           }
         });
-        
+
         setState(() {
           qpayResult = invoice;
           currentInvoiceId = invoice['invoice_id'];
@@ -193,7 +195,6 @@ class _QRCodeScreenState extends State<QRCodeScreen> {
       } else {
         throw Exception(result['error'] ?? 'Failed to create QPay invoice');
       }
-
     } catch (error) {
       print('Error creating QPay invoice: $error');
 
@@ -247,14 +248,15 @@ class _QRCodeScreenState extends State<QRCodeScreen> {
 
       // Check payment status
       final paymentResult = await QPayHelperService.checkPayment(
-        authResult['access_token'], 
+        authResult['access_token'],
         currentInvoiceId!,
       );
 
       if (paymentResult['success'] == true) {
         final int count = paymentResult['count'] ?? 0;
-        final double paidAmount = (paymentResult['paid_amount'] ?? 0).toDouble();
-        
+        final double paidAmount = (paymentResult['paid_amount'] ?? 0)
+            .toDouble();
+
         if (count > 0 && paidAmount >= paymentAmount) {
           // Payment found and amount is sufficient
           setState(() {
@@ -263,24 +265,28 @@ class _QRCodeScreenState extends State<QRCodeScreen> {
 
           // Update Firebase
           await _updateFirebaseBalance(paymentAmount);
-          
-          _showMessage('Payment confirmed! ₮${paymentAmount.toStringAsFixed(0)} deducted from balance', isError: false);
-          
+
+          _showMessage(
+            'Payment confirmed! ₮${paymentAmount.toStringAsFixed(0)} deducted from balance',
+            isError: false,
+          );
+
           // Clear the input
           _verifyAmountController.clear();
-          
+
           // Reload balance
           await _loadUserBalance();
-          
         } else if (count > 0 && paidAmount < paymentAmount) {
-          _showMessage('Payment found but amount is less than entered (₮${paidAmount.toStringAsFixed(0)})', isError: true);
+          _showMessage(
+            'Payment found but amount is less than entered (₮${paidAmount.toStringAsFixed(0)})',
+            isError: true,
+          );
         } else {
           _showMessage('No payment found yet', isError: true);
         }
       } else {
         throw Exception(paymentResult['error'] ?? 'Failed to check payment');
       }
-
     } catch (error) {
       print('Error checking payment: $error');
       _showMessage('Error checking payment: $error', isError: true);
@@ -307,7 +313,6 @@ class _QRCodeScreenState extends State<QRCodeScreen> {
       };
 
       await QPayWebhookService.processWebhook(webhookData);
-      
     } catch (error) {
       print('Error updating Firebase balance: $error');
     }
@@ -335,22 +340,27 @@ class _QRCodeScreenState extends State<QRCodeScreen> {
     try {
       // Try using the new method first
       final primaryBankingApp = QRUtils.getPrimaryBankingApp(qpayResult!);
-      
+
       if (primaryBankingApp != null) {
         print('🚀 Launching primary banking app: ${primaryBankingApp.name}');
         try {
           final uri = Uri.parse(primaryBankingApp.deepLink);
-          
+
           if (await canLaunchUrl(uri)) {
             await launchUrl(uri, mode: LaunchMode.externalApplication);
             _showMessage('Opened ${primaryBankingApp.name}', isError: false);
             return;
           } else {
-            print('❌ Cannot launch ${primaryBankingApp.name}, trying fallback...');
+            print(
+              '❌ Cannot launch ${primaryBankingApp.name}, trying fallback...',
+            );
           }
         } catch (uriError) {
           print('❌ Error parsing URI for ${primaryBankingApp.name}: $uriError');
-          _showMessage('Invalid link format for ${primaryBankingApp.name}', isError: true);
+          _showMessage(
+            'Invalid link format for ${primaryBankingApp.name}',
+            isError: true,
+          );
         }
       } else {
         print('🔍 No primary banking app found from QPay response');
@@ -359,7 +369,7 @@ class _QRCodeScreenState extends State<QRCodeScreen> {
       // Fallback to legacy method
       final qrText = qpayResult!['qr_text'] ?? '';
       final invoiceId = qpayResult!['invoice_id'];
-      
+
       // Extract QPay short URL from different possible fields
       String? qpayShortUrl;
       if (qpayResult!['qpay_shortUrl'] != null) {
@@ -386,7 +396,11 @@ class _QRCodeScreenState extends State<QRCodeScreen> {
         }
       }
 
-      final deepLink = QRUtils.getPrimaryDeepLink(qrText, qpayShortUrl, invoiceId);
+      final deepLink = QRUtils.getPrimaryDeepLink(
+        qrText,
+        qpayShortUrl,
+        invoiceId,
+      );
 
       if (deepLink != null) {
         try {
@@ -403,7 +417,10 @@ class _QRCodeScreenState extends State<QRCodeScreen> {
                   await launchUrl(webUri, mode: LaunchMode.externalApplication);
                   _showMessage('Opened in browser', isError: false);
                 } else {
-                  _showMessage('No compatible banking app found', isError: true);
+                  _showMessage(
+                    'No compatible banking app found',
+                    isError: true,
+                  );
                 }
               } catch (webUriError) {
                 print('❌ Error parsing web URI: $webUriError');
@@ -434,13 +451,13 @@ class _QRCodeScreenState extends State<QRCodeScreen> {
 
     // Use the new banking app extraction method
     final bankingApps = QRUtils.extractBankingApps(qpayResult!);
-    
+
     // Fallback to legacy method if new method returns empty
     Map<String, String> legacyDeepLinks = {};
     if (bankingApps.isEmpty) {
       final qrText = qpayResult!['qr_text'] ?? '';
       final invoiceId = qpayResult!['invoice_id'];
-      
+
       // Extract QPay short URL from different possible fields
       String? qpayShortUrl;
       if (qpayResult!['qpay_shortUrl'] != null) {
@@ -465,8 +482,12 @@ class _QRCodeScreenState extends State<QRCodeScreen> {
           }
         }
       }
-      
-      legacyDeepLinks = QRUtils.generateDeepLinks(qrText, qpayShortUrl, invoiceId);
+
+      legacyDeepLinks = QRUtils.generateDeepLinks(
+        qrText,
+        qpayShortUrl,
+        invoiceId,
+      );
     }
 
     showModalBottomSheet(
@@ -480,17 +501,14 @@ class _QRCodeScreenState extends State<QRCodeScreen> {
             children: [
               Text(
                 'Open in Banking App',
-                style: TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold,
-                ),
+                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
               ),
               SizedBox(height: 16),
               // New banking apps from QPay
               ...bankingApps.entries.map((entry) {
                 final app = entry.value;
                 IconData icon;
-                
+
                 switch (entry.key) {
                   case 'qpay':
                     icon = Icons.payment;
@@ -514,30 +532,43 @@ class _QRCodeScreenState extends State<QRCodeScreen> {
                 return ListTile(
                   leading: Icon(icon, color: Colors.blue),
                   title: Text(app.name),
-                  subtitle: Text(app.description.isNotEmpty ? app.description : 'Mobile banking app'),
+                  subtitle: Text(
+                    app.description.isNotEmpty
+                        ? app.description
+                        : 'Mobile banking app',
+                  ),
                   onTap: () async {
                     Navigator.pop(context);
                     try {
                       final uri = Uri.parse(app.deepLink);
                       if (await canLaunchUrl(uri)) {
-                        await launchUrl(uri, mode: LaunchMode.externalApplication);
+                        await launchUrl(
+                          uri,
+                          mode: LaunchMode.externalApplication,
+                        );
                         _showMessage('Opened ${app.name}', isError: false);
                       } else {
-                        _showMessage('${app.name} not installed', isError: true);
+                        _showMessage(
+                          '${app.name} not installed',
+                          isError: true,
+                        );
                       }
                     } catch (uriError) {
                       print('Error launching ${app.name}: $uriError');
-                      _showMessage('Invalid link format for ${app.name}', isError: true);
+                      _showMessage(
+                        'Invalid link format for ${app.name}',
+                        isError: true,
+                      );
                     }
                   },
                 );
               }).toList(),
-              
+
               // Legacy deep links as fallback
               ...legacyDeepLinks.entries.map((entry) {
                 String appName;
                 IconData icon;
-                
+
                 switch (entry.key) {
                   case 'qpay':
                     appName = 'QPay App';
@@ -559,25 +590,33 @@ class _QRCodeScreenState extends State<QRCodeScreen> {
                 return ListTile(
                   leading: Icon(icon, color: Colors.blue),
                   title: Text(appName),
-                  subtitle: Text(entry.key == 'banking' ? 'Web browser' : 'Mobile app'),
+                  subtitle: Text(
+                    entry.key == 'banking' ? 'Web browser' : 'Mobile app',
+                  ),
                   onTap: () async {
                     Navigator.pop(context);
                     try {
                       final uri = Uri.parse(entry.value);
                       if (await canLaunchUrl(uri)) {
-                        await launchUrl(uri, mode: LaunchMode.externalApplication);
+                        await launchUrl(
+                          uri,
+                          mode: LaunchMode.externalApplication,
+                        );
                         _showMessage('Opened in $appName', isError: false);
                       } else {
                         _showMessage('$appName not installed', isError: true);
                       }
                     } catch (uriError) {
                       print('Error launching $appName: $uriError');
-                      _showMessage('Invalid link format for $appName', isError: true);
+                      _showMessage(
+                        'Invalid link format for $appName',
+                        isError: true,
+                      );
                     }
                   },
                 );
               }).toList(),
-              
+
               SizedBox(height: 16),
               TextButton(
                 onPressed: () => Navigator.pop(context),
@@ -698,7 +737,11 @@ class _QRCodeScreenState extends State<QRCodeScreen> {
                         ),
                       ),
                       if (currentFoodAmount > 0)
-                        Icon(Icons.trending_down, color: Colors.orange, size: 16),
+                        Icon(
+                          Icons.trending_down,
+                          color: Colors.orange,
+                          size: 16,
+                        ),
                     ],
                   ),
                 ),
@@ -958,12 +1001,19 @@ class _QRCodeScreenState extends State<QRCodeScreen> {
                             ),
                           ),
                           Container(
-                            padding: EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                            padding: EdgeInsets.symmetric(
+                              horizontal: 12,
+                              vertical: 4,
+                            ),
                             decoration: BoxDecoration(
-                              color: paymentStatus == 'paid' ? Colors.green.shade100 : Colors.orange.shade100,
+                              color: paymentStatus == 'paid'
+                                  ? Colors.green.shade100
+                                  : Colors.orange.shade100,
                               borderRadius: BorderRadius.circular(12),
                               border: Border.all(
-                                color: paymentStatus == 'paid' ? Colors.green : Colors.orange,
+                                color: paymentStatus == 'paid'
+                                    ? Colors.green
+                                    : Colors.orange,
                                 width: 1,
                               ),
                             ),
@@ -972,7 +1022,9 @@ class _QRCodeScreenState extends State<QRCodeScreen> {
                               style: TextStyle(
                                 fontSize: 12,
                                 fontWeight: FontWeight.bold,
-                                color: paymentStatus == 'paid' ? Colors.green.shade700 : Colors.orange.shade700,
+                                color: paymentStatus == 'paid'
+                                    ? Colors.green.shade700
+                                    : Colors.orange.shade700,
                               ),
                             ),
                           ),
@@ -1040,7 +1092,9 @@ class _QRCodeScreenState extends State<QRCodeScreen> {
                         SizedBox(
                           width: double.infinity,
                           child: ElevatedButton(
-                            onPressed: isCheckingPayment ? null : _checkPaymentStatus,
+                            onPressed: isCheckingPayment
+                                ? null
+                                : _checkPaymentStatus,
                             style: ElevatedButton.styleFrom(
                               backgroundColor: Colors.blue.shade600,
                               foregroundColor: Colors.white,
@@ -1059,7 +1113,10 @@ class _QRCodeScreenState extends State<QRCodeScreen> {
                                         height: 16,
                                         child: CircularProgressIndicator(
                                           strokeWidth: 2,
-                                          valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                                          valueColor:
+                                              AlwaysStoppedAnimation<Color>(
+                                                Colors.white,
+                                              ),
                                         ),
                                       ),
                                       SizedBox(width: 8),
@@ -1107,7 +1164,10 @@ class _QRCodeScreenState extends State<QRCodeScreen> {
                       style: ElevatedButton.styleFrom(
                         backgroundColor: Colors.grey.shade600,
                         foregroundColor: Colors.white,
-                        padding: EdgeInsets.symmetric(vertical: 12, horizontal: 16),
+                        padding: EdgeInsets.symmetric(
+                          vertical: 12,
+                          horizontal: 16,
+                        ),
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(8),
                         ),

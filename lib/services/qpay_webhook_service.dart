@@ -30,7 +30,9 @@ class QPayWebhookService {
         throw Exception('Missing user_id in webhook data');
       }
 
-      AppLogger.info('Payment Status: $paymentStatus, Amount: $paidAmount, User: $userId');
+      AppLogger.info(
+        'Payment Status: $paymentStatus, Amount: $paidAmount, User: $userId',
+      );
 
       // Only process if payment was successful
       if (paymentStatus == "PAID") {
@@ -44,8 +46,10 @@ class QPayWebhookService {
         // Log the payment
         await _logPayment(userId, paidAmount, webhookData);
 
-        AppLogger.success('Payment processed successfully: ₮$paidAmount for user $userId');
-        
+        AppLogger.success(
+          'Payment processed successfully: ₮$paidAmount for user $userId',
+        );
+
         return {
           'success': true,
           'message': 'Payment processed successfully',
@@ -53,33 +57,29 @@ class QPayWebhookService {
           'paidAmount': paidAmount,
           'status': paymentStatus,
         };
-      } 
-      else if (paymentStatus == "FAILED" || paymentStatus == "CANCELLED") {
-        AppLogger.warning('Payment $paymentStatus for user $userId, no changes made');
-        
+      } else if (paymentStatus == "FAILED" || paymentStatus == "CANCELLED") {
+        AppLogger.warning(
+          'Payment $paymentStatus for user $userId, no changes made',
+        );
+
         return {
           'success': true,
           'message': 'Payment $paymentStatus, no changes made',
           'userId': userId,
           'status': paymentStatus,
         };
-      } 
-      else {
+      } else {
         AppLogger.warning('Unhandled payment status: $paymentStatus');
-        
+
         return {
           'success': false,
           'message': 'Unhandled payment status: $paymentStatus',
           'status': paymentStatus,
         };
       }
-
     } catch (error) {
       AppLogger.error('QPayWebhookService.processWebhook error: $error');
-      return {
-        'success': false,
-        'error': error.toString(),
-      };
+      return {'success': false, 'error': error.toString()};
     }
   }
 
@@ -89,23 +89,30 @@ class QPayWebhookService {
   /// [paidAmount] - Amount paid by user
   ///
   /// Returns update result
-  static Future<void> _updateUserFoodAmount(String userId, double paidAmount) async {
+  static Future<void> _updateUserFoodAmount(
+    String userId,
+    double paidAmount,
+  ) async {
     try {
-      final DocumentReference userDoc = _firestore.collection('users').doc(userId);
-      
+      final DocumentReference userDoc = _firestore
+          .collection('users')
+          .doc(userId);
+
       // Get current user data
       final DocumentSnapshot userSnapshot = await userDoc.get();
-      
+
       if (!userSnapshot.exists) {
         throw Exception('User document not found: $userId');
       }
 
-      final Map<String, dynamic>? userData = userSnapshot.data() as Map<String, dynamic>?;
-      final double currentTotalAmountFood = _parseDouble(userData?['totalAmountFood']) ?? 0.0;
-      
+      final Map<String, dynamic>? userData =
+          userSnapshot.data() as Map<String, dynamic>?;
+      final double currentTotalAmountFood =
+          _parseDouble(userData?['totalAmountFood']) ?? 0.0;
+
       // Subtract paid amount from current total
       final double newTotalAmountFood = currentTotalAmountFood - paidAmount;
-      
+
       // Update user document
       await userDoc.update({
         'totalAmountFood': newTotalAmountFood,
@@ -115,9 +122,8 @@ class QPayWebhookService {
       });
 
       AppLogger.success(
-        'Updated user $userId: totalAmountFood $currentTotalAmountFood -> $newTotalAmountFood (paid: ₮$paidAmount)'
+        'Updated user $userId: totalAmountFood $currentTotalAmountFood -> $newTotalAmountFood (paid: ₮$paidAmount)',
       );
-
     } catch (error) {
       AppLogger.error('Error updating user food amount: $error');
       rethrow;
@@ -126,14 +132,14 @@ class QPayWebhookService {
 
   /// Log payment to user's payment history
   ///
-  /// [userId] - User's Firebase UID  
+  /// [userId] - User's Firebase UID
   /// [paidAmount] - Amount paid
   /// [webhookData] - Original webhook data
   ///
   /// Returns logging result
   static Future<void> _logPayment(
     String userId,
-    double paidAmount, 
+    double paidAmount,
     Map<String, dynamic> webhookData,
   ) async {
     try {
@@ -148,7 +154,9 @@ class QPayWebhookService {
         'description': 'QPay food payment',
         'timestamp': FieldValue.serverTimestamp(),
         'date': DateTime.now().toIso8601String(),
-        'transactionId': webhookData['transaction_id'] ?? 'QPAY_${DateTime.now().millisecondsSinceEpoch}',
+        'transactionId':
+            webhookData['transaction_id'] ??
+            'QPAY_${DateTime.now().millisecondsSinceEpoch}',
         'invoiceId': webhookData['invoice_id'],
         'paymentMethod': 'QPay',
         'status': 'completed',
@@ -158,7 +166,6 @@ class QPayWebhookService {
       await paymentHistory.add(paymentRecord);
 
       AppLogger.success('Payment logged to history for user $userId');
-
     } catch (error) {
       AppLogger.error('Error logging payment: $error');
       // Don't rethrow - logging failure shouldn't prevent payment processing
@@ -172,7 +179,7 @@ class QPayWebhookService {
   ///
   /// Returns verification result
   static bool verifyWebhook(
-    Map<String, dynamic> webhookData, 
+    Map<String, dynamic> webhookData,
     String? signature,
   ) {
     try {
@@ -181,10 +188,11 @@ class QPayWebhookService {
       // 1. Creating expected signature using QPay secret key
       // 2. Comparing with received signature
       // 3. Returning true if they match
-      
-      AppLogger.info('Webhook verification (placeholder) - always returns true');
+
+      AppLogger.info(
+        'Webhook verification (placeholder) - always returns true',
+      );
       return true;
-      
     } catch (error) {
       AppLogger.error('Error verifying webhook: $error');
       return false;
@@ -198,15 +206,16 @@ class QPayWebhookService {
   /// Returns update result
   static Future<void> setPaymentStatusPending(String userId) async {
     try {
-      final DocumentReference userDoc = _firestore.collection('users').doc(userId);
-      
+      final DocumentReference userDoc = _firestore
+          .collection('users')
+          .doc(userId);
+
       await userDoc.update({
         'paymentStatus': false, // boolean field: false = pending
         'updatedAt': FieldValue.serverTimestamp(),
       });
 
       AppLogger.info('Set payment status to pending for user: $userId');
-
     } catch (error) {
       AppLogger.error('Error setting payment status to pending: $error');
       // Don't rethrow - this is not critical
@@ -229,9 +238,10 @@ class QPayWebhookService {
         return 0.0;
       }
 
-      final Map<String, dynamic>? userData = userDoc.data() as Map<String, dynamic>?;
-      return _parseDouble(userData?['totalAmountFood']) ?? 0.0;
+      final Map<String, dynamic>? userData =
+          userDoc.data() as Map<String, dynamic>?;
 
+      return _parseDouble(userData?['totalAmountFood']) ?? 0.0;
     } catch (error) {
       AppLogger.error('Error getting user food amount: $error');
       return 0.0;
