@@ -32,7 +32,6 @@ class _EmployeeLoginScreenState extends State<EmployeeLoginScreen> {
     });
 
     try {
-      debugPrint('Starting employee login for: ${_emailController.text.trim()}');
 
       // First, search for employee in Firestore to get employee data
       final querySnapshot = await _firestore
@@ -63,18 +62,14 @@ class _EmployeeLoginScreenState extends State<EmployeeLoginScreen> {
           email: _emailController.text.trim(),
           password: _passwordController.text.trim(),
         );
-        debugPrint('Firebase Auth login successful');
       } catch (authError) {
-        debugPrint('Firebase Auth error: $authError');
         // If Firebase Auth fails, try to create the user account
         try {
           await _auth.createUserWithEmailAndPassword(
             email: _emailController.text.trim(),
             password: _passwordController.text.trim(),
           );
-          debugPrint('Firebase Auth account created and logged in');
         } catch (createError) {
-          debugPrint('Failed to create Firebase Auth account: $createError');
           _showErrorSnackBar('Системд нэвтрэхэд алдаа гарлаа. Дахин оролдоно уу.');
           return;
         }
@@ -87,19 +82,20 @@ class _EmployeeLoginScreenState extends State<EmployeeLoginScreen> {
       final organizationId = employeeDoc.reference.parent.parent!.id;
 
       // Navigate to employee main screen
-      Navigator.pushReplacementNamed(
-        context,
-        Routes.main,
-        arguments: {
-          'employeeId': employeeDoc.id,
-          'organizationId': organizationId,
-          'employeeData': employeeData,
-          'isFirstLogin': employeeData['isFirstLogin'] ?? false,
-        },
-      );
+      if (mounted) {
+        Navigator.pushReplacementNamed(
+          context,
+          Routes.main,
+          arguments: {
+            'employeeId': employeeDoc.id,
+            'organizationId': organizationId,
+            'employeeData': employeeData,
+            'isFirstLogin': employeeData['isFirstLogin'] ?? false,
+          },
+        );
+      }
 
     } catch (e) {
-      debugPrint('Employee login error: $e');
       _showErrorSnackBar('Нэвтрэхэд алдаа гарлаа: $e');
     } finally {
       if (mounted) {
