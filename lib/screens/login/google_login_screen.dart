@@ -26,16 +26,21 @@ class _GoogleLoginScreenState extends State<GoogleLoginScreen> {
         setState(() => _isLoading = false);
         return; // User cancelled
       }
-      final GoogleSignInAuthentication googleAuth = await googleUser.authentication;
+      final GoogleSignInAuthentication googleAuth =
+          await googleUser.authentication;
       final credential = GoogleAuthProvider.credential(
         accessToken: googleAuth.accessToken,
         idToken: googleAuth.idToken,
       );
-      final userCredential = await FirebaseAuth.instance.signInWithCredential(credential);
+      final userCredential = await FirebaseAuth.instance.signInWithCredential(
+        credential,
+      );
       final user = userCredential.user;
       if (user != null) {
         // Save user profile to Firestore
-        final userDoc = FirebaseFirestore.instance.collection('users').doc(user.uid);
+        final userDoc = FirebaseFirestore.instance
+            .collection('users')
+            .doc(user.uid);
         await userDoc.set({
           'profile': {
             'uid': user.uid,
@@ -43,7 +48,7 @@ class _GoogleLoginScreenState extends State<GoogleLoginScreen> {
             'email': user.email,
             'photoURL': user.photoURL,
             'lastLogin': FieldValue.serverTimestamp(),
-          }
+          },
         }, SetOptions(merge: true));
         if (mounted) {
           Navigator.of(context).pushReplacement(
@@ -52,6 +57,7 @@ class _GoogleLoginScreenState extends State<GoogleLoginScreen> {
         }
       }
     } catch (e) {
+      print('ergergergergergereg e$e');
       setState(() => _error = 'Google нэвтрэлт амжилтгүй: $e');
     } finally {
       setState(() => _isLoading = false);
@@ -68,7 +74,11 @@ class _GoogleLoginScreenState extends State<GoogleLoginScreen> {
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Image.asset('assets/images/google_logo.png', width: 80, height: 80),
+              Image.asset(
+                'assets/images/google_logo.png',
+                width: 80,
+                height: 80,
+              ),
               const SizedBox(height: 32),
               const Text(
                 'Google-ээр нэвтрэх',
@@ -82,12 +92,19 @@ class _GoogleLoginScreenState extends State<GoogleLoginScreen> {
               SizedBox(
                 width: double.infinity,
                 child: ElevatedButton.icon(
-                  icon: Image.asset('assets/images/google_logo.png', width: 24, height: 24),
+                  icon: Image.asset(
+                    'assets/images/google_logo.png',
+                    width: 24,
+                    height: 24,
+                  ),
                   label: _isLoading
                       ? const SizedBox(
                           width: 20,
                           height: 20,
-                          child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            color: Colors.white,
+                          ),
                         )
                       : const Text('Google-ээр нэвтрэх'),
                   onPressed: _isLoading ? null : _signInWithGoogle,
