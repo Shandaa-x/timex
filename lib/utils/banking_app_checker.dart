@@ -8,10 +8,14 @@ import 'logger.dart';
 class BankingAppChecker {
   /// Common Mongolian banking app schemes based on QPay documentation
   static const Map<String, String> bankingAppSchemes = {
+    // Khan Bank (separate from SocialPay)
     'Khan Bank': 'khanbank://',
     'Khan Bank Alt': 'khanbankapp://',
-    'Social Pay': 'socialpay://',
+
+    // SocialPay (independent app)
     'Social Pay Payment': 'socialpay-payment://',
+
+    // Other banks
     'State Bank': 'statebank://',
     'State Bank Alt': 'statebankapp://',
     'TDB Bank': 'tdbbank://',
@@ -51,22 +55,22 @@ class BankingAppChecker {
       try {
         // Try multiple approaches for iOS compatibility
         final baseUri = Uri.parse(entry.value);
-        
+
         // Test with just the scheme
         bool isAvailable = await canLaunchUrl(baseUri);
-        
+
         // If that fails, try with a common path
         if (!isAvailable) {
           final testUri = Uri.parse('${entry.value}open');
           isAvailable = await canLaunchUrl(testUri);
         }
-        
+
         // Last attempt with different parameter
         if (!isAvailable) {
           final testUri = Uri.parse('${entry.value}launch');
           isAvailable = await canLaunchUrl(testUri);
         }
-        
+
         availabilityMap[entry.key] = isAvailable;
 
         if (isAvailable) {
@@ -94,16 +98,16 @@ class BankingAppChecker {
   static Future<bool> testDeepLink(String deepLink) async {
     try {
       final uri = Uri.parse(deepLink);
-      
+
       // First try the exact link
       bool canLaunch = await canLaunchUrl(uri);
-      
+
       // If that fails, try just the scheme
       if (!canLaunch && uri.scheme.isNotEmpty) {
         final schemeUri = Uri.parse('${uri.scheme}://');
         canLaunch = await canLaunchUrl(schemeUri);
       }
-      
+
       AppLogger.info(
         'Deep link test: $deepLink - ${canLaunch ? 'Available' : 'Not available'}',
       );
@@ -141,8 +145,15 @@ class BankingAppChecker {
 
     // Test schemes for each bank
     final bankSchemes = {
+      // Khan Bank (separate from SocialPay)
       'Khan Bank': ['khanbank://', 'khanbankapp://'],
-      'Social Pay': ['socialpay-payment://', 'socialpay://'],
+
+      // SocialPay (independent app with multiple possible schemes)
+      'Social Pay': [
+        'socialpay-payment://', // Payment-specific scheme (requires key - use last)
+      ],
+
+      // Other banks
       'State Bank': ['statebank://', 'statebankapp://'],
       'TDB Bank': ['tdbbank://', 'tdb://'],
       'Xac Bank': ['xacbank://', 'xac://'],
@@ -169,6 +180,8 @@ class BankingAppChecker {
           deepLink = 'socialpay-payment://q?qPay_QRcode=$encodedQR';
         } else if (workingScheme.startsWith('socialpay://')) {
           deepLink = 'socialpay://qpay?qr=$encodedQR';
+        } else if (workingScheme.startsWith('mn.socialpay://')) {
+          deepLink = 'mn.socialpay://qpay?qr=$encodedQR';
         } else if (workingScheme.startsWith('khanbank://')) {
           deepLink = 'khanbank://q?qPay_QRcode=$encodedQR';
         } else if (workingScheme.startsWith('tdbbank://')) {

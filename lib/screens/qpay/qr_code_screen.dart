@@ -11,6 +11,7 @@ import '../../services/qpay_webhook_service.dart';
 import '../../services/qpay_helper_service.dart';
 import '../../utils/qr_utils.dart';
 import '../../utils/banking_app_checker.dart';
+import '../../utils/socialpay_integration.dart';
 
 class QRCodeScreen extends StatefulWidget {
   const QRCodeScreen({super.key});
@@ -720,6 +721,13 @@ class _QRCodeScreenState extends State<QRCodeScreen> {
 
   Future<void> _launchBankingApp(String deepLink, String appName) async {
     try {
+      // Special handling for SocialPay
+      if (appName.toLowerCase().contains('social pay') || deepLink.contains('socialpay')) {
+        // Use the specialized SocialPay integration
+        await _launchSocialPay(deepLink, appName);
+        return;
+      }
+
       final uri = Uri.parse(deepLink);
       if (await canLaunchUrl(uri)) {
         await launchUrl(
@@ -733,6 +741,59 @@ class _QRCodeScreenState extends State<QRCodeScreen> {
     } catch (error) {
       print('Error launching $appName: $error');
       _showMessage('Invalid link format for $appName', isError: true);
+    }
+  }
+
+  Future<void> _launchSocialPay(String deepLink, String appName) async {
+    try {
+      // Run debug to see what schemes are available
+      await SocialPayIntegration.debugSchemeDetection();
+
+      // Check if SocialPay is installed using the improved detection
+      final isInstalled = await SocialPayIntegration.isAppInstalled();
+      print('SocialPay installation check: $isInstalled');
+
+      if (!isInstalled) {
+        _showMessage('$appName not installed', isError: true);
+        return;
+      }
+
+      // Extract QR code from deep link
+      String? qrCode;
+      final uri = Uri.parse(deepLink);
+      
+      // Try to extract QR code from various parameters
+      qrCode = uri.queryParameters['qr'] ?? 
+               uri.queryParameters['qPay_QRcode'] ??
+               uri.queryParameters['QRcode'];
+
+      if (qrCode != null && qpayResult?['qr_text'] != null) {
+        // Use the QR code from the current payment
+        final result = await SocialPayIntegration.payWithQRCode(
+          qpayResult!['qr_text'],
+          double.tryParse(qpayResult!['amount']?.toString() ?? '0') ?? 0.0,
+          'TimEx Payment',
+          currentInvoiceId ?? qpayResult!['invoice_id']?.toString() ?? 'unknown',
+        );
+
+        if (result.success) {
+          _showMessage('Opened $appName successfully', isError: false);
+        } else {
+          _showMessage('Failed to open $appName: ${result.message}', isError: true);
+        }
+      } else {
+        // Fallback to original URL launch
+        final uri = Uri.parse(deepLink);
+        if (await canLaunchUrl(uri)) {
+          await launchUrl(uri, mode: LaunchMode.externalApplication);
+          _showMessage('Opened $appName', isError: false);
+        } else {
+          _showMessage('$appName not installed', isError: true);
+        }
+      }
+    } catch (error) {
+      print('Error launching SocialPay: $error');
+      _showMessage('Error launching $appName: $error', isError: true);
     }
   }
 
@@ -1240,6 +1301,37 @@ class _QRCodeScreenState extends State<QRCodeScreen> {
                           ),
                         ),
                       ],
+                    ),
+                  ),
+
+                SizedBox(height: 20),
+
+                // Debug button for SocialPay testing (temporary)
+                if (kDebugMode)
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 20),
+                    child: ElevatedButton(
+                      onPressed: () async {
+                        print('=== MANUAL SOCIALPAY DEBUG TEST ===');
+                        await SocialPayIntegration.debugSchemeDetection();
+                        final info = await SocialPayIntegration.getSystemInfo();
+                        print('SocialPay System Info: $info');
+                        
+                        final isInstalled = await SocialPayIntegration.isAppInstalled();
+                        print('SocialPay Installation Status: $isInstalled');
+                        
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text('SocialPay Debug: ${isInstalled ? "DETECTED" : "NOT DETECTED"} - Check console'),
+                            backgroundColor: isInstalled ? Colors.green : Colors.red,
+                          ),
+                        );
+                      },
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.orange,
+                        foregroundColor: Colors.white,
+                      ),
+                      child: Text('🔍 Debug SocialPay Detection'),
                     ),
                   ),
 
