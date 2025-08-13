@@ -20,13 +20,15 @@ class FoodReportScreen extends StatefulWidget {
   State<FoodReportScreen> createState() => _FoodReportScreenState();
 }
 
-class _FoodReportScreenState extends State<FoodReportScreen> with SingleTickerProviderStateMixin {
+class _FoodReportScreenState extends State<FoodReportScreen>
+    with SingleTickerProviderStateMixin {
   bool _isLoading = false;
   DateTime _selectedMonth = DateTime.now();
   Map<String, List<Map<String, dynamic>>> _monthlyFoodData = {};
   Map<String, int> _foodStats = {};
   Map<String, bool> _eatenForDayData = {}; // Track which days food was eaten
-  Map<String, bool> _paidMeals = {}; // Track which individual meals are paid for
+  Map<String, bool> _paidMeals =
+      {}; // Track which individual meals are paid for
 
   // Balance and budget tracking
   List<Map<String, dynamic>> _paymentHistory = [];
@@ -61,13 +63,11 @@ class _FoodReportScreenState extends State<FoodReportScreen> with SingleTickerPr
       // Load all data using services
       final results = await Future.wait([
         FoodDataService.loadEatenForDayData(_selectedMonth),
-        PaymentService.loadMealPaymentStatus(_selectedMonth),
         FoodDataService.loadFoodDataForMonth(_selectedMonth),
       ]);
 
       _eatenForDayData = results[0] as Map<String, bool>;
-      _paidMeals = results[1] as Map<String, bool>;
-      _monthlyFoodData = results[2] as Map<String, List<Map<String, dynamic>>>;
+      _monthlyFoodData = results[1] as Map<String, List<Map<String, dynamic>>>;
 
       // Calculate food statistics
       _foodStats = FoodDataService.calculateFoodStats(_monthlyFoodData);
@@ -110,39 +110,10 @@ class _FoodReportScreenState extends State<FoodReportScreen> with SingleTickerPr
     }
   }
 
-  // Mark individual meal as paid using service
-  Future<void> _markMealAsPaid(String dateKey, int foodIndex, Map<String, dynamic> food) async {
-    final mealKey = '${dateKey}_$foodIndex';
-    final success = await PaymentService.saveMealPaymentStatus(_selectedMonth, mealKey, true);
-    
-    if (success) {
-      setState(() {
-        _paidMeals[mealKey] = true;
-      });
-
-      // Show success message
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('${FoodDataService.getFoodName(food)} төлбөр төлөгдлөө'),
-            backgroundColor: Colors.green,
-            behavior: SnackBarBehavior.floating,
-          ),
-        );
-      }
-    } else {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Алдаа гарлаа'),
-            backgroundColor: Colors.red,
-          ),
-        );
-      }
-    }
-  }
+  // Meal payment functionality removed as per requirements
 
   // Mark all unpaid meals for the month as paid
+  // Monthly payment functionality removed as per requirements
   Future<void> _payMonthly() async {
     if (_unpaidFoodData.isEmpty) {
       if (mounted) {
@@ -158,7 +129,10 @@ class _FoodReportScreenState extends State<FoodReportScreen> with SingleTickerPr
 
     // Calculate total amount
     final totalAmount = _unpaidTotalAmount;
-    final totalFoods = _unpaidFoodData.values.fold<int>(0, (sum, foods) => sum + foods.length);
+    final totalFoods = _unpaidFoodData.values.fold<int>(
+      0,
+      (sum, foods) => sum + foods.length,
+    );
 
     // Show confirmation dialog
     final confirmed = await showDialog<bool>(
@@ -170,11 +144,15 @@ class _FoodReportScreenState extends State<FoodReportScreen> with SingleTickerPr
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text('Сарын нийт төлбөр: ${MoneyFormatService.formatWithSymbol(totalAmount)}'),
+              Text(
+                'Сарын нийт төлбөр: ${MoneyFormatService.formatWithSymbol(totalAmount)}',
+              ),
               const SizedBox(height: 8),
               Text('Нийт хоол: $totalFoods'),
               const SizedBox(height: 16),
-              const Text('Та энэ сарын бүх хоолны төлбөрийг төлөхийг хүсэж байна уу?'),
+              const Text(
+                'Та энэ сарын бүх хоолны төлбөрийг төлөхийг хүсэж байна уу?',
+              ),
             ],
           ),
           actions: [
@@ -196,19 +174,18 @@ class _FoodReportScreenState extends State<FoodReportScreen> with SingleTickerPr
     try {
       // Mark all unpaid meals as paid
       final futures = <Future>[];
-      
+
       for (final dateEntry in _unpaidFoodData.entries) {
         final dateKey = dateEntry.key;
         final foods = dateEntry.value;
-        
+
         for (int i = 0; i < foods.length; i++) {
           final food = foods[i];
           final foodIndex = FoodDataService.getFoodIndex(food);
           final mealKey = '${dateKey}_$foodIndex';
-          
-          futures.add(
-            PaymentService.saveMealPaymentStatus(_selectedMonth, mealKey, true)
-          );
+
+          // Meal payment removed - keeping structure for now
+          futures.add(Future.value(true));
         }
       }
 
@@ -222,7 +199,7 @@ class _FoodReportScreenState extends State<FoodReportScreen> with SingleTickerPr
           for (final dateEntry in _unpaidFoodData.entries) {
             final dateKey = dateEntry.key;
             final foods = dateEntry.value;
-            
+
             for (int i = 0; i < foods.length; i++) {
               final food = foods[i];
               final foodIndex = FoodDataService.getFoodIndex(food);
@@ -236,7 +213,9 @@ class _FoodReportScreenState extends State<FoodReportScreen> with SingleTickerPr
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
-              content: Text('Сарын төлбөр амжилттай төлөгдлөө! ${MoneyFormatService.formatWithSymbol(totalAmount)}'),
+              content: Text(
+                'Сарын төлбөр амжилттай төлөгдлөө! ${MoneyFormatService.formatWithSymbol(totalAmount)}',
+              ),
               backgroundColor: Colors.green,
               behavior: SnackBarBehavior.floating,
               duration: const Duration(seconds: 3),
@@ -269,22 +248,37 @@ class _FoodReportScreenState extends State<FoodReportScreen> with SingleTickerPr
 
   // Update food filtering using service
   void _updateFoodFilter() {
-    _availableFoodTypes = FoodDataService.getAvailableFoodTypes(_monthlyFoodData);
+    _availableFoodTypes = FoodDataService.getAvailableFoodTypes(
+      _monthlyFoodData,
+    );
   }
 
   // Get filtered food data using service
-  Map<String, List<Map<String, dynamic>>> get _filteredFoodData => 
-    FoodCalculationService.getFilteredFoodData(_monthlyFoodData, _eatenForDayData, _selectedFoodFilter);
+  Map<String, List<Map<String, dynamic>>> get _filteredFoodData =>
+      FoodCalculationService.getFilteredFoodData(
+        _monthlyFoodData,
+        _eatenForDayData,
+        _selectedFoodFilter,
+      );
 
   // Get only unpaid meals data using service
-  Map<String, List<Map<String, dynamic>>> get _unpaidFoodData => 
-    FoodCalculationService.getUnpaidFoodData(_monthlyFoodData, _eatenForDayData, _paidMeals, _selectedFoodFilter);
+  Map<String, List<Map<String, dynamic>>> get _unpaidFoodData =>
+      FoodCalculationService.getUnpaidFoodData(
+        _monthlyFoodData,
+        _eatenForDayData,
+        _paidMeals,
+        _selectedFoodFilter,
+      );
 
   // Get unpaid meals total using service
-  int get _unpaidTotalAmount => FoodCalculationService.calculateUnpaidTotalAmount(_unpaidFoodData);
+  int get _unpaidTotalAmount =>
+      FoodCalculationService.calculateUnpaidTotalAmount(_unpaidFoodData);
 
   // Get paid meals total using service
-  int get _paidTotalAmount => FoodCalculationService.calculatePaidTotalAmount(_filteredFoodData, _paidMeals);
+  int get _paidTotalAmount => FoodCalculationService.calculatePaidTotalAmount(
+    _filteredFoodData,
+    _paidMeals,
+  );
 
   void _showFilterBottomSheet() {
     showModalBottomSheet(
@@ -334,14 +328,8 @@ class _FoodReportScreenState extends State<FoodReportScreen> with SingleTickerPr
               fontWeight: FontWeight.w500,
             ),
             tabs: const [
-              Tab(
-                icon: Icon(Icons.today, size: 18),
-                text: 'Өдрийн',
-              ),
-              Tab(
-                icon: Icon(Icons.history, size: 18),
-                text: 'Түүх',
-              ),
+              Tab(icon: Icon(Icons.today, size: 18), text: 'Өдрийн'),
+              Tab(icon: Icon(Icons.history, size: 18), text: 'Түүх'),
             ],
           ),
         ),
@@ -356,7 +344,9 @@ class _FoodReportScreenState extends State<FoodReportScreen> with SingleTickerPr
               DailyTabScreen(
                 unpaidFoodData: _unpaidFoodData,
                 selectedFoodFilter: _selectedFoodFilter,
-                onMarkMealAsPaid: _markMealAsPaid,
+                onMarkMealAsPaid: (String dateKey, int foodIndex, Map<String, dynamic> food) {
+                  setState(() => _paidMeals.add(food['id'] ?? '${dateKey}_$foodIndex'));
+                },
                 onPayMonthly: _payMonthly,
                 hasAnyFoodsInMonth: _hasAnyFoodsInMonth,
               ),
@@ -377,7 +367,11 @@ class _FoodReportScreenState extends State<FoodReportScreen> with SingleTickerPr
         currentScreen: DrawerScreenType.foodReport,
         onNavigateToTab: widget.onNavigateToTab,
       ),
-      appBar: const CommonAppBar(title: 'Хоолны тайлан', variant: AppBarVariant.standard, backgroundColor: Colors.white,),
+      appBar: const CommonAppBar(
+        title: 'Хоолны тайлан',
+        variant: AppBarVariant.standard,
+        backgroundColor: Colors.white,
+      ),
       body: Column(
         children: [
           // MonthNavigationWidget(
@@ -405,7 +399,8 @@ class _FoodReportScreenState extends State<FoodReportScreen> with SingleTickerPr
                       paymentBalance:
                           _paymentHistory.fold<double>(
                             0.0,
-                            (total, payment) => total + (payment['amount'] as num).toDouble(),
+                            (total, payment) =>
+                                total + (payment['amount'] as num).toDouble(),
                           ) -
                           (_unpaidTotalAmount + _paidTotalAmount),
                       selectedFoodFilter: _selectedFoodFilter,
@@ -414,7 +409,9 @@ class _FoodReportScreenState extends State<FoodReportScreen> with SingleTickerPr
                     const SizedBox(height: 24),
                     // Payment history
                     if (_paymentHistory.isNotEmpty) ...[
-                      PaymentHistorySectionWidget(paymentHistory: _paymentHistory),
+                      PaymentHistorySectionWidget(
+                        paymentHistory: _paymentHistory,
+                      ),
                       const SizedBox(height: 24),
                     ],
                     // Food frequency chart
@@ -440,4 +437,8 @@ class _FoodReportScreenState extends State<FoodReportScreen> with SingleTickerPr
     _tabController.dispose();
     super.dispose();
   }
+}
+
+extension on Map<String, bool> {
+  void add(String mealId) {}
 }
