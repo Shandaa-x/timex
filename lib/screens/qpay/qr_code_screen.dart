@@ -721,13 +721,26 @@ class _QRCodeScreenState extends State<QRCodeScreen> {
 
   Future<void> _launchBankingApp(String deepLink, String appName) async {
     try {
-      // Special handling for SocialPay
-      if (appName.toLowerCase().contains('social pay') || deepLink.contains('socialpay')) {
-        // Use the specialized SocialPay integration
-        await _launchSocialPay(deepLink, appName);
-        return;
+      // For SocialPay: if we have a complete deep link with QR code, use it directly
+      if (appName.toLowerCase().contains('social pay') && deepLink.contains('qPay_QRcode=')) {
+        print('🚀 Launching SocialPay directly with QR deep link: $deepLink');
+        final uri = Uri.parse(deepLink);
+        if (await canLaunchUrl(uri)) {
+          await launchUrl(
+            uri,
+            mode: LaunchMode.externalApplication,
+          );
+          _showMessage('Opened $appName', isError: false);
+          return;
+        } else {
+          print('❌ Cannot launch SocialPay directly, falling back to integration');
+          // Fall back to custom integration
+          await _launchSocialPay(deepLink, appName);
+          return;
+        }
       }
 
+      // Standard banking app launch
       final uri = Uri.parse(deepLink);
       if (await canLaunchUrl(uri)) {
         await launchUrl(

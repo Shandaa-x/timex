@@ -243,6 +243,13 @@ class SocialPayIntegration {
             continue;
           }
 
+          // Check if we can generate deep link for this scheme before proceeding
+          if (scheme == 'socialpay-payment://' && 
+              (request.socialPayKey == null || request.socialPayKey!.isEmpty)) {
+            AppLogger.info('Skipping $scheme - requires socialPayKey parameter');
+            continue;
+          }
+
           // Try to generate deep link for this scheme
           String deepLink;
           try {

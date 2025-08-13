@@ -107,8 +107,7 @@
         
         <!-- SocialPay (independent app) -->
         <package android:name="mn.socialpay" />
-        <package android:name="com.khan.socialpay" />
-        <package android:name="mn.socialpay.wallet" />
+        <package android:name="mn.egolomt.socialpay" />
         <package android:name="mn.statebank" />
         <package android:name="com.statebank.mobile" />
         <package android:name="mn.tdb.online" />
@@ -147,10 +146,6 @@
         <intent>
             <action android:name="android.intent.action.VIEW" />
             <data android:scheme="socialpay-payment" />
-        </intent>
-        <intent>
-            <action android:name="android.intent.action.VIEW" />
-            <data android:scheme="socialpaywallet" />
         </intent>
         <intent>
             <action android:name="android.intent.action.VIEW" />
