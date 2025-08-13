@@ -97,17 +97,12 @@
         </intent>
         
         <!-- Banking app queries for deep linking -->
-        <!-- Khan Bank (separate from SocialPay) -->
         <package android:name="mn.khan.bank" />
         <package android:name="com.khanbank.mobile" />
-        
-        <!-- QPay Wallet -->
         <package android:name="mn.qpay.wallet" />
         <package android:name="com.qpay.wallet" />
-        
-        <!-- SocialPay (independent app) -->
         <package android:name="mn.socialpay" />
-        <package android:name="mn.egolomt.socialpay" />
+        <package android:name="com.khan.socialpay" />
         <package android:name="mn.statebank" />
         <package android:name="com.statebank.mobile" />
         <package android:name="mn.tdb.online" />
@@ -138,7 +133,6 @@
             <action android:name="android.intent.action.VIEW" />
             <data android:scheme="khanbankapp" />
         </intent>
-        <!-- SocialPay schemes (separate from Khan Bank) -->
         <intent>
             <action android:name="android.intent.action.VIEW" />
             <data android:scheme="socialpay" />
