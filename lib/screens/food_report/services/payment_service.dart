@@ -2,13 +2,17 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 
 class PaymentService {
-  static String get _currentUserId => FirebaseAuth.instance.currentUser?.uid ?? 'unknown_user';
+  static String get _currentUserId =>
+      FirebaseAuth.instance.currentUser?.uid ?? 'unknown_user';
   static const int _pageSize = 10; // Number of documents per page
 
   // Load payment history from Firestore
-  static Future<List<Map<String, dynamic>>> loadPaymentHistory(DateTime selectedMonth) async {
+  static Future<List<Map<String, dynamic>>> loadPaymentHistory(
+    DateTime selectedMonth,
+  ) async {
     try {
-      final monthKey = '${selectedMonth.year}-${selectedMonth.month.toString().padLeft(2, '0')}';
+      final monthKey =
+          '${selectedMonth.year}-${selectedMonth.month.toString().padLeft(2, '0')}';
 
       final docSnapshot = await FirebaseFirestore.instance
           .collection('payments')
@@ -27,7 +31,6 @@ class PaymentService {
     }
   }
 
-
   // Save payment to Firestore
   static Future<Map<String, dynamic>?> savePaymentToHistory(
     DateTime selectedMonth,
@@ -35,7 +38,8 @@ class PaymentService {
     int amount,
   ) async {
     try {
-      final monthKey = '${selectedMonth.year}-${selectedMonth.month.toString().padLeft(2, '0')}';
+      final monthKey =
+          '${selectedMonth.year}-${selectedMonth.month.toString().padLeft(2, '0')}';
       final paymentData = {
         'type': type,
         'amount': amount,
@@ -82,7 +86,9 @@ class PaymentService {
   }
 
   // Get initial payment history page
-  static Future<QuerySnapshot> getInitialPaymentHistory({int limit = _pageSize}) async {
+  static Future<QuerySnapshot> getInitialPaymentHistory({
+    int limit = _pageSize,
+  }) async {
     try {
       return await FirebaseFirestore.instance
           .collection('users')
@@ -128,7 +134,10 @@ class PaymentService {
       'type': data['type'] ?? 'payment',
       'description': data['description'] ?? '',
       'timestamp': data['timestamp'],
-      'date': data['date'] ?? data['timestamp']?.toDate()?.toIso8601String() ?? DateTime.now().toIso8601String(),
+      'date':
+          data['date'] ??
+          data['timestamp']?.toDate()?.toIso8601String() ??
+          DateTime.now().toIso8601String(),
       'transactionId': data['transactionId'] ?? doc.id,
       'status': data['status'] ?? 'completed',
       'paymentMethod': data['paymentMethod'] ?? 'unknown',
@@ -152,9 +161,14 @@ class PaymentService {
           'amount': 15000,
           'type': 'payment',
           'description': 'Сарын хоолны төлбөр',
-          'timestamp': Timestamp.fromDate(DateTime.now().subtract(const Duration(days: 1))),
-          'date': DateTime.now().subtract(const Duration(days: 1)).toIso8601String(),
-          'transactionId': 'TXN${DateTime.now().millisecondsSinceEpoch - 86400000}',
+          'timestamp': Timestamp.fromDate(
+            DateTime.now().subtract(const Duration(days: 1)),
+          ),
+          'date': DateTime.now()
+              .subtract(const Duration(days: 1))
+              .toIso8601String(),
+          'transactionId':
+              'TXN${DateTime.now().millisecondsSinceEpoch - 86400000}',
           'status': 'completed',
           'paymentMethod': 'card',
         },
@@ -162,9 +176,14 @@ class PaymentService {
           'amount': 50000,
           'type': 'topup',
           'description': 'Данс цэнэглэх',
-          'timestamp': Timestamp.fromDate(DateTime.now().subtract(const Duration(days: 2))),
-          'date': DateTime.now().subtract(const Duration(days: 2)).toIso8601String(),
-          'transactionId': 'TXN${DateTime.now().millisecondsSinceEpoch - 172800000}',
+          'timestamp': Timestamp.fromDate(
+            DateTime.now().subtract(const Duration(days: 2)),
+          ),
+          'date': DateTime.now()
+              .subtract(const Duration(days: 2))
+              .toIso8601String(),
+          'transactionId':
+              'TXN${DateTime.now().millisecondsSinceEpoch - 172800000}',
           'status': 'completed',
           'paymentMethod': 'bank_transfer',
         },
@@ -172,9 +191,14 @@ class PaymentService {
           'amount': 8500,
           'type': 'payment',
           'description': 'Өдрийн хоолны төлбөр',
-          'timestamp': Timestamp.fromDate(DateTime.now().subtract(const Duration(days: 3))),
-          'date': DateTime.now().subtract(const Duration(days: 3)).toIso8601String(),
-          'transactionId': 'TXN${DateTime.now().millisecondsSinceEpoch - 259200000}',
+          'timestamp': Timestamp.fromDate(
+            DateTime.now().subtract(const Duration(days: 3)),
+          ),
+          'date': DateTime.now()
+              .subtract(const Duration(days: 3))
+              .toIso8601String(),
+          'transactionId':
+              'TXN${DateTime.now().millisecondsSinceEpoch - 259200000}',
           'status': 'completed',
           'paymentMethod': 'qr_code',
         },
@@ -182,9 +206,14 @@ class PaymentService {
           'amount': 12000,
           'type': 'refund',
           'description': 'Буцаан олголт',
-          'timestamp': Timestamp.fromDate(DateTime.now().subtract(const Duration(days: 5))),
-          'date': DateTime.now().subtract(const Duration(days: 5)).toIso8601String(),
-          'transactionId': 'TXN${DateTime.now().millisecondsSinceEpoch - 432000000}',
+          'timestamp': Timestamp.fromDate(
+            DateTime.now().subtract(const Duration(days: 5)),
+          ),
+          'date': DateTime.now()
+              .subtract(const Duration(days: 5))
+              .toIso8601String(),
+          'transactionId':
+              'TXN${DateTime.now().millisecondsSinceEpoch - 432000000}',
           'status': 'completed',
           'paymentMethod': 'card',
         },
@@ -192,9 +221,14 @@ class PaymentService {
           'amount': 25000,
           'type': 'payment',
           'description': 'Долоо хоногийн хоолны төлбөр',
-          'timestamp': Timestamp.fromDate(DateTime.now().subtract(const Duration(days: 7))),
-          'date': DateTime.now().subtract(const Duration(days: 7)).toIso8601String(),
-          'transactionId': 'TXN${DateTime.now().millisecondsSinceEpoch - 604800000}',
+          'timestamp': Timestamp.fromDate(
+            DateTime.now().subtract(const Duration(days: 7)),
+          ),
+          'date': DateTime.now()
+              .subtract(const Duration(days: 7))
+              .toIso8601String(),
+          'transactionId':
+              'TXN${DateTime.now().millisecondsSinceEpoch - 604800000}',
           'status': 'pending',
           'paymentMethod': 'card',
         },

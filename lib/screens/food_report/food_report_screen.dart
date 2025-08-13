@@ -344,9 +344,10 @@ class _FoodReportScreenState extends State<FoodReportScreen>
               DailyTabScreen(
                 unpaidFoodData: _unpaidFoodData,
                 selectedFoodFilter: _selectedFoodFilter,
-                onMarkMealAsPaid: (String dateKey, int foodIndex, Map<String, dynamic> food) {
-                  setState(() => _paidMeals.add(food['id'] ?? '${dateKey}_$foodIndex'));
-                },
+                onMarkMealAsPaid:
+                    (String mealId, int amount, Map<String, dynamic> food) {
+                      setState(() => _paidMeals.add(mealId));
+                    },
                 onPayMonthly: _payMonthly,
                 hasAnyFoodsInMonth: _hasAnyFoodsInMonth,
               ),
