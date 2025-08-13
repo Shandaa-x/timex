@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import '../main/main_screen.dart';
 
 class GoogleLoginScreen extends StatefulWidget {
   const GoogleLoginScreen({super.key});
@@ -28,6 +29,7 @@ class _GoogleLoginScreenState extends State<GoogleLoginScreen> {
       // Sign out from Google
       await googleSignIn.signOut();
 
+      print('User signed out successfully');
 
       if (mounted) {
         setState(() {
@@ -36,13 +38,14 @@ class _GoogleLoginScreenState extends State<GoogleLoginScreen> {
         // Show success message
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('Амжилттай гарлаа'),
+            content: Text('Logout successful  '),
             backgroundColor: Colors.green,
             duration: Duration(seconds: 2),
           ),
         );
       }
     } catch (e) {
+      print('Sign out error: $e');
       if (mounted) {
         setState(() {
           _error = 'Гарах үед алдаа гарлаа: $e';
@@ -100,11 +103,16 @@ class _GoogleLoginScreenState extends State<GoogleLoginScreen> {
         // Save to Firestore
         await userDoc.set(userData, SetOptions(merge: true));
 
+        print('User saved to Firestore: ${user.uid}');
 
-        // AuthWrapper will automatically handle navigation to MainScreen
-        // No manual navigation needed here
+        if (mounted) {
+          Navigator.of(context).pushReplacement(
+            MaterialPageRoute(builder: (_) => const MainScreen()),
+          );
+        }
       }
     } catch (e) {
+      print('Google Sign-In Error: $e');
       if (e.toString().contains('sign_in_failed')) {
         setState(
           () => _error = 'Google нэвтрэлт тохиргооны алдаа. Дахин оролдоно уу.',

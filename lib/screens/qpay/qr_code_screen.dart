@@ -7,6 +7,7 @@ import 'package:flutter/foundation.dart';
 import 'dart:typed_data';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:google_sign_in/google_sign_in.dart';
+import '../login/google_login_screen.dart';
 
 class QRCodeScreen extends StatefulWidget {
   const QRCodeScreen({super.key});
@@ -54,8 +55,12 @@ class _QRCodeScreenState extends State<QRCodeScreen> {
 
       print('User signed out successfully from QR screen');
 
-      // AuthWrapper will automatically handle navigation to login screen
-      // No manual navigation needed here
+      if (mounted) {
+        Navigator.of(context).pushAndRemoveUntil(
+          MaterialPageRoute(builder: (_) => const GoogleLoginScreen()),
+          (route) => false,
+        );
+      }
     } catch (e) {
       print('Sign out error: $e');
       if (mounted) {
