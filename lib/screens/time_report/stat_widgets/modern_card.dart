@@ -19,7 +19,7 @@ class ModernCard extends StatelessWidget {
           ),
         ],
       ),
-      padding: const EdgeInsets.all(15),
+      padding: const EdgeInsets.all(12),
       child: child,
     );
   }

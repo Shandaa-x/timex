@@ -6,6 +6,7 @@ import 'package:timex/screens/home/home_screen.dart';
 import 'package:timex/index.dart';
 import 'package:timex/screens/time_track/time_tracking_screen.dart';
 import 'package:timex/screens/qpay/qr_code_screen.dart';
+import 'package:timex/services/realtime_food_total_service.dart';
 
 class MainScreen extends StatefulWidget {
   const MainScreen({super.key});
@@ -35,6 +36,9 @@ class _MainScreenState extends State<MainScreen> {
       QRCodeScreen(),
     ];
     print('Screens initialized: ${_screens.length}');
+    
+    // Start real-time food total service
+    RealtimeFoodTotalService.startListening();
   }
 
   @override
@@ -243,6 +247,8 @@ class _MainScreenState extends State<MainScreen> {
   @override
   void dispose() {
     _pageController.dispose();
+    // Stop real-time food total service
+    RealtimeFoodTotalService.stopListening();
     super.dispose();
   }
 }

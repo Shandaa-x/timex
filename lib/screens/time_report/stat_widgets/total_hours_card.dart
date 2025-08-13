@@ -17,6 +17,14 @@ class TotalHoursCard extends StatelessWidget {
     required this.isTablet,
   });
 
+  String formatMongolianHours(double hours) {
+    final int h = hours.floor();
+    final int m = ((hours - h) * 60).round();
+    if (h > 0 && m > 0) return '$h цаг, $m минут';
+    if (h > 0) return '$h цаг';
+    return '$h цаг, $m минут';
+  }
+
   @override
   Widget build(BuildContext context) {
     return ModernCard(
@@ -36,9 +44,9 @@ class TotalHoursCard extends StatelessWidget {
             child: Column(
               children: [
                 Text(
-                  totalHours.toStringAsFixed(1),
+                  formatMongolianHours(totalHours),
                   style: TextStyle(
-                    fontSize: isTablet ? 56 : 48,
+                    fontSize: isTablet ? 30 : 24,
                     fontWeight: FontWeight.w700,
                     color: Colors.white,
                     height: 1,

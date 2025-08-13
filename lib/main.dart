@@ -7,12 +7,12 @@ import 'package:get/get_navigation/src/root/get_material_app.dart';
 import 'package:timex/index.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:timex/screens/login/google_login_screen.dart';
-import 'package:timex/screens/main/main_screen.dart';
 import 'package:timezone/data/latest.dart' as tz;
 import 'package:timezone/timezone.dart' as tz;
 import 'package:permission_handler/permission_handler.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'firebase_options.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
 
 final FlutterLocalNotificationsPlugin flutterLocalNotificationsPlugin =
     FlutterLocalNotificationsPlugin();
@@ -125,6 +125,15 @@ class MyApp extends StatelessWidget {
       onGenerateRoute: (settings) => Routes().getRoute(settings),
       debugShowCheckedModeBanner: false,
       home: const GoogleLoginScreen(),
+      localizationsDelegates: [
+        GlobalMaterialLocalizations.delegate,
+        GlobalWidgetsLocalizations.delegate,
+        GlobalCupertinoLocalizations.delegate,
+      ],
+      supportedLocales: const [
+        Locale('en'),
+        Locale('mn'),
+      ],
     );
   }
 }

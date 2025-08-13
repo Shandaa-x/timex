@@ -74,6 +74,9 @@ dependencies:
   #notifications
   flutter_local_notifications: ^19.4.0
   timezone: ^0.10.1
+
+  #localization
+  flutter_localization: ^0.3.3
   
   #qr code
   qr_flutter: ^4.1.0

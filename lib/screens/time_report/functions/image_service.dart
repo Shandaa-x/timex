@@ -40,6 +40,7 @@ class ImageService {
 
   // Confirm day with images
   static Future<void> confirmDay(
+    String userId,
     String dateString,
     Map<String, dynamic> dayData,
     List<String>? selectedImages,
@@ -68,6 +69,8 @@ class ImageService {
       }
 
       await _firestore
+          .collection('users')
+          .doc(userId)
           .collection('calendarDays')
           .doc(dateString)
           .update(updateData);

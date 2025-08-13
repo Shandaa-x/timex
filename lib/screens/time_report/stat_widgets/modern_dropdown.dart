@@ -6,6 +6,7 @@ class ModernDropdown<T> extends StatelessWidget {
   final IconData? icon;
   final List<DropdownMenuItem<T>> items;
   final void Function(T?) onChanged;
+  final bool enabled;
 
   const ModernDropdown({
     super.key,
@@ -14,9 +15,10 @@ class ModernDropdown<T> extends StatelessWidget {
     this.icon,
     required this.items,
     required this.onChanged,
+    this.enabled = true,
   });
 
-    @override
+  @override
   Widget build(BuildContext context) {
     return Container(
       decoration: BoxDecoration(
@@ -34,7 +36,7 @@ class ModernDropdown<T> extends StatelessWidget {
           contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
         ),
         items: items,
-        onChanged: onChanged,
+        onChanged: enabled ? onChanged : null,
         dropdownColor: Colors.white,
         style: const TextStyle(color: Color(0xFF1E293B), fontWeight: FontWeight.w500),
       ),
