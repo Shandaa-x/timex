@@ -64,7 +64,7 @@ class DefaultFirebaseOptions {
     messagingSenderId: '325943660774',
     projectId: 'timex-9ce03',
     storageBucket: 'timex-9ce03.firebasestorage.app',
-    iosBundleId: 'com.example.timex',
+    iosBundleId: 'com.delger.timex',
   );
 
   static const FirebaseOptions macos = FirebaseOptions(
@@ -73,7 +73,7 @@ class DefaultFirebaseOptions {
     messagingSenderId: '325943660774',
     projectId: 'timex-9ce03',
     storageBucket: 'timex-9ce03.firebasestorage.app',
-    iosBundleId: 'com.example.timex',
+    iosBundleId: 'com.delger.timex',
   );
 
   static const FirebaseOptions windows = FirebaseOptions(

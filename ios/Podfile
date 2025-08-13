@@ -1,5 +1,5 @@
 # Uncomment this line to define a global platform for your project
-# platform :ios, '12.0'
+platform :ios, '18.0'
 
 # CocoaPods analytics sends network stats synchronously affecting flutter build latency.
 ENV['COCOAPODS_DISABLE_STATS'] = 'true'
@@ -39,5 +39,27 @@ end
 post_install do |installer|
   installer.pods_project.targets.each do |target|
     flutter_additional_ios_build_settings(target)
+    
+    # iOS 18+ compatibility fixes
+    target.build_configurations.each do |config|
+      config.build_settings['IPHONEOS_DEPLOYMENT_TARGET'] = '18.0'
+      config.build_settings['ENABLE_BITCODE'] = 'NO'
+      
+      # Remove architecture exclusions for iOS 18+ and Apple Silicon
+      config.build_settings.delete('EXCLUDED_ARCHS[sdk=iphonesimulator*]')
+      
+      # iOS 18+ specific settings
+      config.build_settings['CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER'] = 'NO'
+      config.build_settings['ENABLE_USER_SCRIPT_SANDBOXING'] = 'NO'
+      
+      # Firebase specific settings for iOS 18+
+      config.build_settings['GCC_PREPROCESSOR_DEFINITIONS'] ||= '$(inherited)'
+      config.build_settings['GCC_PREPROCESSOR_DEFINITIONS'] << ' FIREBASE_ANALYTICS_COLLECTION_ENABLED=1'
+      
+      # Fix for module map issues
+      if target.name == 'geolocator_apple' || target.name.include?('geolocator')
+        config.build_settings['DEFINES_MODULE'] = 'YES'
+      end
+    end
   end
 end

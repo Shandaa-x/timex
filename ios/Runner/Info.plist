@@ -2,6 +2,8 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
+	<key>CADisableMinimumFrameDurationOnPhone</key>
+	<true/>
 	<key>CFBundleDevelopmentRegion</key>
 	<string>$(DEVELOPMENT_LANGUAGE)</string>
 	<key>CFBundleDisplayName</key>
@@ -20,9 +22,69 @@
 	<string>$(FLUTTER_BUILD_NAME)</string>
 	<key>CFBundleSignature</key>
 	<string>????</string>
+	<key>CFBundleURLTypes</key>
+	<array>
+		<dict>
+			<key>CFBundleURLName</key>
+			<string>google-sign-in</string>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>com.googleusercontent.apps.325943660774-vfaq5nn119fbp2qo67mtc0ekbqbsogcl</string>
+			</array>
+		</dict>
+	</array>
 	<key>CFBundleVersion</key>
 	<string>$(FLUTTER_BUILD_NUMBER)</string>
 	<key>LSRequiresIPhoneOS</key>
+	<true/>
+	<key>NSBonjourServices</key>
+	<array>
+		<string>_workstation._tcp</string>
+	</array>
+	<key>NSCameraUsageDescription</key>
+	<string>This app needs camera access to take photos.</string>
+	<key>NSLocalNetworkUsageDescription</key>
+	<string>This app needs access to local network to communicate with nearby services.</string>
+	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
+	<string>This app needs location access to provide location-based services and maps functionality.</string>
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>This app needs location access to provide location-based services and maps functionality.</string>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>This app needs microphone access for recording features.</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>This app needs photo library access to select images.</string>
+	<key>LSApplicationQueriesSchemes</key>
+	<array>
+		<string>khanbank</string>
+		<string>statebank</string>
+		<string>tdbbank</string>
+		<string>xacbank</string>
+		<string>most</string>
+		<string>nibank</string>
+		<string>ckbank</string>
+		<string>capitronbank</string>
+		<string>bogdbank</string>
+		<string>candypay</string>
+		<string>qpay</string>
+		<string>socialpay</string>
+		<string>socialpay-payment</string>
+		<string>golomtbank</string>
+		<string>ubbank</string>
+		<string>arigbank</string>
+		<string>transbank</string>
+		<string>mbank</string>
+		<string>creditbank</string>
+		<string>mongolbank</string>
+		<string>developmentbank</string>
+		<string>khanbank-mobile</string>
+		<string>khanbank-payment</string>
+		<string>statebank-payment</string>
+		<string>tdb-payment</string>
+		<string>mostmoney</string>
+		<string>qpay-wallet</string>
+		<string>qpay-payment</string>
+	</array>
+	<key>UIApplicationSupportsIndirectInputEvents</key>
 	<true/>
 	<key>UILaunchStoryboardName</key>
 	<string>LaunchScreen</string>
@@ -41,9 +103,5 @@
 		<string>UIInterfaceOrientationLandscapeLeft</string>
 		<string>UIInterfaceOrientationLandscapeRight</string>
 	</array>
-	<key>CADisableMinimumFrameDurationOnPhone</key>
-	<true/>
-	<key>UIApplicationSupportsIndirectInputEvents</key>
-	<true/>
 </dict>
 </plist>

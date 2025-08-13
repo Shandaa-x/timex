@@ -243,52 +243,17 @@ class QRUtils {
       deepLinks['qpay'] = 'qpay://invoice?id=$invoiceId';
     }
 
-    // Enhanced deep links for different banks with proper QR handling
+    // Social Pay deep link (Khan Bank) - use the correct payment scheme
     if (qrText.isNotEmpty) {
-      final encodedQR = Uri.encodeComponent(qrText);
+      // Use the actual scheme that Social Pay app expects
+      deepLinks['socialpay'] =
+          'socialpay-payment://q?qPay_QRcode=${Uri.encodeComponent(qrText)}';
+    }
 
-      // Social Pay deep link (Khan Bank) - use proper format
-      deepLinks['socialpay'] = 'socialpay://qpay?qr=$encodedQR';
-
-      // Khan Bank app deep link - try multiple formats
-      deepLinks['khanbank'] = 'khanbank://q?qPay_QRcode=$encodedQR';
-      deepLinks['khanbankalt'] = 'khanbankapp://payment?qr=$encodedQR';
-
-      // State Bank deep links
-      deepLinks['statebank'] = 'statebank://payment?qr=$encodedQR';
-      deepLinks['statebankalt'] = 'statebankapp://qpay?code=$encodedQR';
-
-      // TDB Bank deep links
-      deepLinks['tdbbank'] = 'tdbbank://qpay?qr=$encodedQR';
-      deepLinks['tdb'] = 'tdb://payment?code=$encodedQR';
-
-      // Xac Bank deep links
-      deepLinks['xacbank'] = 'xacbank://qpay?qr=$encodedQR';
-      deepLinks['xac'] = 'xac://payment?qr=$encodedQR';
-
-      // Most Money deep links
-      deepLinks['most'] = 'most://qpay?qr=$encodedQR';
-      deepLinks['mostmoney'] = 'mostmoney://payment?code=$encodedQR';
-
-      // NIB Bank deep links
-      deepLinks['nibank'] = 'nibank://qpay?qr=$encodedQR';
-      deepLinks['ulaanbaatarbank'] = 'ulaanbaatarbank://payment?qr=$encodedQR';
-
-      // Chinggis Khaan Bank deep links
-      deepLinks['ckbank'] = 'ckbank://qpay?qr=$encodedQR';
-      deepLinks['chinggisnbank'] = 'chinggisnbank://payment?code=$encodedQR';
-
-      // Capitron Bank deep links
-      deepLinks['capitronbank'] = 'capitronbank://qpay?qr=$encodedQR';
-      deepLinks['capitron'] = 'capitron://payment?qr=$encodedQR';
-
-      // Bogd Bank deep links
-      deepLinks['bogdbank'] = 'bogdbank://qpay?qr=$encodedQR';
-      deepLinks['bogd'] = 'bogd://payment?code=$encodedQR';
-
-      // Candy Pay deep links
-      deepLinks['candypay'] = 'candypay://qpay?qr=$encodedQR';
-      deepLinks['candy'] = 'candy://payment?qr=$encodedQR';
+    // Khan Bank app deep link - use QR code format from QPay docs
+    if (qrText.isNotEmpty) {
+      deepLinks['khanbank'] =
+          'khanbank://q?qPay_QRcode=${Uri.encodeComponent(qrText)}';
     }
 
     // Generic banking URL (web fallback)
