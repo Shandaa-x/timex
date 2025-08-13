@@ -96,8 +96,6 @@ class _MealPlanCalendarState extends State<MealPlanCalendar>
       try {
         // Use a range query to get all food documents for the current month
         final querySnapshot = await FirebaseFirestore.instance
-            .collection('users')
-            .doc(_userId)
             .collection('foods')
             .where(FieldPath.documentId, isGreaterThanOrEqualTo: startDocId)
             .where(FieldPath.documentId, isLessThanOrEqualTo: endDocId)

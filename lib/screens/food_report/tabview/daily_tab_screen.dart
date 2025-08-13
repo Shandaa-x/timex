@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import '../widgets/daily_breakdown_section_widget.dart';
+import '../widgets/eaten_food_display_widget.dart';
 
 class DailyTabScreen extends StatelessWidget {
   final Map<String, List<Map<String, dynamic>>> unpaidFoodData;
@@ -20,13 +20,7 @@ class DailyTabScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return SingleChildScrollView(
-      child: DailyBreakdownSectionWidget(
-        unpaidFoodData: unpaidFoodData,
-        selectedFoodFilter: selectedFoodFilter,
-        onMarkMealAsPaid: onMarkMealAsPaid,
-        onPayMonthly: onPayMonthly,
-        hasAnyFoodsInMonth: hasAnyFoodsInMonth,
-      ),
+      child: EatenFoodDisplayWidget(),
     );
   }
 }

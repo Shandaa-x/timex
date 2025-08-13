@@ -146,6 +146,57 @@ class PaymentService {
     };
   }
 
+  // Load meal payment status from Firestore
+  static Future<Map<String, bool>> loadMealPaymentStatus(DateTime selectedMonth) async {
+    try {
+      final monthKey =
+          '${selectedMonth.year}-${selectedMonth.month.toString().padLeft(2, '0')}';
+
+      final docSnapshot = await FirebaseFirestore.instance
+          .collection('mealPayments')
+          .doc('$_currentUserId-$monthKey')
+          .get();
+
+      if (docSnapshot.exists) {
+        final data = docSnapshot.data()!;
+        return Map<String, bool>.from(data['paidMeals'] ?? {});
+      } else {
+        return {};
+      }
+    } catch (e) {
+      print('Error loading meal payment status: $e');
+      return {};
+    }
+  }
+
+  // Save meal payment status to Firestore
+  static Future<bool> saveMealPaymentStatus(
+    DateTime selectedMonth,
+    String mealKey,
+    bool isPaid,
+  ) async {
+    try {
+      final monthKey =
+          '${selectedMonth.year}-${selectedMonth.month.toString().padLeft(2, '0')}';
+
+      final docRef = FirebaseFirestore.instance
+          .collection('mealPayments')
+          .doc('$_currentUserId-$monthKey');
+
+      await docRef.set({
+        'userId': _currentUserId,
+        'year': selectedMonth.year,
+        'month': selectedMonth.month,
+        'paidMeals': {mealKey: isPaid},
+      }, SetOptions(merge: true));
+
+      return true;
+    } catch (e) {
+      print('Error saving meal payment status: $e');
+      return false;
+    }
+  }
+
   // Utility method to add sample payment data for testing
   static Future<void> addSamplePaymentData() async {
     try {

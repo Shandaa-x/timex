@@ -1,7 +1,9 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import '../../../services/money_format.dart';
+import '../../../services/realtime_food_total_service.dart';
 
 class FoodEatenStatusWidget extends StatefulWidget {
   final List<Map<String, dynamic>> todayFoods;
@@ -24,6 +26,9 @@ class FoodEatenStatusWidget extends StatefulWidget {
 class _FoodEatenStatusWidgetState extends State<FoodEatenStatusWidget> {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   bool _isUpdating = false;
+
+  // Helper to get current user ID
+  String get _userId => FirebaseAuth.instance.currentUser?.uid ?? 'unknown_user';
 
   Future<void> _showEatenConfirmationDialog() async {
     final confirmed = await showDialog<bool>(
@@ -73,7 +78,7 @@ class _FoodEatenStatusWidgetState extends State<FoodEatenStatusWidget> {
 
     try {
       // Check if calendarDays document exists
-      final docRef = _firestore.collection('calendarDays').doc(widget.dateString);
+      final docRef = _firestore.collection('users').doc(_userId).collection('calendarDays').doc(widget.dateString);
       final docSnap = await docRef.get();
       if (!docSnap.exists) {
         if (mounted) {
@@ -96,6 +101,37 @@ class _FoodEatenStatusWidgetState extends State<FoodEatenStatusWidget> {
         'updatedAt': FieldValue.serverTimestamp(),
       });
 
+      // If marking as eaten, save to eatens subcollection
+      if (eaten && widget.todayFoods.isNotEmpty) {
+        final now = DateTime.now();
+        final eatenData = {
+          'date': widget.dateString,
+          'totalPrice': _totalFoodPrice,
+          'foodCount': widget.todayFoods.length,
+          'foods': widget.todayFoods.map((food) => {
+            'name': food['name'] ?? 'Unknown Food',
+            'price': food['price'] ?? 0,
+            'description': food['description'] ?? '',
+            'category': food['category'] ?? '',
+            'image': food['image'] ?? '',
+            'timestamp': food['timestamp'],
+          }).toList(),
+          'eatenAt': Timestamp.fromDate(now),
+          'createdAt': FieldValue.serverTimestamp(),
+        };
+
+        // Save to eatens subcollection
+        await _firestore
+            .collection('users')
+            .doc(_userId)
+            .collection('eatens')
+            .doc(widget.dateString)
+            .set(eatenData);
+
+        // Note: Real-time service will automatically update totalFoodAmount
+        // when the eatens collection changes via RealtimeFoodTotalService
+      }
+
       widget.onStatusChanged();
 
       if (mounted) {
@@ -103,7 +139,7 @@ class _FoodEatenStatusWidgetState extends State<FoodEatenStatusWidget> {
           SnackBar(
             content: Text(
               eaten 
-                ? 'Хоол идсэн гэж тэмдэглэлээ ✅' 
+                ? 'Хоол идсэн гэж тэмдэглэлээ ✅${eaten ? ' (${MoneyFormatService.formatWithSymbol(_totalFoodPrice)} хадгалагдлаа)' : ''}' 
                 : 'Хоол идээгүй гэж тэмдэглэлээ',
             ),
             backgroundColor: eaten ? Colors.green : Colors.blue,
