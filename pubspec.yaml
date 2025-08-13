@@ -108,6 +108,8 @@ flutter:
   assets:
      - assets/images/
      - assets/images/google_logo.png
+
+     - assets/images/google_logo.png
      - .env.example
 
   fonts:

@@ -117,18 +117,56 @@ class _MainScreenState extends State<MainScreen> {
         }
       },
       child: Scaffold(
-        body: PageView.builder(
-          physics: const NeverScrollableScrollPhysics(),
-          controller: _pageController,
-          itemCount: _screens.length,
-          itemBuilder: (context, index) {
-            return _screens[index];
-          },
-          onPageChanged: (index) {
-            setState(() {
-              _currentIndex = index;
-            });
-          },
+        body: Stack(
+          children: [
+            PageView.builder(
+              physics: const NeverScrollableScrollPhysics(),
+              controller: _pageController,
+              itemCount: _screens.length,
+              itemBuilder: (context, index) {
+                try {
+                  return _screens[index];
+                } catch (e) {
+                  return Scaffold(
+                    body: Center(
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(Icons.error, color: Colors.red, size: 48),
+                          SizedBox(height: 16),
+                          Text('Error loading screen at index $index'),
+                          SizedBox(height: 8),
+                          Text('$e'),
+                        ],
+                      ),
+                    ),
+                  );
+                }
+              },
+              onPageChanged: (index) {
+                setState(() {
+                  _currentIndex = index;
+                });
+              },
+            ),
+            // Debug button to test QR screen
+            if (_currentIndex == 0) // Only show on first tab
+              Positioned(
+                top: 100,
+                right: 20,
+                child: FloatingActionButton(
+                  mini: true,
+                  onPressed: () {
+                    _pageController.jumpToPage(4); // Jump to QR screen
+                    setState(() {
+                      _currentIndex = 4;
+                    });
+                  },
+                  backgroundColor: Colors.red,
+                  child: Icon(Icons.qr_code),
+                ),
+              ),
+          ],
         ),
         bottomNavigationBar: _buildSegmentedTabBar(),
       ),
@@ -164,7 +202,6 @@ class _MainScreenState extends State<MainScreen> {
               return Expanded(
                 child: InkWell(
                   onTap: () {
-                    print('Tab tapped: $index');
                     _onTabTapped(index);
                   },
                   borderRadius: BorderRadius.circular(12),
@@ -186,7 +223,8 @@ class _MainScreenState extends State<MainScreen> {
                         Icon(
                           tabs[index]['icon'] as IconData,
                           color: isSelected
-                              ? Colors.white // White on green for better contrast
+                              ? Colors
+                                    .white // White on green for better contrast
                               : Colors.white.withValues(alpha: 0.6),
                           size: 20,
                         ),
@@ -194,7 +232,8 @@ class _MainScreenState extends State<MainScreen> {
                           tabs[index]['label'] as String,
                           style: TxtStl.bodyText1(
                             color: isSelected
-                                ? Colors.white // White text on green
+                                ? Colors
+                                      .white // White text on green
                                 : Colors.white.withValues(alpha: 0.6),
                             fontSize: 9,
                           ),
