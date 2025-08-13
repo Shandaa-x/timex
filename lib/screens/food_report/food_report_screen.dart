@@ -237,6 +237,10 @@ class _FoodReportScreenState extends State<FoodReportScreen>
       0,
       (sum, foods) => sum + foods.length,
     );
+    final totalFoods = _unpaidFoodData.values.fold<int>(
+      0,
+      (sum, foods) => sum + foods.length,
+    );
 
     // Show confirmation dialog
     final confirmed = await showDialog<bool>(
@@ -251,9 +255,15 @@ class _FoodReportScreenState extends State<FoodReportScreen>
               Text(
                 'Сарын нийт төлбөр: ${MoneyFormatService.formatWithSymbol(totalAmount)}',
               ),
+              Text(
+                'Сарын нийт төлбөр: ${MoneyFormatService.formatWithSymbol(totalAmount)}',
+              ),
               const SizedBox(height: 8),
               Text('Нийт хоол: $totalFoods'),
               const SizedBox(height: 16),
+              const Text(
+                'Та энэ сарын бүх хоолны төлбөрийг төлөхийг хүсэж байна уу?',
+              ),
               const Text(
                 'Та энэ сарын бүх хоолны төлбөрийг төлөхийг хүсэж байна уу?',
               ),
@@ -279,9 +289,11 @@ class _FoodReportScreenState extends State<FoodReportScreen>
       // Mark all unpaid meals as paid
       final futures = <Future>[];
 
+
       for (final dateEntry in _unpaidFoodData.entries) {
         final dateKey = dateEntry.key;
         final foods = dateEntry.value;
+
 
         for (int i = 0; i < foods.length; i++) {
           final food = foods[i];
@@ -305,6 +317,7 @@ class _FoodReportScreenState extends State<FoodReportScreen>
             final dateKey = dateEntry.key;
             final foods = dateEntry.value;
 
+
             for (int i = 0; i < foods.length; i++) {
               final food = foods[i];
               final foodIndex = FoodDataService.getFoodIndex(food);
@@ -318,6 +331,9 @@ class _FoodReportScreenState extends State<FoodReportScreen>
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
+              content: Text(
+                'Сарын төлбөр амжилттай төлөгдлөө! ${MoneyFormatService.formatWithSymbol(totalAmount)}',
+              ),
               content: Text(
                 'Сарын төлбөр амжилттай төлөгдлөө! ${MoneyFormatService.formatWithSymbol(totalAmount)}',
               ),
@@ -356,9 +372,18 @@ class _FoodReportScreenState extends State<FoodReportScreen>
     _availableFoodTypes = FoodDataService.getAvailableFoodTypes(
       _monthlyFoodData,
     );
+    _availableFoodTypes = FoodDataService.getAvailableFoodTypes(
+      _monthlyFoodData,
+    );
   }
 
   // Get filtered food data using service
+  Map<String, List<Map<String, dynamic>>> get _filteredFoodData =>
+      FoodCalculationService.getFilteredFoodData(
+        _monthlyFoodData,
+        _eatenForDayData,
+        _selectedFoodFilter,
+      );
   Map<String, List<Map<String, dynamic>>> get _filteredFoodData =>
       FoodCalculationService.getFilteredFoodData(
         _monthlyFoodData,
@@ -374,12 +399,25 @@ class _FoodReportScreenState extends State<FoodReportScreen>
         _paidMeals,
         _selectedFoodFilter,
       );
+  Map<String, List<Map<String, dynamic>>> get _unpaidFoodData =>
+      FoodCalculationService.getUnpaidFoodData(
+        _monthlyFoodData,
+        _eatenForDayData,
+        _paidMeals,
+        _selectedFoodFilter,
+      );
 
   // Get unpaid meals total using service
   int get _unpaidTotalAmount =>
       FoodCalculationService.calculateUnpaidTotalAmount(_unpaidFoodData);
+  int get _unpaidTotalAmount =>
+      FoodCalculationService.calculateUnpaidTotalAmount(_unpaidFoodData);
 
   // Get paid meals total using service
+  int get _paidTotalAmount => FoodCalculationService.calculatePaidTotalAmount(
+    _filteredFoodData,
+    _paidMeals,
+  );
   int get _paidTotalAmount => FoodCalculationService.calculatePaidTotalAmount(
     _filteredFoodData,
     _paidMeals,
@@ -512,6 +550,11 @@ class _FoodReportScreenState extends State<FoodReportScreen>
       drawer: CustomDrawer(
         currentScreen: DrawerScreenType.foodReport,
         onNavigateToTab: widget.onNavigateToTab,
+      ),
+      appBar: const CommonAppBar(
+        title: 'Хоолны тайлан',
+        variant: AppBarVariant.standard,
+        backgroundColor: Colors.white,
       ),
       appBar: const CommonAppBar(
         title: 'Хоолны тайлан',

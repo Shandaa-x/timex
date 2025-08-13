@@ -161,13 +161,54 @@ class _MainScreenState extends State<MainScreen> {
                 child: FloatingActionButton(
                   mini: true,
                   onPressed: () {
-                    _pageController.jumpToPage(4); // Jump to QR screen
+                    _pageController.jumpToPage(5); // Jump to QR screen (index 5)
                     setState(() {
-                      _currentIndex = 4;
+                      _currentIndex = 5;
                     });
                   },
                   backgroundColor: Colors.red,
                   child: Icon(Icons.qr_code),
+                ),
+              ),
+            // Meal Payment Test Button
+            if (_currentIndex == 0) // Only show on first tab
+              Positioned(
+                top: 160,
+                right: 20,
+                child: FloatingActionButton(
+                  mini: true,
+                  onPressed: () async {
+                    try {
+                      // Import the function at the top of this file
+                      // import '../../utils/meal_payment_example.dart';
+                      
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text('🚀 Creating meal payment example...'),
+                          backgroundColor: Colors.blue,
+                        ),
+                      );
+                      
+                      // Call the meal payment creation function
+                      // await createMealPaymentExample();
+                      
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text('✅ Meal payment example created! Check console.'),
+                          backgroundColor: Colors.green,
+                        ),
+                      );
+                    } catch (e) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: Text('❌ Error: $e'),
+                          backgroundColor: Colors.red,
+                        ),
+                      );
+                    }
+                  },
+                  backgroundColor: Colors.green,
+                  child: Icon(Icons.restaurant),
                 ),
               ),
           ],

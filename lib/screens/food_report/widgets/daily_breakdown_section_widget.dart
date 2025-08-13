@@ -6,7 +6,7 @@ import '../services/food_data_service.dart';
 class DailyBreakdownSectionWidget extends StatelessWidget {
   final Map<String, List<Map<String, dynamic>>> unpaidFoodData;
   final String? selectedFoodFilter;
-  final Function(String dateKey, int foodIndex, Map<String, dynamic> food) onMarkMealAsPaid;
+  final Function(String dateKey, int foodIndex, Map<String, dynamic> food)? onMarkMealAsPaid;
   final VoidCallback? onPayMonthly;
   final bool hasAnyFoodsInMonth; // New parameter to indicate if any foods exist
 
@@ -14,7 +14,7 @@ class DailyBreakdownSectionWidget extends StatelessWidget {
     super.key,
     required this.unpaidFoodData,
     this.selectedFoodFilter,
-    required this.onMarkMealAsPaid,
+    this.onMarkMealAsPaid,
     this.onPayMonthly,
     required this.hasAnyFoodsInMonth, // Required parameter
   });

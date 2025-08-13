@@ -2,12 +2,15 @@ import 'package:flutter/material.dart';
 import 'package:timex/index.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 import 'dart:convert';
-import 'package:http/http.dart' as http;
 import 'package:flutter/foundation.dart';
-import 'dart:typed_data';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:google_sign_in/google_sign_in.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../login/google_login_screen.dart';
+import '../../services/qpay_webhook_service.dart';
+import '../../services/qpay_helper_service.dart';
+import '../../utils/qr_utils.dart';
+import '../../utils/banking_app_checker.dart';
 
 class QRCodeScreen extends StatefulWidget {
   const QRCodeScreen({super.key});
@@ -17,26 +20,60 @@ class QRCodeScreen extends StatefulWidget {
 }
 
 class _QRCodeScreenState extends State<QRCodeScreen> {
-  final int totalPrice = 1000; // Total price 1000 MNT
-  final Map<String, int> products = {'Steak': 500, 'Soup': 500};
-
   Map<String, dynamic>? qpayResult;
   bool isLoading = false;
   String? errorMessage;
+  double currentFoodAmount = 0.0;
+  bool isLoadingBalance = true;
 
-  // QPay credentials from .env
-  static const String qpayUrl = 'https://merchant.qpay.mn/v2';
-  static const String username = 'GRAND_IT';
-  static const String password = 'gY8ljnov';
-  static const String template = 'GRAND_IT_INVOICE';
-  static const String apiKey =
-      'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJjbGllbnRfaWQiOiJiMmE2MGY5YS04MDRhLTQ2ZTMtYjMzNy03ZDlmN2UwYWE2ZDciLCJzZXNzaW9uX2lkIjoiUFlvdTVPck4tZ0dOUmk5dWJoNXBGZlhLZlhLa3lwNC0iLCJpYXQiOjE3NTMzNzA4NDgsImV4cCI6MzUwNjgyODA5Nn0.YEu775QWRyryG1X2gd1NS3XK-hXnLrQNfSmQejA8Tvo';
+  // Payment verification
+  final TextEditingController _paymentAmountController =
+      TextEditingController();
+  final TextEditingController _verifyAmountController = TextEditingController();
+  bool isCheckingPayment = false;
+  String? paymentStatus; // 'pending', 'paid', or null
+  String? currentInvoiceId;
+
+  // QPay integration now handled by QPayHelperService
 
   @override
   void initState() {
     super.initState();
     print('QRCodeScreen initState called');
-    _createQPayInvoice();
+    _loadUserBalance();
+    _checkBankingApps(); // Check what banking apps are available
+  }
+
+  /// Check available banking apps for debugging
+  Future<void> _checkBankingApps() async {
+    if (kDebugMode) {
+      try {
+        final report = await BankingAppChecker.getAvailabilityReport();
+        print('📱 Banking Apps Available:');
+        print(report);
+      } catch (error) {
+        print('Error checking banking apps: $error');
+      }
+    }
+  }
+
+  /// Load user's current food balance
+  Future<void> _loadUserBalance() async {
+    try {
+      final user = FirebaseAuth.instance.currentUser;
+      if (user != null) {
+        final balance = await QPayWebhookService.getUserFoodAmount(user.uid);
+        setState(() {
+          currentFoodAmount = balance;
+          isLoadingBalance = false;
+        });
+      }
+    } catch (error) {
+      print('Error loading user balance: $error');
+      setState(() {
+        isLoadingBalance = false;
+      });
+    }
   }
 
   Future<void> _signOut() async {
@@ -84,35 +121,80 @@ class _QRCodeScreenState extends State<QRCodeScreen> {
     if (kIsWeb) {
       setState(() {
         errorMessage =
-            '🌐 Running on Web Browser\n\n✅ QPay integration is correctly implemented!\n\n🚫 Web browsers block direct API calls to external services (CORS policy)\n\n📱 Please test on a mobile device to see real QPay QR codes that work with Mongolian banking apps.\n\n💡 On mobile, this will generate scannable QR codes for 1000 MNT (Steak: 500 + Soup: 500)';
+            '🌐 Running on Web Browser\n\n✅ QPay integration is correctly implemented!\n\n🚫 Web browsers block direct API calls to external services (CORS policy)\n\n📱 Please test on a mobile device to see real QPay QR codes that work with Mongolian banking apps.';
+        isLoading = false;
+      });
+      return;
+    }
+
+    // Validate amount input
+    final amountText = _paymentAmountController.text.trim();
+    if (amountText.isEmpty) {
+      setState(() {
+        errorMessage = 'Please enter an amount first';
+        isLoading = false;
+      });
+      return;
+    }
+
+    final double? amount = double.tryParse(amountText);
+    if (amount == null || amount <= 0) {
+      setState(() {
+        errorMessage = 'Please enter a valid amount greater than 0';
         isLoading = false;
       });
       return;
     }
 
     try {
-      print('🚀 DIRECT QPAY API CALL STARTING...');
-      print('💳 Using API Key: ${apiKey.substring(0, 20)}...');
+      print('🚀 Creating QPay invoice using helper service...');
 
-      // Get QPay access token first (like your JS code)
-      final accessToken = await _getQPayAccessToken();
-      if (accessToken == null) {
-        throw Exception('Failed to get QPay access token');
+      // Get current user
+      final currentUser = FirebaseAuth.instance.currentUser;
+      final String userUid = currentUser?.uid ?? 'unknown';
+      final String orderId = 'TIMEX_${DateTime.now().millisecondsSinceEpoch}';
+
+      // Use the new helper service
+      final result = await QPayHelperService.createInvoiceWithQR(
+        amount: amount,
+        orderId: orderId,
+        userId: userUid,
+        invoiceDescription:
+            'TIMEX Food Payment - ₮${amount.toStringAsFixed(0)}',
+        callbackUrl: 'http://localhost:3000/qpay/webhook',
+      );
+
+      if (result['success'] == true) {
+        final invoice = result['invoice'];
+        print('✅ QPay invoice created successfully: ${invoice['invoice_id']}');
+
+        // Set payment status to pending in Firebase
+        await QPayWebhookService.setPaymentStatusPending(userUid);
+
+        // Debug: Print the invoice structure to understand the response
+        print('🔍 QPay invoice response structure:');
+        invoice.forEach((key, value) {
+          if (key == 'urls' && value is List) {
+            print('  $key: List with ${value.length} items');
+            for (int i = 0; i < value.length; i++) {
+              print('    [$i]: ${value[i].runtimeType} = ${value[i]}');
+            }
+          } else {
+            print(
+              '  $key: ${value.runtimeType} = ${value.toString().length > 100 ? '${value.toString().substring(0, 100)}...' : value}',
+            );
+          }
+        });
+
+        setState(() {
+          qpayResult = invoice;
+          currentInvoiceId = invoice['invoice_id'];
+          paymentStatus = 'pending';
+          isLoading = false;
+        });
+      } else {
+        throw Exception(result['error'] ?? 'Failed to create QPay invoice');
       }
-
-      print('✅ Got QPay access token: ${accessToken.substring(0, 20)}...');
-
-      // Create QPay invoice with token
-      print('🔥 CREATING QPAY INVOICE...');
-      final invoiceResult = await _createQPayInvoiceWithToken(accessToken);
-
-      print('✅ REAL QPAY SUCCESS: ${invoiceResult['invoice_id']}');
-
-      setState(() {
-        qpayResult = invoiceResult;
-        isLoading = false;
-      });
-      return;
     } catch (error) {
       print('Error creating QPay invoice: $error');
 
@@ -121,7 +203,7 @@ class _QRCodeScreenState extends State<QRCodeScreen> {
           error.toString().contains('CORS') ||
           error.toString().contains('network')) {
         userFriendlyError =
-            'Cannot connect to QPay from web browser due to CORS policy.\n\n✅ The integration is working correctly!\n\n📱 Please test on a mobile device where QPay API calls will work properly and generate real, scannable QR codes.\n\n💡 On mobile, you\'ll see real QPay QR codes that work with Mongolian banking apps.';
+            'Cannot connect to QPay from web browser due to CORS policy.\n\n✅ The integration is working correctly!\n\n📱 Please test on a mobile device where QPay API calls will work properly and generate real, scannable QR codes.';
       } else {
         userFriendlyError =
             'Failed to create QPay invoice: ${error.toString()}';
@@ -134,94 +216,429 @@ class _QRCodeScreenState extends State<QRCodeScreen> {
     }
   }
 
-  Future<String?> _getQPayAccessToken() async {
-    try {
-      // Use Basic Auth like in your working JS code
-      String basicAuth =
-          'Basic ${base64Encode(utf8.encode('$username:$password'))}';
+  // Payment verification methods
+  Future<void> _checkPaymentStatus() async {
+    if (currentInvoiceId == null) {
+      _showMessage('No invoice to check', isError: true);
+      return;
+    }
 
-      final response = await http.post(
-        Uri.parse('$qpayUrl/auth/token'),
-        headers: {
-          'Authorization': basicAuth,
-          'Content-Type': 'application/json',
-        },
+    final amountText = _verifyAmountController.text.trim();
+    if (amountText.isEmpty) {
+      _showMessage('Please enter payment amount', isError: true);
+      return;
+    }
+
+    final double? paymentAmount = double.tryParse(amountText);
+    if (paymentAmount == null || paymentAmount <= 0) {
+      _showMessage('Please enter valid payment amount', isError: true);
+      return;
+    }
+
+    setState(() {
+      isCheckingPayment = true;
+    });
+
+    try {
+      // Get access token first
+      final authResult = await QPayHelperService.getAccessToken();
+      if (authResult['success'] != true) {
+        throw Exception('Failed to authenticate: ${authResult['error']}');
+      }
+
+      // Check payment status
+      final paymentResult = await QPayHelperService.checkPayment(
+        authResult['access_token'],
+        currentInvoiceId!,
       );
 
-      print('QPay auth response status: ${response.statusCode}');
-      print('QPay auth response body: ${response.body}');
+      if (paymentResult['success'] == true) {
+        final int count = paymentResult['count'] ?? 0;
+        final double paidAmount = (paymentResult['paid_amount'] ?? 0)
+            .toDouble();
 
-      if (response.statusCode == 200) {
-        final data = json.decode(response.body);
-        return data['access_token'];
+        if (count > 0 && paidAmount >= paymentAmount) {
+          // Payment found and amount is sufficient
+          setState(() {
+            paymentStatus = 'paid';
+          });
+
+          // Update Firebase
+          await _updateFirebaseBalance(paymentAmount);
+
+          _showMessage(
+            'Payment confirmed! ₮${paymentAmount.toStringAsFixed(0)} deducted from balance',
+            isError: false,
+          );
+
+          // Clear the input
+          _verifyAmountController.clear();
+
+          // Reload balance
+          await _loadUserBalance();
+        } else if (count > 0 && paidAmount < paymentAmount) {
+          _showMessage(
+            'Payment found but amount is less than entered (₮${paidAmount.toStringAsFixed(0)})',
+            isError: true,
+          );
+        } else {
+          _showMessage('No payment found yet', isError: true);
+        }
       } else {
-        throw Exception(
-          'QPay auth failed: ${response.statusCode} ${response.body}',
-        );
+        throw Exception(paymentResult['error'] ?? 'Failed to check payment');
       }
     } catch (error) {
-      print('Error getting QPay access token: $error');
-      rethrow;
+      print('Error checking payment: $error');
+      _showMessage('Error checking payment: $error', isError: true);
+    } finally {
+      setState(() {
+        isCheckingPayment = false;
+      });
     }
   }
 
-  Future<Map<String, dynamic>> _createQPayInvoiceWithToken(
-    String accessToken,
-  ) async {
+  Future<void> _updateFirebaseBalance(double paidAmount) async {
     try {
-      final invoiceNo = 'TIMEX_${DateTime.now().millisecondsSinceEpoch}';
+      final user = FirebaseAuth.instance.currentUser;
+      if (user == null) return;
 
-      final requestBody = {
-        'invoice_code': template,
-        'sender_invoice_no': invoiceNo,
-        'sender_staff_code': 'staff_01',
-        'invoice_receiver_code': 'user-terminal',
-        'invoice_description': 'TIMEX Order - ${products.keys.join(', ')}',
-        'amount': totalPrice,
-        'has_ebarimt': false,
-        'callback_url': 'http://localhost:3000/qpay/callback',
+      // Simulate webhook processing
+      final webhookData = {
+        'payment_status': 'PAID',
+        'paid_amount': paidAmount,
+        'user_id': user.uid,
+        'invoice_id': currentInvoiceId,
+        'transaction_id': 'MANUAL_${DateTime.now().millisecondsSinceEpoch}',
+        'payment_date': DateTime.now().toIso8601String(),
       };
 
-      print(
-        '✨ UPDATED VERSION - Creating QPay invoice with body: ${json.encode(requestBody)}',
+      await QPayWebhookService.processWebhook(webhookData);
+    } catch (error) {
+      print('Error updating Firebase balance: $error');
+    }
+  }
+
+  void _showMessage(String message, {required bool isError}) {
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(message),
+          backgroundColor: isError ? Colors.red : Colors.green,
+          duration: Duration(seconds: 3),
+        ),
       );
+    }
+  }
 
-      final response = await http.post(
-        Uri.parse('$qpayUrl/invoice'),
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': 'Bearer $accessToken',
-        },
-        body: json.encode(requestBody),
-      );
+  /// Launch deep link to mobile banking app
+  Future<void> _launchMobileBankingApp() async {
+    if (qpayResult == null) {
+      _showMessage('No invoice available', isError: true);
+      return;
+    }
 
-      print('QPay invoice response status: ${response.statusCode}');
-      print('QPay invoice response body: ${response.body}');
+    try {
+      // Try using the new method first
+      final primaryBankingApp = QRUtils.getPrimaryBankingApp(qpayResult!);
 
-      final responseData = json.decode(response.body);
-      print('🎯 INVOICE CREATED:');
-      print('📄 Invoice ID: ${responseData['invoice_id']}');
-      print('💰 Amount: 1000 MNT');
-      print('🏦 QR Text Length: ${responseData['qr_text']?.length ?? 0}');
-      print('📱 QR Image Length: ${responseData['qr_image']?.length ?? 0}');
-      print('🔗 Bank URLs: ${responseData['urls']?.length ?? 0}');
+      if (primaryBankingApp != null) {
+        print('🚀 Launching primary banking app: ${primaryBankingApp.name}');
+        try {
+          final uri = Uri.parse(primaryBankingApp.deepLink);
 
-      if (response.statusCode == 200) {
-        return json.decode(response.body);
+          if (await canLaunchUrl(uri)) {
+            await launchUrl(uri, mode: LaunchMode.externalApplication);
+            _showMessage('Opened ${primaryBankingApp.name}', isError: false);
+            return;
+          } else {
+            print(
+              '❌ Cannot launch ${primaryBankingApp.name}, trying fallback...',
+            );
+          }
+        } catch (uriError) {
+          print('❌ Error parsing URI for ${primaryBankingApp.name}: $uriError');
+          _showMessage(
+            'Invalid link format for ${primaryBankingApp.name}',
+            isError: true,
+          );
+        }
       } else {
-        throw Exception(
-          'QPay invoice creation failed: ${response.statusCode} ${response.body}',
-        );
+        print('🔍 No primary banking app found from QPay response');
+      }
+
+      // Fallback to legacy method
+      final qrText = qpayResult!['qr_text'] ?? '';
+      final invoiceId = qpayResult!['invoice_id'];
+
+      // Extract QPay short URL from different possible fields
+      String? qpayShortUrl;
+      if (qpayResult!['qpay_shortUrl'] != null) {
+        qpayShortUrl = qpayResult!['qpay_shortUrl'].toString();
+      } else if (qpayResult!['urls'] != null) {
+        final urls = qpayResult!['urls'];
+        if (urls is List && urls.isNotEmpty) {
+          // Look for the first valid URL
+          for (final url in urls) {
+            if (url is Map && url['link'] != null) {
+              final link = url['link'].toString();
+              if (link.startsWith('http')) {
+                qpayShortUrl = link;
+                break;
+              }
+            }
+          }
+        } else if (urls is Map) {
+          // If urls is a map, try to get the first value
+          final values = urls.values;
+          if (values.isNotEmpty) {
+            qpayShortUrl = values.first.toString();
+          }
+        }
+      }
+
+      final deepLink = QRUtils.getPrimaryDeepLink(
+        qrText,
+        qpayShortUrl,
+        invoiceId,
+      );
+
+      if (deepLink != null) {
+        try {
+          final uri = Uri.parse(deepLink);
+          if (await canLaunchUrl(uri)) {
+            await launchUrl(uri, mode: LaunchMode.externalApplication);
+            _showMessage('Opened in banking app', isError: false);
+          } else {
+            // Fallback to web URL if available
+            if (qpayShortUrl != null && qpayShortUrl.startsWith('http')) {
+              try {
+                final webUri = Uri.parse(qpayShortUrl);
+                if (await canLaunchUrl(webUri)) {
+                  await launchUrl(webUri, mode: LaunchMode.externalApplication);
+                  _showMessage('Opened in browser', isError: false);
+                } else {
+                  _showMessage(
+                    'No compatible banking app found',
+                    isError: true,
+                  );
+                }
+              } catch (webUriError) {
+                print('❌ Error parsing web URI: $webUriError');
+                _showMessage('Invalid web URL format', isError: true);
+              }
+            } else {
+              _showMessage('No compatible banking app found', isError: true);
+            }
+          }
+        } catch (deepLinkError) {
+          print('❌ Error parsing deep link URI: $deepLinkError');
+          _showMessage('Invalid deep link format', isError: true);
+        }
+      } else {
+        // If no deep link is available, show banking app options instead
+        print('🔍 No primary deep link found, showing banking app options');
+        _showBankingAppOptions();
       }
     } catch (error) {
-      print('Error creating QPay invoice with token: $error');
-      rethrow;
+      print('Error launching banking app: $error');
+      _showMessage('Failed to open banking app: $error', isError: true);
     }
+  }
+
+  /// Show available banking app options
+  void _showBankingAppOptions() {
+    if (qpayResult == null) return;
+
+    // Use the new banking app extraction method
+    final bankingApps = QRUtils.extractBankingApps(qpayResult!);
+
+    // Fallback to legacy method if new method returns empty
+    Map<String, String> legacyDeepLinks = {};
+    if (bankingApps.isEmpty) {
+      final qrText = qpayResult!['qr_text'] ?? '';
+      final invoiceId = qpayResult!['invoice_id'];
+
+      // Extract QPay short URL from different possible fields
+      String? qpayShortUrl;
+      if (qpayResult!['qpay_shortUrl'] != null) {
+        qpayShortUrl = qpayResult!['qpay_shortUrl'].toString();
+      } else if (qpayResult!['urls'] != null) {
+        final urls = qpayResult!['urls'];
+        if (urls is List && urls.isNotEmpty) {
+          // Look for the first valid URL
+          for (final url in urls) {
+            if (url is Map && url['link'] != null) {
+              final link = url['link'].toString();
+              if (link.startsWith('http')) {
+                qpayShortUrl = link;
+                break;
+              }
+            }
+          }
+        } else if (urls is Map) {
+          final values = urls.values;
+          if (values.isNotEmpty) {
+            qpayShortUrl = values.first.toString();
+          }
+        }
+      }
+
+      legacyDeepLinks = QRUtils.generateDeepLinks(
+        qrText,
+        qpayShortUrl,
+        invoiceId,
+      );
+    }
+
+    showModalBottomSheet(
+      context: context,
+      builder: (BuildContext context) {
+        return Container(
+          padding: const EdgeInsets.all(20),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Open in Banking App',
+                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+              ),
+              SizedBox(height: 16),
+              // New banking apps from QPay
+              ...bankingApps.entries.map((entry) {
+                final app = entry.value;
+                IconData icon;
+
+                switch (entry.key) {
+                  case 'qpay':
+                    icon = Icons.payment;
+                    break;
+                  case 'khanbank':
+                  case 'khan':
+                    icon = Icons.account_balance;
+                    break;
+                  case 'statebank':
+                  case 'state':
+                    icon = Icons.account_balance_wallet;
+                    break;
+                  case 'tdb':
+                  case 'tradeanddevelopmentbank':
+                    icon = Icons.business;
+                    break;
+                  default:
+                    icon = Icons.open_in_new;
+                }
+
+                return ListTile(
+                  leading: Icon(icon, color: Colors.blue),
+                  title: Text(app.name),
+                  subtitle: Text(
+                    app.description.isNotEmpty
+                        ? app.description
+                        : 'Mobile banking app',
+                  ),
+                  onTap: () async {
+                    Navigator.pop(context);
+                    try {
+                      final uri = Uri.parse(app.deepLink);
+                      if (await canLaunchUrl(uri)) {
+                        await launchUrl(
+                          uri,
+                          mode: LaunchMode.externalApplication,
+                        );
+                        _showMessage('Opened ${app.name}', isError: false);
+                      } else {
+                        _showMessage(
+                          '${app.name} not installed',
+                          isError: true,
+                        );
+                      }
+                    } catch (uriError) {
+                      print('Error launching ${app.name}: $uriError');
+                      _showMessage(
+                        'Invalid link format for ${app.name}',
+                        isError: true,
+                      );
+                    }
+                  },
+                );
+              }).toList(),
+
+              // Legacy deep links as fallback
+              ...legacyDeepLinks.entries.map((entry) {
+                String appName;
+                IconData icon;
+
+                switch (entry.key) {
+                  case 'qpay':
+                    appName = 'QPay App';
+                    icon = Icons.payment;
+                    break;
+                  case 'socialpay':
+                    appName = 'Social Pay (Khan Bank)';
+                    icon = Icons.account_balance;
+                    break;
+                  case 'khanbank':
+                    appName = 'Khan Bank';
+                    icon = Icons.account_balance;
+                    break;
+                  default:
+                    appName = 'Banking App';
+                    icon = Icons.open_in_new;
+                }
+
+                return ListTile(
+                  leading: Icon(icon, color: Colors.blue),
+                  title: Text(appName),
+                  subtitle: Text(
+                    entry.key == 'banking' ? 'Web browser' : 'Mobile app',
+                  ),
+                  onTap: () async {
+                    Navigator.pop(context);
+                    try {
+                      final uri = Uri.parse(entry.value);
+                      if (await canLaunchUrl(uri)) {
+                        await launchUrl(
+                          uri,
+                          mode: LaunchMode.externalApplication,
+                        );
+                        _showMessage('Opened in $appName', isError: false);
+                      } else {
+                        _showMessage('$appName not installed', isError: true);
+                      }
+                    } catch (uriError) {
+                      print('Error launching $appName: $uriError');
+                      _showMessage(
+                        'Invalid link format for $appName',
+                        isError: true,
+                      );
+                    }
+                  },
+                );
+              }).toList(),
+
+              SizedBox(height: 16),
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: Text('Cancel'),
+              ),
+            ],
+          ),
+        );
+      },
+    );
   }
 
   Future<void> _refreshQRCode() async {
     print('Refresh QR pressed');
-    await _createQPayInvoice();
+    await _loadUserBalance();
+    // Clear previous results to show the input form again
+    setState(() {
+      qpayResult = null;
+      errorMessage = null;
+      paymentStatus = null;
+      currentInvoiceId = null;
+    });
   }
 
   @override
@@ -252,6 +669,7 @@ class _QRCodeScreenState extends State<QRCodeScreen> {
                   )
                 : const Icon(Icons.refresh, color: Colors.black),
             onPressed: isLoading ? null : _refreshQRCode,
+            tooltip: 'Refresh QR Code',
           ),
           IconButton(
             icon: const Icon(Icons.logout, color: Colors.red),
@@ -265,6 +683,172 @@ class _QRCodeScreenState extends State<QRCodeScreen> {
           padding: const EdgeInsets.all(20),
           child: Column(
             children: [
+              // User Balance Display
+              if (!isLoadingBalance)
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(16),
+                  margin: const EdgeInsets.only(bottom: 20),
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      colors: [Colors.blue.shade50, Colors.blue.shade100],
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                    ),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: Colors.blue.shade200),
+                  ),
+                  child: Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(8),
+                        decoration: BoxDecoration(
+                          color: Colors.blue.shade600,
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Icon(
+                          Icons.account_balance_wallet,
+                          color: Colors.white,
+                          size: 24,
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Current Food Balance',
+                              style: TextStyle(
+                                fontSize: 14,
+                                color: Colors.blue.shade700,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                            Text(
+                              '₮${currentFoodAmount.toStringAsFixed(0)} MNT',
+                              style: TextStyle(
+                                fontSize: 20,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.blue.shade800,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      if (currentFoodAmount > 0)
+                        Icon(
+                          Icons.trending_down,
+                          color: Colors.orange,
+                          size: 16,
+                        ),
+                    ],
+                  ),
+                ),
+
+              // Amount Input Section (only show if no invoice yet)
+              if (qpayResult == null && errorMessage == null)
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(20),
+                  margin: const EdgeInsets.only(bottom: 20),
+                  decoration: BoxDecoration(
+                    color: Colors.green.shade50,
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: Colors.green.shade200),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.all(8),
+                            decoration: BoxDecoration(
+                              color: Colors.green.shade600,
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: Icon(
+                              Icons.payment,
+                              color: Colors.white,
+                              size: 20,
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Text(
+                            'Create QPay Invoice',
+                            style: TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.green.shade800,
+                            ),
+                          ),
+                        ],
+                      ),
+                      SizedBox(height: 16),
+                      Text(
+                        'Enter the amount you want to pay:',
+                        style: TextStyle(
+                          fontSize: 14,
+                          color: Colors.grey.shade700,
+                        ),
+                      ),
+                      SizedBox(height: 8),
+                      TextField(
+                        controller: _paymentAmountController,
+                        keyboardType: TextInputType.number,
+                        decoration: InputDecoration(
+                          hintText: 'Amount (e.g. 1000)',
+                          prefixText: '₮ ',
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          filled: true,
+                          fillColor: Colors.white,
+                        ),
+                      ),
+                      SizedBox(height: 12),
+                      SizedBox(
+                        width: double.infinity,
+                        child: ElevatedButton(
+                          onPressed: isLoading ? null : _createQPayInvoice,
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.green.shade600,
+                            foregroundColor: Colors.white,
+                            padding: EdgeInsets.symmetric(vertical: 12),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                          ),
+                          child: isLoading
+                              ? Row(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    SizedBox(
+                                      width: 16,
+                                      height: 16,
+                                      child: CircularProgressIndicator(
+                                        strokeWidth: 2,
+                                        color: Colors.white,
+                                      ),
+                                    ),
+                                    SizedBox(width: 8),
+                                    Text('Creating Invoice...'),
+                                  ],
+                                )
+                              : Text(
+                                  'Create QPay Invoice',
+                                  style: TextStyle(
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+
               // Loading State
               if (isLoading)
                 Container(
@@ -405,45 +989,191 @@ class _QRCodeScreenState extends State<QRCodeScreen> {
                       ),
                       SizedBox(height: 15),
 
-                      // Products
-                      ...products.entries.map(
-                        (entry) => Padding(
-                          padding: const EdgeInsets.symmetric(vertical: 4),
-                          child: Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                            children: [
-                              Text(entry.key),
-                              Text('₮${entry.value}'),
-                            ],
-                          ),
-                        ),
-                      ),
-
-                      Divider(),
-
-                      // Total
+                      // Payment Status
                       Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
                           Text(
-                            'Total Amount',
+                            'Payment Status',
                             style: TextStyle(
                               fontSize: 16,
                               fontWeight: FontWeight.bold,
                             ),
                           ),
-                          Text(
-                            '₮$totalPrice MNT',
-                            style: TextStyle(
-                              fontSize: 18,
-                              fontWeight: FontWeight.bold,
-                              color: Colors.blue.shade700,
+                          Container(
+                            padding: EdgeInsets.symmetric(
+                              horizontal: 12,
+                              vertical: 4,
+                            ),
+                            decoration: BoxDecoration(
+                              color: paymentStatus == 'paid'
+                                  ? Colors.green.shade100
+                                  : Colors.orange.shade100,
+                              borderRadius: BorderRadius.circular(12),
+                              border: Border.all(
+                                color: paymentStatus == 'paid'
+                                    ? Colors.green
+                                    : Colors.orange,
+                                width: 1,
+                              ),
+                            ),
+                            child: Text(
+                              paymentStatus == 'paid' ? 'PAID' : 'PENDING',
+                              style: TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.bold,
+                                color: paymentStatus == 'paid'
+                                    ? Colors.green.shade700
+                                    : Colors.orange.shade700,
+                              ),
                             ),
                           ),
                         ],
                       ),
+                      SizedBox(height: 8),
+                      Text(
+                        'Scan QR code and pay any amount you want, then verify below',
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: Colors.grey.shade600,
+                          fontStyle: FontStyle.italic,
+                        ),
+                      ),
                     ],
                   ),
+                ),
+
+                SizedBox(height: 20),
+
+                // Payment Verification Section
+                if (paymentStatus == 'pending')
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(20),
+                    decoration: BoxDecoration(
+                      color: Colors.blue.shade50,
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: Colors.blue.shade200),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Verify Your Payment',
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.blue.shade800,
+                          ),
+                        ),
+                        SizedBox(height: 12),
+                        Text(
+                          'Enter the amount you paid:',
+                          style: TextStyle(
+                            fontSize: 14,
+                            color: Colors.grey.shade700,
+                          ),
+                        ),
+                        SizedBox(height: 8),
+                        TextField(
+                          controller: _verifyAmountController,
+                          keyboardType: TextInputType.number,
+                          decoration: InputDecoration(
+                            hintText: 'Amount (e.g. 1000)',
+                            prefixText: '₮ ',
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            filled: true,
+                            fillColor: Colors.white,
+                          ),
+                        ),
+                        SizedBox(height: 12),
+                        SizedBox(
+                          width: double.infinity,
+                          child: ElevatedButton(
+                            onPressed: isCheckingPayment
+                                ? null
+                                : _checkPaymentStatus,
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: Colors.blue.shade600,
+                              foregroundColor: Colors.white,
+                              padding: EdgeInsets.symmetric(vertical: 12),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                            ),
+                            child: isCheckingPayment
+                                ? Row(
+                                    mainAxisAlignment: MainAxisAlignment.center,
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      SizedBox(
+                                        width: 16,
+                                        height: 16,
+                                        child: CircularProgressIndicator(
+                                          strokeWidth: 2,
+                                          valueColor:
+                                              AlwaysStoppedAnimation<Color>(
+                                                Colors.white,
+                                              ),
+                                        ),
+                                      ),
+                                      SizedBox(width: 8),
+                                      Text('Checking Payment...'),
+                                    ],
+                                  )
+                                : Text(
+                                    'Check Payment Status',
+                                    style: TextStyle(
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                  ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+
+                SizedBox(height: 20),
+
+                // Mobile Banking App Buttons
+                Row(
+                  children: [
+                    Expanded(
+                      child: ElevatedButton.icon(
+                        onPressed: _launchMobileBankingApp,
+                        icon: Icon(Icons.phone_android),
+                        label: Text('Open Banking App'),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.blue.shade600,
+                          foregroundColor: Colors.white,
+                          padding: EdgeInsets.symmetric(vertical: 12),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                        ),
+                      ),
+                    ),
+                    SizedBox(width: 12),
+                    ElevatedButton.icon(
+                      onPressed: _showBankingAppOptions,
+                      icon: Icon(Icons.more_vert),
+                      label: Text('More Apps'),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.grey.shade600,
+                        foregroundColor: Colors.white,
+                        padding: EdgeInsets.symmetric(
+                          vertical: 12,
+                          horizontal: 16,
+                        ),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
 
                 SizedBox(height: 20),
@@ -462,7 +1192,7 @@ class _QRCodeScreenState extends State<QRCodeScreen> {
                       SizedBox(width: 10),
                       Expanded(
                         child: Text(
-                          'Scan with your Mongolian bank app to pay',
+                          'Scan with your bank app - pay any amount you choose',
                           style: TextStyle(
                             fontSize: 14,
                             color: Colors.amber.shade800,
