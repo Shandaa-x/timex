@@ -6,11 +6,7 @@ import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:get/get_navigation/src/root/get_material_app.dart';
 import 'package:timex/index.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
-import 'package:timex/screens/login/google_login_screen.dart';
-<<<<<<< HEAD
-=======
 import 'package:timex/screens/auth/auth_wrapper.dart';
->>>>>>> origin/master
 import 'package:timezone/data/latest.dart' as tz;
 import 'package:timezone/timezone.dart' as tz;
 import 'package:permission_handler/permission_handler.dart';
@@ -128,8 +124,7 @@ class MyApp extends StatelessWidget {
       initialRoute: Routes.authWrapper,
       onGenerateRoute: (settings) => Routes().getRoute(settings),
       debugShowCheckedModeBanner: false,
-<<<<<<< HEAD
-      home: const GoogleLoginScreen(),
+      home: const AuthWrapper(),
       localizationsDelegates: [
         GlobalMaterialLocalizations.delegate,
         GlobalWidgetsLocalizations.delegate,
@@ -139,9 +134,6 @@ class MyApp extends StatelessWidget {
         Locale('en'),
         Locale('mn'),
       ],
-=======
-      home: const AuthWrapper(),
->>>>>>> origin/master
     );
   }
 }
