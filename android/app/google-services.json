@@ -12,7 +12,20 @@
           "package_name": "com.example.timex"
         }
       },
-      "oauth_client": [],
+      "oauth_client": [
+        {
+          "client_id": "325943660774-n4joakudu6c9jrbhd1ae8asp6ceutdiv.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.example.timex",
+            "certificate_hash": "b6b8b04423f5ec77a0ee62b7dd99ead1972c12fb"
+          }
+        },
+        {
+          "client_id": "325943660774-io79c06cupiqfk39lagmns18pp1oo70a.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
       "api_key": [
         {
           "current_key": "AIzaSyCJplGXQfX7FqOJkI2UCcgDpPb10pSp3tM"
@@ -20,7 +33,19 @@
       ],
       "services": {
         "appinvite_service": {
-          "other_platform_oauth_client": []
+          "other_platform_oauth_client": [
+            {
+              "client_id": "325943660774-io79c06cupiqfk39lagmns18pp1oo70a.apps.googleusercontent.com",
+              "client_type": 3
+            },
+            {
+              "client_id": "325943660774-vfaq5nn119fbp2qo67mtc0ekbqbsogcl.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "com.example.timex"
+              }
+            }
+          ]
         }
       }
     }
