@@ -54,20 +54,19 @@ class QPayHelperService {
     String? callbackUrl,
   }) async {
     final payload = {
+      // Required fields by QPay API
       'invoice_code': _template,
       'sender_invoice_no': orderId,
       'invoice_receiver_code': userId.isEmpty ? 'terminal' : userId,
       'invoice_description': invoiceDescription,
-      'line_unit_price': amount,
-      'line_description': 'Food Payment',
-      'line_quantity': 1,
-      'amount': amount,
-      'has_ebarimt': false,
+      'amount': amount.round(),
       'callback_url': callbackUrl ?? 'http://localhost:3000/qpay/webhook',
-      'allow_partial': false,
-      'minimum_amount': amount,
-      'allow_exceed': false,
-      'maximum_amount': amount,
+      
+      // Optional but recommended fields
+      'allow_partial': true,  // Allow partial payments
+      'minimum_amount': 100,  // Minimum 100 MNT
+      'allow_exceed': true,   // Allow paying more than invoice amount
+      'maximum_amount': (amount * 10).round(), // Up to 10x the invoice amount
     };
 
     try {

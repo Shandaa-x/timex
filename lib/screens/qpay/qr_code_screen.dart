@@ -5,9 +5,11 @@ import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:google_sign_in/google_sign_in.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../login/google_login_screen.dart';
 import '../../services/qpay_webhook_service.dart';
 import '../../services/qpay_helper_service.dart';
+import '../../utils/qr_utils.dart';
 
 class QRCodeScreen extends StatefulWidget {
   const QRCodeScreen({super.key});
@@ -154,6 +156,12 @@ class _QRCodeScreenState extends State<QRCodeScreen> {
         // Set payment status to pending in Firebase
         await QPayWebhookService.setPaymentStatusPending(userUid);
         
+        // Debug: Print the invoice structure to understand the response
+        print('🔍 QPay invoice response structure:');
+        invoice.forEach((key, value) {
+          print('  $key: ${value.runtimeType} = $value');
+        });
+        
         setState(() {
           qpayResult = invoice;
           currentInvoiceId = invoice['invoice_id'];
@@ -293,6 +301,163 @@ class _QRCodeScreenState extends State<QRCodeScreen> {
         ),
       );
     }
+  }
+
+  /// Launch deep link to mobile banking app
+  Future<void> _launchMobileBankingApp() async {
+    if (qpayResult == null) {
+      _showMessage('No invoice available', isError: true);
+      return;
+    }
+
+    try {
+      final qrText = qpayResult!['qr_text'] ?? '';
+      final invoiceId = qpayResult!['invoice_id'];
+      
+      // Extract QPay short URL from different possible fields
+      String? qpayShortUrl;
+      if (qpayResult!['qpay_shortUrl'] != null) {
+        qpayShortUrl = qpayResult!['qpay_shortUrl'].toString();
+      } else if (qpayResult!['urls'] != null) {
+        final urls = qpayResult!['urls'];
+        if (urls is List && urls.isNotEmpty) {
+          qpayShortUrl = urls.first.toString();
+        } else if (urls is Map) {
+          // If urls is a map, try to get the first value
+          final values = urls.values;
+          if (values.isNotEmpty) {
+            qpayShortUrl = values.first.toString();
+          }
+        }
+      }
+
+      final deepLink = QRUtils.getPrimaryDeepLink(qrText, qpayShortUrl, invoiceId);
+
+      if (deepLink != null) {
+        final uri = Uri.parse(deepLink);
+        if (await canLaunchUrl(uri)) {
+          await launchUrl(uri, mode: LaunchMode.externalApplication);
+          _showMessage('Opened in banking app', isError: false);
+        } else {
+          // Fallback to web URL if available
+          if (qpayShortUrl != null) {
+            final webUri = Uri.parse(qpayShortUrl);
+            if (await canLaunchUrl(webUri)) {
+              await launchUrl(webUri, mode: LaunchMode.externalApplication);
+              _showMessage('Opened in browser', isError: false);
+            } else {
+              _showMessage('No compatible banking app found', isError: true);
+            }
+          } else {
+            _showMessage('No compatible banking app found', isError: true);
+          }
+        }
+      } else {
+        // If no deep link is available, show banking app options instead
+        print('🔍 No primary deep link found, showing banking app options');
+        _showBankingAppOptions();
+      }
+    } catch (error) {
+      print('Error launching banking app: $error');
+      _showMessage('Failed to open banking app: $error', isError: true);
+    }
+  }
+
+  /// Show available banking app options
+  void _showBankingAppOptions() {
+    if (qpayResult == null) return;
+
+    final qrText = qpayResult!['qr_text'] ?? '';
+    final invoiceId = qpayResult!['invoice_id'];
+    
+    // Extract QPay short URL from different possible fields
+    String? qpayShortUrl;
+    if (qpayResult!['qpay_shortUrl'] != null) {
+      qpayShortUrl = qpayResult!['qpay_shortUrl'].toString();
+    } else if (qpayResult!['urls'] != null) {
+      final urls = qpayResult!['urls'];
+      if (urls is List && urls.isNotEmpty) {
+        qpayShortUrl = urls.first.toString();
+      } else if (urls is Map) {
+        // If urls is a map, try to get the first value
+        final values = urls.values;
+        if (values.isNotEmpty) {
+          qpayShortUrl = values.first.toString();
+        }
+      }
+    }
+
+    final deepLinks = QRUtils.generateDeepLinks(qrText, qpayShortUrl, invoiceId);
+
+    showModalBottomSheet(
+      context: context,
+      builder: (BuildContext context) {
+        return Container(
+          padding: const EdgeInsets.all(20),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Open in Banking App',
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              SizedBox(height: 16),
+              ...deepLinks.entries.map((entry) {
+                String appName;
+                IconData icon;
+                
+                switch (entry.key) {
+                  case 'qpay':
+                    appName = 'QPay App';
+                    icon = Icons.payment;
+                    break;
+                  case 'socialpay':
+                    appName = 'Social Pay (Khan Bank)';
+                    icon = Icons.account_balance;
+                    break;
+                  case 'khanbank':
+                    appName = 'Khan Bank';
+                    icon = Icons.account_balance;
+                    break;
+                  default:
+                    appName = 'Banking App';
+                    icon = Icons.open_in_new;
+                }
+
+                return ListTile(
+                  leading: Icon(icon, color: Colors.blue),
+                  title: Text(appName),
+                  subtitle: Text(entry.key == 'banking' ? 'Web browser' : 'Mobile app'),
+                  onTap: () async {
+                    Navigator.pop(context);
+                    try {
+                      final uri = Uri.parse(entry.value);
+                      if (await canLaunchUrl(uri)) {
+                        await launchUrl(uri, mode: LaunchMode.externalApplication);
+                        _showMessage('Opened in $appName', isError: false);
+                      } else {
+                        _showMessage('$appName not installed', isError: true);
+                      }
+                    } catch (error) {
+                      _showMessage('Failed to open $appName', isError: true);
+                    }
+                  },
+                );
+              }).toList(),
+              SizedBox(height: 16),
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: Text('Cancel'),
+              ),
+            ],
+          ),
+        );
+      },
+    );
   }
 
   Future<void> _refreshQRCode() async {
@@ -783,6 +948,43 @@ class _QRCodeScreenState extends State<QRCodeScreen> {
                       ],
                     ),
                   ),
+
+                SizedBox(height: 20),
+
+                // Mobile Banking App Buttons
+                Row(
+                  children: [
+                    Expanded(
+                      child: ElevatedButton.icon(
+                        onPressed: _launchMobileBankingApp,
+                        icon: Icon(Icons.phone_android),
+                        label: Text('Open Banking App'),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.blue.shade600,
+                          foregroundColor: Colors.white,
+                          padding: EdgeInsets.symmetric(vertical: 12),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                        ),
+                      ),
+                    ),
+                    SizedBox(width: 12),
+                    ElevatedButton.icon(
+                      onPressed: _showBankingAppOptions,
+                      icon: Icon(Icons.more_vert),
+                      label: Text('More Apps'),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.grey.shade600,
+                        foregroundColor: Colors.white,
+                        padding: EdgeInsets.symmetric(vertical: 12, horizontal: 16),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
 
                 SizedBox(height: 20),
 

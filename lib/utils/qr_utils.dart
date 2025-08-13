@@ -5,8 +5,7 @@ import '../utils/logger.dart';
 
 /// QR Code generation utilities
 class QRUtils {
-  /// Generate QR code data URL (placeholder implementation)
-  /// In a real app, you would use a package like qr_flutter
+  /// Generate QR code data URL from QPay response
   static Future<String?> generateQRDataURL(String data) async {
     try {
       if (data.isEmpty) {
@@ -14,25 +13,15 @@ class QRUtils {
       }
 
       AppLogger.info(
-        'Generating QR code data URL for: ${data.substring(0, data.length > 50 ? 50 : data.length)}...',
+        'Processing QR code data: ${data.substring(0, data.length > 50 ? 50 : data.length)}...',
       );
 
-      // This is a placeholder implementation
-      // In a real app, you would:
-      // 1. Use qr_flutter package to generate QR code
-      // 2. Convert it to image bytes
-      // 3. Encode to base64
-
-      // For now, return a placeholder data URL
-      const String placeholderQR =
-          'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==';
-
-      AppLogger.success(
-        'QR code data URL generated successfully (placeholder)',
-      );
-      return placeholderQR;
+      // QPay returns QR text that should be used directly with qr_flutter
+      // The QR text contains the payment information that banking apps can scan
+      AppLogger.success('QR code data processed successfully');
+      return data; // Return the raw QR text for qr_flutter to use
     } catch (error) {
-      AppLogger.error('Failed to generate QR code data URL', error);
+      AppLogger.error('Failed to process QR code data', error);
       return null;
     }
   }
@@ -104,6 +93,57 @@ class QRUtils {
         data.contains('merchant') ||
         data.startsWith('https://qpay.mn/') ||
         data.contains('invoice_id');
+  }
+
+  /// Generate QPay deep links for mobile banking apps
+  static Map<String, String> generateDeepLinks(String qrText, String? qpayShortUrl, String? invoiceId) {
+    final deepLinks = <String, String>{};
+    
+    // QPay app deep link
+    if (invoiceId != null && invoiceId.isNotEmpty) {
+      deepLinks['qpay'] = 'qpay://invoice?id=$invoiceId';
+    }
+    
+    // Social Pay deep link (Khan Bank)
+    if (qpayShortUrl != null && qpayShortUrl.isNotEmpty) {
+      deepLinks['socialpay'] = 'socialpay://qpay?url=${Uri.encodeComponent(qpayShortUrl)}';
+    }
+    
+    // Khan Bank app deep link
+    if (qrText.isNotEmpty) {
+      deepLinks['khanbank'] = 'khanbank://qrpay?data=${Uri.encodeComponent(qrText)}';
+    }
+    
+    // Always add generic banking options even if no URLs are available
+    if (qpayShortUrl != null && qpayShortUrl.isNotEmpty) {
+      deepLinks['banking'] = qpayShortUrl;
+    } else if (qrText.isNotEmpty) {
+      // Fallback to a generic QR code payment URL pattern
+      deepLinks['banking'] = 'https://qpay.mn/pay?qr=${Uri.encodeComponent(qrText)}';
+    }
+    
+    return deepLinks;
+  }
+
+  /// Get primary deep link for opening in mobile banking app
+  static String? getPrimaryDeepLink(String qrText, String? qpayShortUrl, String? invoiceId) {
+    final deepLinks = generateDeepLinks(qrText, qpayShortUrl, invoiceId);
+    
+    // Priority order: QPay app > Social Pay > Khan Bank > Generic banking
+    if (deepLinks.containsKey('qpay')) {
+      return deepLinks['qpay'];
+    }
+    if (deepLinks.containsKey('socialpay')) {
+      return deepLinks['socialpay'];
+    }
+    if (deepLinks.containsKey('khanbank')) {
+      return deepLinks['khanbank'];
+    }
+    if (deepLinks.containsKey('banking')) {
+      return deepLinks['banking'];
+    }
+    
+    return null;
   }
 
   /// Generate simple QR code info for debugging
