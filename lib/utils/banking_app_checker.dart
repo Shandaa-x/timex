@@ -141,7 +141,8 @@ class BankingAppChecker {
 
     // Test schemes for each bank
     final bankSchemes = {
-      'Khan Bank': ['khanbank://', 'khanbankapp://', 'socialpay://'],
+      'Khan Bank': ['khanbank://', 'khanbankapp://'],
+      'Social Pay': ['socialpay-payment://', 'socialpay://'],
       'State Bank': ['statebank://', 'statebankapp://'],
       'TDB Bank': ['tdbbank://', 'tdb://'],
       'Xac Bank': ['xacbank://', 'xac://'],
@@ -150,6 +151,9 @@ class BankingAppChecker {
       'Chinggis Khaan Bank': ['ckbank://', 'chinggisnbank://'],
       'Capitron Bank': ['capitronbank://', 'capitron://'],
       'Bogd Bank': ['bogdbank://', 'bogd://'],
+      'Arig Bank': ['arigbank://', 'arig://'],
+      'Trans Bank': ['transbank://'],
+      'M Bank': ['mbank://'],
       'Candy Pay': ['candypay://', 'candy://'],
       'QPay Wallet': ['qpay://'],
     };
@@ -161,10 +165,16 @@ class BankingAppChecker {
         String deepLink;
         if (workingScheme.startsWith('qpay://') && invoiceId != null) {
           deepLink = 'qpay://invoice?id=$invoiceId';
+        } else if (workingScheme.startsWith('socialpay-payment://')) {
+          deepLink = 'socialpay-payment://q?qPay_QRcode=$encodedQR';
         } else if (workingScheme.startsWith('socialpay://')) {
           deepLink = 'socialpay://qpay?qr=$encodedQR';
         } else if (workingScheme.startsWith('khanbank://')) {
           deepLink = 'khanbank://q?qPay_QRcode=$encodedQR';
+        } else if (workingScheme.startsWith('tdbbank://')) {
+          deepLink = 'tdbbank://q?qPay_QRcode=$encodedQR';
+        } else if (workingScheme.startsWith('xacbank://')) {
+          deepLink = 'xacbank://q?qPay_QRcode=$encodedQR';
         } else {
           // Generic format for other banks
           deepLink = '${workingScheme}qpay?qr=$encodedQR';

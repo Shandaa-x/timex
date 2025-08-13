@@ -504,14 +504,21 @@ class _QRCodeScreenState extends State<QRCodeScreen> {
         context: context,
         isScrollControlled: true,
         builder: (BuildContext context) {
+          // Debug: Print banking apps count
+          print('🖥️ UI: About to render ${bankingApps.length} banking apps');
+          bankingApps.forEach((key, app) {
+            print('🖥️ UI: Banking app - Key: $key, Name: ${app.name}');
+          });
+          
           return Container(
             padding: const EdgeInsets.all(20),
             constraints: BoxConstraints(
               maxHeight: MediaQuery.of(context).size.height * 0.8,
             ),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
+            child: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
                   'Choose Banking App',
@@ -559,6 +566,8 @@ class _QRCodeScreenState extends State<QRCodeScreen> {
                   SizedBox(height: 8),
                   ...bankingApps.entries.map((entry) {
                     final app = entry.value;
+                    // Debug: Print which apps are being rendered
+                    print('🖥️ UI: Rendering banking app: ${app.name} (key: ${entry.key})');
                     return ListTile(
                       leading: Icon(
                         _getBankIcon(app.name),
@@ -613,6 +622,7 @@ class _QRCodeScreenState extends State<QRCodeScreen> {
                   ),
                 ),
               ],
+            ),
             ),
           );
         },
