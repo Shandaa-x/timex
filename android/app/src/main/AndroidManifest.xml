@@ -95,5 +95,68 @@
             <action android:name="android.intent.action.PROCESS_TEXT" />
             <data android:mimeType="text/plain" />
         </intent>
+        
+        <!-- Banking app queries for deep linking -->
+        <package android:name="mn.khan.bank" />
+        <package android:name="mn.qpay.wallet" />
+        <package android:name="mn.socialpay" />
+        <package android:name="mn.statebank" />
+        <package android:name="mn.tdb.online" />
+        <package android:name="mn.xac.bank" />
+        <package android:name="mn.ub.bank" />
+        <package android:name="mn.most.money" />
+        <package android:name="mn.capitron.bank" />
+        <package android:name="mn.bogd.bank" />
+        <package android:name="mn.candy.pay" />
+        
+        <!-- Query for banking schemes -->
+        <intent>
+            <action android:name="android.intent.action.VIEW" />
+            <data android:scheme="qpay" />
+        </intent>
+        <intent>
+            <action android:name="android.intent.action.VIEW" />
+            <data android:scheme="khanbank" />
+        </intent>
+        <intent>
+            <action android:name="android.intent.action.VIEW" />
+            <data android:scheme="socialpay" />
+        </intent>
+        <intent>
+            <action android:name="android.intent.action.VIEW" />
+            <data android:scheme="statebank" />
+        </intent>
+        <intent>
+            <action android:name="android.intent.action.VIEW" />
+            <data android:scheme="tdbbank" />
+        </intent>
+        <intent>
+            <action android:name="android.intent.action.VIEW" />
+            <data android:scheme="xacbank" />
+        </intent>
+        <intent>
+            <action android:name="android.intent.action.VIEW" />
+            <data android:scheme="most" />
+        </intent>
+        <intent>
+            <action android:name="android.intent.action.VIEW" />
+            <data android:scheme="nibank" />
+        </intent>
+        <intent>
+            <action android:name="android.intent.action.VIEW" />
+            <data android:scheme="ckbank" />
+        </intent>
+        <intent>
+            <action android:name="android.intent.action.VIEW" />
+            <data android:scheme="capitronbank" />
+        </intent>
+        <intent>
+            <action android:name="android.intent.action.VIEW" />
+            <data android:scheme="bogdbank" />
+        </intent>
+        <intent>
+            <action android:name="android.intent.action.VIEW" />
+            <data android:scheme="candypay" />
+        </intent>
     </queries>
 </manifest>

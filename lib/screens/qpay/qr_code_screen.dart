@@ -10,6 +10,7 @@ import '../login/google_login_screen.dart';
 import '../../services/qpay_webhook_service.dart';
 import '../../services/qpay_helper_service.dart';
 import '../../utils/qr_utils.dart';
+import '../../utils/banking_app_checker.dart';
 
 class QRCodeScreen extends StatefulWidget {
   const QRCodeScreen({super.key});
@@ -40,6 +41,20 @@ class _QRCodeScreenState extends State<QRCodeScreen> {
     super.initState();
     print('QRCodeScreen initState called');
     _loadUserBalance();
+    _checkBankingApps(); // Check what banking apps are available
+  }
+
+  /// Check available banking apps for debugging
+  Future<void> _checkBankingApps() async {
+    if (kDebugMode) {
+      try {
+        final report = await BankingAppChecker.getAvailabilityReport();
+        print('📱 Banking Apps Available:');
+        print(report);
+      } catch (error) {
+        print('Error checking banking apps: $error');
+      }
+    }
   }
 
   /// Load user's current food balance
@@ -159,7 +174,14 @@ class _QRCodeScreenState extends State<QRCodeScreen> {
         // Debug: Print the invoice structure to understand the response
         print('🔍 QPay invoice response structure:');
         invoice.forEach((key, value) {
-          print('  $key: ${value.runtimeType} = $value');
+          if (key == 'urls' && value is List) {
+            print('  $key: List with ${value.length} items');
+            for (int i = 0; i < value.length; i++) {
+              print('    [$i]: ${value[i].runtimeType} = ${value[i]}');
+            }
+          } else {
+            print('  $key: ${value.runtimeType} = ${value.toString().length > 100 ? '${value.toString().substring(0, 100)}...' : value}');
+          }
         });
         
         setState(() {
@@ -311,6 +333,30 @@ class _QRCodeScreenState extends State<QRCodeScreen> {
     }
 
     try {
+      // Try using the new method first
+      final primaryBankingApp = QRUtils.getPrimaryBankingApp(qpayResult!);
+      
+      if (primaryBankingApp != null) {
+        print('🚀 Launching primary banking app: ${primaryBankingApp.name}');
+        try {
+          final uri = Uri.parse(primaryBankingApp.deepLink);
+          
+          if (await canLaunchUrl(uri)) {
+            await launchUrl(uri, mode: LaunchMode.externalApplication);
+            _showMessage('Opened ${primaryBankingApp.name}', isError: false);
+            return;
+          } else {
+            print('❌ Cannot launch ${primaryBankingApp.name}, trying fallback...');
+          }
+        } catch (uriError) {
+          print('❌ Error parsing URI for ${primaryBankingApp.name}: $uriError');
+          _showMessage('Invalid link format for ${primaryBankingApp.name}', isError: true);
+        }
+      } else {
+        print('🔍 No primary banking app found from QPay response');
+      }
+
+      // Fallback to legacy method
       final qrText = qpayResult!['qr_text'] ?? '';
       final invoiceId = qpayResult!['invoice_id'];
       
@@ -321,7 +367,16 @@ class _QRCodeScreenState extends State<QRCodeScreen> {
       } else if (qpayResult!['urls'] != null) {
         final urls = qpayResult!['urls'];
         if (urls is List && urls.isNotEmpty) {
-          qpayShortUrl = urls.first.toString();
+          // Look for the first valid URL
+          for (final url in urls) {
+            if (url is Map && url['link'] != null) {
+              final link = url['link'].toString();
+              if (link.startsWith('http')) {
+                qpayShortUrl = link;
+                break;
+              }
+            }
+          }
         } else if (urls is Map) {
           // If urls is a map, try to get the first value
           final values = urls.values;
@@ -334,23 +389,33 @@ class _QRCodeScreenState extends State<QRCodeScreen> {
       final deepLink = QRUtils.getPrimaryDeepLink(qrText, qpayShortUrl, invoiceId);
 
       if (deepLink != null) {
-        final uri = Uri.parse(deepLink);
-        if (await canLaunchUrl(uri)) {
-          await launchUrl(uri, mode: LaunchMode.externalApplication);
-          _showMessage('Opened in banking app', isError: false);
-        } else {
-          // Fallback to web URL if available
-          if (qpayShortUrl != null) {
-            final webUri = Uri.parse(qpayShortUrl);
-            if (await canLaunchUrl(webUri)) {
-              await launchUrl(webUri, mode: LaunchMode.externalApplication);
-              _showMessage('Opened in browser', isError: false);
+        try {
+          final uri = Uri.parse(deepLink);
+          if (await canLaunchUrl(uri)) {
+            await launchUrl(uri, mode: LaunchMode.externalApplication);
+            _showMessage('Opened in banking app', isError: false);
+          } else {
+            // Fallback to web URL if available
+            if (qpayShortUrl != null && qpayShortUrl.startsWith('http')) {
+              try {
+                final webUri = Uri.parse(qpayShortUrl);
+                if (await canLaunchUrl(webUri)) {
+                  await launchUrl(webUri, mode: LaunchMode.externalApplication);
+                  _showMessage('Opened in browser', isError: false);
+                } else {
+                  _showMessage('No compatible banking app found', isError: true);
+                }
+              } catch (webUriError) {
+                print('❌ Error parsing web URI: $webUriError');
+                _showMessage('Invalid web URL format', isError: true);
+              }
             } else {
               _showMessage('No compatible banking app found', isError: true);
             }
-          } else {
-            _showMessage('No compatible banking app found', isError: true);
           }
+        } catch (deepLinkError) {
+          print('❌ Error parsing deep link URI: $deepLinkError');
+          _showMessage('Invalid deep link format', isError: true);
         }
       } else {
         // If no deep link is available, show banking app options instead
@@ -367,27 +432,42 @@ class _QRCodeScreenState extends State<QRCodeScreen> {
   void _showBankingAppOptions() {
     if (qpayResult == null) return;
 
-    final qrText = qpayResult!['qr_text'] ?? '';
-    final invoiceId = qpayResult!['invoice_id'];
+    // Use the new banking app extraction method
+    final bankingApps = QRUtils.extractBankingApps(qpayResult!);
     
-    // Extract QPay short URL from different possible fields
-    String? qpayShortUrl;
-    if (qpayResult!['qpay_shortUrl'] != null) {
-      qpayShortUrl = qpayResult!['qpay_shortUrl'].toString();
-    } else if (qpayResult!['urls'] != null) {
-      final urls = qpayResult!['urls'];
-      if (urls is List && urls.isNotEmpty) {
-        qpayShortUrl = urls.first.toString();
-      } else if (urls is Map) {
-        // If urls is a map, try to get the first value
-        final values = urls.values;
-        if (values.isNotEmpty) {
-          qpayShortUrl = values.first.toString();
+    // Fallback to legacy method if new method returns empty
+    Map<String, String> legacyDeepLinks = {};
+    if (bankingApps.isEmpty) {
+      final qrText = qpayResult!['qr_text'] ?? '';
+      final invoiceId = qpayResult!['invoice_id'];
+      
+      // Extract QPay short URL from different possible fields
+      String? qpayShortUrl;
+      if (qpayResult!['qpay_shortUrl'] != null) {
+        qpayShortUrl = qpayResult!['qpay_shortUrl'].toString();
+      } else if (qpayResult!['urls'] != null) {
+        final urls = qpayResult!['urls'];
+        if (urls is List && urls.isNotEmpty) {
+          // Look for the first valid URL
+          for (final url in urls) {
+            if (url is Map && url['link'] != null) {
+              final link = url['link'].toString();
+              if (link.startsWith('http')) {
+                qpayShortUrl = link;
+                break;
+              }
+            }
+          }
+        } else if (urls is Map) {
+          final values = urls.values;
+          if (values.isNotEmpty) {
+            qpayShortUrl = values.first.toString();
+          }
         }
       }
+      
+      legacyDeepLinks = QRUtils.generateDeepLinks(qrText, qpayShortUrl, invoiceId);
     }
-
-    final deepLinks = QRUtils.generateDeepLinks(qrText, qpayShortUrl, invoiceId);
 
     showModalBottomSheet(
       context: context,
@@ -406,7 +486,55 @@ class _QRCodeScreenState extends State<QRCodeScreen> {
                 ),
               ),
               SizedBox(height: 16),
-              ...deepLinks.entries.map((entry) {
+              // New banking apps from QPay
+              ...bankingApps.entries.map((entry) {
+                final app = entry.value;
+                IconData icon;
+                
+                switch (entry.key) {
+                  case 'qpay':
+                    icon = Icons.payment;
+                    break;
+                  case 'khanbank':
+                  case 'khan':
+                    icon = Icons.account_balance;
+                    break;
+                  case 'statebank':
+                  case 'state':
+                    icon = Icons.account_balance_wallet;
+                    break;
+                  case 'tdb':
+                  case 'tradeanddevelopmentbank':
+                    icon = Icons.business;
+                    break;
+                  default:
+                    icon = Icons.open_in_new;
+                }
+
+                return ListTile(
+                  leading: Icon(icon, color: Colors.blue),
+                  title: Text(app.name),
+                  subtitle: Text(app.description.isNotEmpty ? app.description : 'Mobile banking app'),
+                  onTap: () async {
+                    Navigator.pop(context);
+                    try {
+                      final uri = Uri.parse(app.deepLink);
+                      if (await canLaunchUrl(uri)) {
+                        await launchUrl(uri, mode: LaunchMode.externalApplication);
+                        _showMessage('Opened ${app.name}', isError: false);
+                      } else {
+                        _showMessage('${app.name} not installed', isError: true);
+                      }
+                    } catch (uriError) {
+                      print('Error launching ${app.name}: $uriError');
+                      _showMessage('Invalid link format for ${app.name}', isError: true);
+                    }
+                  },
+                );
+              }).toList(),
+              
+              // Legacy deep links as fallback
+              ...legacyDeepLinks.entries.map((entry) {
                 String appName;
                 IconData icon;
                 
@@ -442,12 +570,14 @@ class _QRCodeScreenState extends State<QRCodeScreen> {
                       } else {
                         _showMessage('$appName not installed', isError: true);
                       }
-                    } catch (error) {
-                      _showMessage('Failed to open $appName', isError: true);
+                    } catch (uriError) {
+                      print('Error launching $appName: $uriError');
+                      _showMessage('Invalid link format for $appName', isError: true);
                     }
                   },
                 );
               }).toList(),
+              
               SizedBox(height: 16),
               TextButton(
                 onPressed: () => Navigator.pop(context),
