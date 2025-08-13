@@ -541,22 +541,38 @@ class _QRCodeScreenState extends State<QRCodeScreen> {
                     Navigator.pop(context);
                     try {
                       final uri = Uri.parse(app.deepLink);
-                      if (await canLaunchUrl(uri)) {
+                      
+                      // Enhanced check for iOS
+                      bool canLaunch = await canLaunchUrl(uri);
+                      
+                      // If the specific link fails, try just the scheme
+                      if (!canLaunch && uri.scheme.isNotEmpty) {
+                        final schemeUri = Uri.parse('${uri.scheme}://');
+                        canLaunch = await canLaunchUrl(schemeUri);
+                      }
+                      
+                      if (canLaunch) {
                         await launchUrl(
                           uri,
                           mode: LaunchMode.externalApplication,
                         );
                         _showMessage('Opened ${app.name}', isError: false);
                       } else {
+                        // Check if this is an iOS issue with URL schemes
                         _showMessage(
-                          '${app.name} not installed',
+                          '${app.name} not found. Please check if the app is installed and try again. Deep link: ${uri.scheme}://',
                           isError: true,
                         );
+                        
+                        // Debug info
+                        print('🔍 Deep link failed: ${app.deepLink}');
+                        print('🔍 Scheme: ${uri.scheme}');
+                        print('🔍 Full URI: $uri');
                       }
                     } catch (uriError) {
                       print('Error launching ${app.name}: $uriError');
                       _showMessage(
-                        'Invalid link format for ${app.name}',
+                        'Invalid link format for ${app.name}: $uriError',
                         isError: true,
                       );
                     }
@@ -597,19 +613,37 @@ class _QRCodeScreenState extends State<QRCodeScreen> {
                     Navigator.pop(context);
                     try {
                       final uri = Uri.parse(entry.value);
-                      if (await canLaunchUrl(uri)) {
+                      
+                      // Enhanced check for iOS
+                      bool canLaunch = await canLaunchUrl(uri);
+                      
+                      // If the specific link fails, try just the scheme
+                      if (!canLaunch && uri.scheme.isNotEmpty) {
+                        final schemeUri = Uri.parse('${uri.scheme}://');
+                        canLaunch = await canLaunchUrl(schemeUri);
+                      }
+                      
+                      if (canLaunch) {
                         await launchUrl(
                           uri,
                           mode: LaunchMode.externalApplication,
                         );
                         _showMessage('Opened in $appName', isError: false);
                       } else {
-                        _showMessage('$appName not installed', isError: true);
+                        _showMessage(
+                          '$appName not found. Please check if the app is installed. Scheme: ${uri.scheme}://',
+                          isError: true,
+                        );
+                        
+                        // Debug info
+                        print('🔍 Legacy deep link failed: ${entry.value}');
+                        print('🔍 App: $appName');
+                        print('🔍 Scheme: ${uri.scheme}');
                       }
                     } catch (uriError) {
                       print('Error launching $appName: $uriError');
                       _showMessage(
-                        'Invalid link format for $appName',
+                        'Invalid link format for $appName: $uriError',
                         isError: true,
                       );
                     }

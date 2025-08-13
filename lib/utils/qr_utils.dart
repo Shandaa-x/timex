@@ -243,10 +243,11 @@ class QRUtils {
       deepLinks['qpay'] = 'qpay://invoice?id=$invoiceId';
     }
 
-    // Social Pay deep link (Khan Bank) - use proper format
+    // Social Pay deep link (Khan Bank) - use the correct payment scheme
     if (qrText.isNotEmpty) {
+      // Use the actual scheme that Social Pay app expects
       deepLinks['socialpay'] =
-          'socialpay://qpay?qr=${Uri.encodeComponent(qrText)}';
+          'socialpay-payment://q?qPay_QRcode=${Uri.encodeComponent(qrText)}';
     }
 
     // Khan Bank app deep link - use QR code format from QPay docs
