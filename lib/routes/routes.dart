@@ -8,6 +8,7 @@ class Routes {
   static const main = 'MainScreen';
   static const location = 'LocationScreen';
   static const loginScreen = 'LoginScreen';
+  static const googleLogin = 'GoogleLoginScreen';
   static const timeTrack = 'TimeTracking';
   static const addEmployee = 'AddEmployeeScreen';
   static const authWrapper = 'AuthWrapper';
