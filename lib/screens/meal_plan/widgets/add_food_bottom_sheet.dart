@@ -9,7 +9,11 @@ class AddFoodBottomSheet extends StatefulWidget {
   final Function(Map<String, dynamic> food) onFoodAdded;
   final String selectedDate; // Format: YYYY-MM-DD
 
-  const AddFoodBottomSheet({super.key, required this.onFoodAdded, required this.selectedDate});
+  const AddFoodBottomSheet({
+    super.key,
+    required this.onFoodAdded,
+    required this.selectedDate,
+  });
 
   @override
   State<AddFoodBottomSheet> createState() => _AddFoodBottomSheetState();
@@ -36,7 +40,10 @@ class _AddFoodBottomSheetState extends State<AddFoodBottomSheet> {
 
   Future<void> _pickImage() async {
     try {
-      final XFile? image = await _picker.pickImage(source: ImageSource.gallery, imageQuality: 70);
+      final XFile? image = await _picker.pickImage(
+        source: ImageSource.gallery,
+        imageQuality: 70,
+      );
 
       if (image != null) {
         final File imageFile = File(image.path);
@@ -50,7 +57,10 @@ class _AddFoodBottomSheetState extends State<AddFoodBottomSheet> {
       }
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error picking image: $e'), backgroundColor: Colors.red),
+        SnackBar(
+          content: Text('Error picking image: $e'),
+          backgroundColor: Colors.red,
+        ),
       );
     }
   }
@@ -85,16 +95,20 @@ class _AddFoodBottomSheetState extends State<AddFoodBottomSheet> {
     });
 
     try {
-      // Create document ID in format: YYYY-MM-DD-foods
-      final documentId =
-          '${selectedDateTime.year}-${selectedDateTime.month.toString().padLeft(2, '0')}-${selectedDateTime.day.toString().padLeft(2, '0')}-foods';
+      // Generate unique document ID for each food item
+      final foodId = DateTime.now().millisecondsSinceEpoch.toString();
+      final dateString = '${selectedDateTime.year}-${selectedDateTime.month.toString().padLeft(2, '0')}-${selectedDateTime.day.toString().padLeft(2, '0')}';
 
       final foodData = {
-        'id': DateTime.now().millisecondsSinceEpoch.toString(), // Unique ID for each food
+        'id': foodId,
         'name': _nameController.text.trim(),
         'description': _descriptionController.text.trim(),
         'price': int.parse(_priceController.text.trim()),
         'image': _imageBase64 ?? '',
+        'date': dateString,
+        'day': selectedDateTime.day,
+        'month': selectedDateTime.month,
+        'year': selectedDateTime.year,
         'createdAt': DateTime.now().millisecondsSinceEpoch,
         'likes': <String>[], // Array of user IDs who liked this food
         'likesCount': 0,
@@ -102,28 +116,12 @@ class _AddFoodBottomSheetState extends State<AddFoodBottomSheet> {
         'commentsCount': 0,
       };
 
-      final docRef = FirebaseFirestore.instance.collection('foods').doc(documentId);
+      // Store each food as a separate document
+      final docRef = FirebaseFirestore.instance
+          .collection('foods')
+          .doc(foodId);
 
-      // Check if document exists
-      final docSnapshot = await docRef.get();
-
-      if (docSnapshot.exists) {
-        // Document exists, add food to the foods array
-        await docRef.update({
-          'foods': FieldValue.arrayUnion([foodData]),
-          'lastUpdated': FieldValue.serverTimestamp(),
-        });
-      } else {
-        // Document doesn't exist, create it with basic info and foods array
-        await docRef.set({
-          'day': selectedDateTime.day,
-          'month': selectedDateTime.month,
-          'year': selectedDateTime.year,
-          'foods': [foodData],
-          'createdAt': FieldValue.serverTimestamp(),
-          'lastUpdated': FieldValue.serverTimestamp(),
-        });
-      }
+      await docRef.set(foodData);
 
       // Call the callback function with the food data
       widget.onFoodAdded(foodData);
@@ -131,13 +129,19 @@ class _AddFoodBottomSheetState extends State<AddFoodBottomSheet> {
       Navigator.pop(context);
 
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Food added successfully!'), backgroundColor: AppTheme.successLight),
+        const SnackBar(
+          content: Text('Food added successfully!'),
+          backgroundColor: AppTheme.successLight,
+        ),
       );
     } catch (e, stackTrace) {
       print('Error adding food: $e');
       print('Stack trace: $stackTrace');
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error adding food: $e'), backgroundColor: Colors.red)
+        SnackBar(
+          content: Text('Error adding food: $e'),
+          backgroundColor: Colors.red,
+        ),
       );
     } finally {
       setState(() {
@@ -202,7 +206,11 @@ class _AddFoodBottomSheetState extends State<AddFoodBottomSheet> {
                       color: colorScheme.outline.withOpacity(0.1),
                       shape: BoxShape.circle,
                     ),
-                    child: Icon(Icons.close, color: colorScheme.onSurface, size: 20),
+                    child: Icon(
+                      Icons.close,
+                      color: colorScheme.onSurface,
+                      size: 20,
+                    ),
                   ),
                 ),
               ],
@@ -227,17 +235,27 @@ class _AddFoodBottomSheetState extends State<AddFoodBottomSheet> {
                         decoration: BoxDecoration(
                           color: colorScheme.outline.withOpacity(0.1),
                           borderRadius: BorderRadius.circular(12),
-                          border: Border.all(color: colorScheme.outline.withOpacity(0.3), width: 2),
+                          border: Border.all(
+                            color: colorScheme.outline.withOpacity(0.3),
+                            width: 2,
+                          ),
                         ),
                         child: _imageFile != null
                             ? ClipRRect(
                                 borderRadius: BorderRadius.circular(12),
-                                child: Image.file(_imageFile!, fit: BoxFit.cover),
+                                child: Image.file(
+                                  _imageFile!,
+                                  fit: BoxFit.cover,
+                                ),
                               )
                             : Column(
                                 mainAxisAlignment: MainAxisAlignment.center,
                                 children: [
-                                  Icon(Icons.add_a_photo, size: 48, color: AppTheme.primaryLight),
+                                  Icon(
+                                    Icons.add_a_photo,
+                                    size: 48,
+                                    color: AppTheme.primaryLight,
+                                  ),
                                   const SizedBox(height: 8),
                                   Text(
                                     'Add Photo',
@@ -250,7 +268,9 @@ class _AddFoodBottomSheetState extends State<AddFoodBottomSheet> {
                                   Text(
                                     'Tap to select image',
                                     style: theme.textTheme.bodySmall?.copyWith(
-                                      color: colorScheme.onSurface.withOpacity(0.6),
+                                      color: colorScheme.onSurface.withOpacity(
+                                        0.6,
+                                      ),
                                     ),
                                   ),
                                 ],
@@ -277,11 +297,15 @@ class _AddFoodBottomSheetState extends State<AddFoodBottomSheet> {
                         fillColor: colorScheme.surface,
                         border: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(12),
-                          borderSide: BorderSide(color: colorScheme.outline.withOpacity(0.3)),
+                          borderSide: BorderSide(
+                            color: colorScheme.outline.withOpacity(0.3),
+                          ),
                         ),
                         enabledBorder: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(12),
-                          borderSide: BorderSide(color: colorScheme.outline.withOpacity(0.3)),
+                          borderSide: BorderSide(
+                            color: colorScheme.outline.withOpacity(0.3),
+                          ),
                         ),
                         focusedBorder: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(12),
@@ -316,11 +340,15 @@ class _AddFoodBottomSheetState extends State<AddFoodBottomSheet> {
                         fillColor: colorScheme.surface,
                         border: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(12),
-                          borderSide: BorderSide(color: colorScheme.outline.withOpacity(0.3)),
+                          borderSide: BorderSide(
+                            color: colorScheme.outline.withOpacity(0.3),
+                          ),
                         ),
                         enabledBorder: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(12),
-                          borderSide: BorderSide(color: colorScheme.outline.withOpacity(0.3)),
+                          borderSide: BorderSide(
+                            color: colorScheme.outline.withOpacity(0.3),
+                          ),
                         ),
                         focusedBorder: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(12),
@@ -350,11 +378,15 @@ class _AddFoodBottomSheetState extends State<AddFoodBottomSheet> {
                         fillColor: colorScheme.surface,
                         border: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(12),
-                          borderSide: BorderSide(color: colorScheme.outline.withOpacity(0.3)),
+                          borderSide: BorderSide(
+                            color: colorScheme.outline.withOpacity(0.3),
+                          ),
                         ),
                         enabledBorder: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(12),
-                          borderSide: BorderSide(color: colorScheme.outline.withOpacity(0.3)),
+                          borderSide: BorderSide(
+                            color: colorScheme.outline.withOpacity(0.3),
+                          ),
                         ),
                         focusedBorder: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(12),
@@ -383,7 +415,9 @@ class _AddFoodBottomSheetState extends State<AddFoodBottomSheet> {
                           backgroundColor: AppTheme.primaryLight,
                           foregroundColor: AppTheme.onPrimaryLight,
                           padding: const EdgeInsets.symmetric(vertical: 16),
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
                           elevation: 0,
                         ),
                         child: _isLoading
@@ -430,13 +464,23 @@ class _AddFoodBottomSheetState extends State<AddFoodBottomSheet> {
       'November',
       'December',
     ];
-    const weekdays = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+    const weekdays = [
+      'Monday',
+      'Tuesday',
+      'Wednesday',
+      'Thursday',
+      'Friday',
+      'Saturday',
+      'Sunday',
+    ];
 
     final today = DateTime.now();
     final tomorrow = today.add(const Duration(days: 1));
     final yesterday = today.subtract(const Duration(days: 1));
 
-    if (date.year == today.year && date.month == today.month && date.day == today.day) {
+    if (date.year == today.year &&
+        date.month == today.month &&
+        date.day == today.day) {
       return 'Today';
     } else if (date.year == tomorrow.year &&
         date.month == tomorrow.month &&

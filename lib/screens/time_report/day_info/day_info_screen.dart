@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'dart:convert';
 
@@ -20,6 +21,7 @@ class DayInfoScreen extends StatefulWidget {
 }
 
 class _DayInfoScreenState extends State<DayInfoScreen> {
+  String get _userId => FirebaseAuth.instance.currentUser?.uid ?? '';
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   List<Map<String, dynamic>> _timeEntries = [];
   bool _isLoading = true;
@@ -33,6 +35,8 @@ class _DayInfoScreenState extends State<DayInfoScreen> {
   Future<void> _loadTimeEntries() async {
     try {
       final entriesSnapshot = await _firestore
+          .collection('users')
+          .doc(_userId)
           .collection('calendarDays')
           .doc(widget.dateString)
           .collection('timeEntries')

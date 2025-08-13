@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import '../../../services/money_format.dart';
 
 class FoodEatenStatusWidget extends StatefulWidget {
@@ -25,6 +26,10 @@ class _FoodEatenStatusWidgetState extends State<FoodEatenStatusWidget> {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   bool _isUpdating = false;
 
+  // Helper to get current user ID
+  String get _userId =>
+      FirebaseAuth.instance.currentUser?.uid ?? 'unknown_user';
+
   Future<void> _showEatenConfirmationDialog() async {
     final confirmed = await showDialog<bool>(
       context: context,
@@ -42,10 +47,7 @@ class _FoodEatenStatusWidgetState extends State<FoodEatenStatusWidget> {
           actions: [
             TextButton(
               onPressed: () => Navigator.of(context).pop(false),
-              child: const Text(
-                'Цуцлах',
-                style: TextStyle(color: Colors.grey),
-              ),
+              child: const Text('Цуцлах', style: TextStyle(color: Colors.grey)),
             ),
             ElevatedButton(
               onPressed: () => Navigator.of(context).pop(true),
@@ -73,7 +75,11 @@ class _FoodEatenStatusWidgetState extends State<FoodEatenStatusWidget> {
 
     try {
       // Check if calendarDays document exists
-      final docRef = _firestore.collection('calendarDays').doc(widget.dateString);
+      final docRef = _firestore
+          .collection('users')
+          .doc(_userId)
+          .collection('calendarDays')
+          .doc(widget.dateString);
       final docSnap = await docRef.get();
       if (!docSnap.exists) {
         if (mounted) {
@@ -82,7 +88,9 @@ class _FoodEatenStatusWidgetState extends State<FoodEatenStatusWidget> {
               content: Text('Та ажлын ирцээ бүртгүүлээгүй байна'),
               backgroundColor: Colors.orange,
               behavior: SnackBarBehavior.floating,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.all(Radius.circular(12))),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.all(Radius.circular(12)),
+              ),
             ),
           );
         }
@@ -96,19 +104,56 @@ class _FoodEatenStatusWidgetState extends State<FoodEatenStatusWidget> {
         'updatedAt': FieldValue.serverTimestamp(),
       });
 
+      // If marking as eaten, save to eatens subcollection
+      if (eaten && widget.todayFoods.isNotEmpty) {
+        final now = DateTime.now();
+        final eatenData = {
+          'date': widget.dateString,
+          'totalPrice': _totalFoodPrice,
+          'foodCount': widget.todayFoods.length,
+          'foods': widget.todayFoods
+              .map(
+                (food) => {
+                  'name': food['name'] ?? 'Unknown Food',
+                  'price': food['price'] ?? 0,
+                  'description': food['description'] ?? '',
+                  'category': food['category'] ?? '',
+                  'image': food['image'] ?? '',
+                  'timestamp': food['timestamp'],
+                },
+              )
+              .toList(),
+          'eatenAt': Timestamp.fromDate(now),
+          'createdAt': FieldValue.serverTimestamp(),
+        };
+
+        // Save to eatens subcollection
+        await _firestore
+            .collection('users')
+            .doc(_userId)
+            .collection('eatens')
+            .doc(widget.dateString)
+            .set(eatenData);
+
+        // Note: Real-time service will automatically update totalFoodAmount
+        // when the eatens collection changes via RealtimeFoodTotalService
+      }
+
       widget.onStatusChanged();
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(
-              eaten 
-                ? 'Хоол идсэн гэж тэмдэглэлээ ✅' 
-                : 'Хоол идээгүй гэж тэмдэглэлээ',
+              eaten
+                  ? 'Хоол идсэн гэж тэмдэглэлээ ✅${eaten ? ' (${MoneyFormatService.formatWithSymbol(_totalFoodPrice)} хадгалагдлаа)' : ''}'
+                  : 'Хоол идээгүй гэж тэмдэглэлээ',
             ),
             backgroundColor: eaten ? Colors.green : Colors.blue,
             behavior: SnackBarBehavior.floating,
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+            ),
           ),
         );
       }
@@ -119,7 +164,9 @@ class _FoodEatenStatusWidgetState extends State<FoodEatenStatusWidget> {
             content: Text('Алдаа гарлаа: $e'),
             backgroundColor: Colors.red,
             behavior: SnackBarBehavior.floating,
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+            ),
           ),
         );
       }
@@ -132,7 +179,7 @@ class _FoodEatenStatusWidgetState extends State<FoodEatenStatusWidget> {
 
   int get _totalFoodPrice {
     return widget.todayFoods.fold<int>(
-      0, 
+      0,
       (total, food) => total + (food['price'] as int? ?? 0),
     );
   }
@@ -154,10 +201,7 @@ class _FoodEatenStatusWidgetState extends State<FoodEatenStatusWidget> {
             SizedBox(width: 12),
             Text(
               'Өнөөдөр хоол бүртгэгдээгүй байна',
-              style: TextStyle(
-                fontSize: 16,
-                color: Colors.grey,
-              ),
+              style: TextStyle(fontSize: 16, color: Colors.grey),
             ),
           ],
         ),
@@ -202,20 +246,24 @@ class _FoodEatenStatusWidgetState extends State<FoodEatenStatusWidget> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        widget.eatenForDay 
-                          ? 'Өнөөдөр хоол идсэн ✅'
-                          : 'Өнөөдөр хоол идээгүй',
+                        widget.eatenForDay
+                            ? 'Өнөөдөр хоол идсэн ✅'
+                            : 'Өнөөдөр хоол идээгүй',
                         style: TextStyle(
                           fontSize: 16,
                           fontWeight: FontWeight.w600,
-                          color: widget.eatenForDay ? Colors.green[700] : Colors.grey[700],
+                          color: widget.eatenForDay
+                              ? Colors.green[700]
+                              : Colors.grey[700],
                         ),
                       ),
                       Text(
                         '${widget.todayFoods.length} хоол • ${MoneyFormatService.formatWithSymbol(_totalFoodPrice)}',
                         style: TextStyle(
                           fontSize: 14,
-                          color: widget.eatenForDay ? Colors.green[600] : Colors.grey[600],
+                          color: widget.eatenForDay
+                              ? Colors.green[600]
+                              : Colors.grey[600],
                         ),
                       ),
                     ],
@@ -231,59 +279,61 @@ class _FoodEatenStatusWidgetState extends State<FoodEatenStatusWidget> {
           // Action buttons
           Padding(
             padding: const EdgeInsets.all(20),
-            child: widget.eatenForDay 
-              ? // Show confirmation message when already eaten
-                Container(
-                  padding: const EdgeInsets.all(16),
-                  decoration: BoxDecoration(
-                    color: Colors.green[50],
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: Colors.green[200]!),
-                  ),
-                  child: Row(
+            child: widget.eatenForDay
+                ? // Show confirmation message when already eaten
+                  Container(
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: Colors.green[50],
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: Colors.green[200]!),
+                    ),
+                    child: Row(
+                      children: [
+                        Icon(Icons.check_circle, color: Colors.green[700]),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Text(
+                            'Хоол идсэн гэж баталгаажуулсан ✅\nБуцааж өөрчлөх боломжгүй',
+                            style: TextStyle(
+                              color: Colors.green[700],
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  )
+                : // Show buttons when not eaten yet
+                  Row(
                     children: [
-                      Icon(Icons.check_circle, color: Colors.green[700]),
-                      const SizedBox(width: 12),
                       Expanded(
-                        child: Text(
-                          'Хоол идсэн гэж баталгаажуулсан ✅\nБуцааж өөрчлөх боломжгүй',
-                          style: TextStyle(
-                            color: Colors.green[700],
-                            fontWeight: FontWeight.w500,
+                        child: ElevatedButton.icon(
+                          onPressed: _isUpdating
+                              ? null
+                              : _showEatenConfirmationDialog,
+                          icon: _isUpdating
+                              ? const SizedBox(
+                                  width: 16,
+                                  height: 16,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                  ),
+                                )
+                              : const Icon(Icons.check_circle),
+                          label: const Text('Идсэн'),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.green,
+                            foregroundColor: Colors.white,
+                            padding: const EdgeInsets.symmetric(vertical: 12),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
                           ),
                         ),
                       ),
                     ],
                   ),
-                )
-              : // Show buttons when not eaten yet
-                Row(
-                  children: [
-                    Expanded(
-                      child: ElevatedButton.icon(
-                        onPressed: _isUpdating 
-                          ? null 
-                          : _showEatenConfirmationDialog,
-                        icon: _isUpdating
-                          ? const SizedBox(
-                              width: 16,
-                              height: 16,
-                              child: CircularProgressIndicator(strokeWidth: 2),
-                            )
-                          : const Icon(Icons.check_circle),
-                        label: const Text('Идсэн'),
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: Colors.green,
-                          foregroundColor: Colors.white,
-                          padding: const EdgeInsets.symmetric(vertical: 12),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
           ),
         ],
       ),
@@ -324,7 +374,7 @@ class _FoodEatenStatusWidgetState extends State<FoodEatenStatusWidget> {
                   ],
                 ),
                 const SizedBox(height: 15),
-                
+
                 // Food image (larger)
                 Center(
                   child: Container(
@@ -348,72 +398,104 @@ class _FoodEatenStatusWidgetState extends State<FoodEatenStatusWidget> {
                               base64Decode(food['image']),
                               fit: BoxFit.cover,
                               errorBuilder: (context, error, stackTrace) {
-                                return const Icon(Icons.fastfood, size: 48, color: Colors.grey);
+                                return const Icon(
+                                  Icons.fastfood,
+                                  size: 48,
+                                  color: Colors.grey,
+                                );
                               },
                             ),
                           )
-                        : const Icon(Icons.fastfood, size: 48, color: Colors.grey),
+                        : const Icon(
+                            Icons.fastfood,
+                            size: 48,
+                            color: Colors.grey,
+                          ),
                   ),
                 ),
                 const SizedBox(height: 24),
-                
+
                 // Food details
-                _buildDetailRow('Нэр', food['name'] ?? 'Unknown Food', Icons.restaurant),
+                _buildDetailRow(
+                  'Нэр',
+                  food['name'] ?? 'Unknown Food',
+                  Icons.restaurant,
+                ),
                 const SizedBox(height: 16),
-                
-                if (food['description'] != null && food['description'].isNotEmpty) ...[
-                  _buildDetailRow('Тайлбар', food['description'], Icons.description),
+
+                if (food['description'] != null &&
+                    food['description'].isNotEmpty) ...[
+                  _buildDetailRow(
+                    'Тайлбар',
+                    food['description'],
+                    Icons.description,
+                  ),
                   const SizedBox(height: 16),
                 ],
-                
-                _buildDetailRow('Үнэ', MoneyFormatService.formatWithSymbol(food['price'] ?? 0), Icons.monetization_on),
+
+                _buildDetailRow(
+                  'Үнэ',
+                  MoneyFormatService.formatWithSymbol(food['price'] ?? 0),
+                  Icons.monetization_on,
+                ),
                 const SizedBox(height: 16),
-                
-                if (food['category'] != null && food['category'].isNotEmpty) ...[
+
+                if (food['category'] != null &&
+                    food['category'].isNotEmpty) ...[
                   _buildDetailRow('Ангилал', food['category'], Icons.category),
                   const SizedBox(height: 16),
                 ],
-                
+
                 if (food['timestamp'] != null) ...[
                   _buildDetailRow(
-                    'Бүртгэсэн цаг', 
-                    _formatTimestamp(food['timestamp']), 
+                    'Бүртгэсэн цаг',
+                    _formatTimestamp(food['timestamp']),
                     Icons.access_time,
                   ),
                   const SizedBox(height: 16),
                 ],
-                
+
                 // Status indicator
                 Container(
                   padding: const EdgeInsets.all(12),
                   decoration: BoxDecoration(
-                    color: widget.eatenForDay ? Colors.green[50] : Colors.orange[50],
+                    color: widget.eatenForDay
+                        ? Colors.green[50]
+                        : Colors.orange[50],
                     borderRadius: BorderRadius.circular(12),
                     border: Border.all(
-                      color: widget.eatenForDay ? Colors.green[200]! : Colors.orange[200]!
+                      color: widget.eatenForDay
+                          ? Colors.green[200]!
+                          : Colors.orange[200]!,
                     ),
                   ),
                   child: Row(
                     children: [
                       Icon(
-                        widget.eatenForDay ? Icons.check_circle : Icons.schedule,
-                        color: widget.eatenForDay ? Colors.green[700] : Colors.orange[700],
+                        widget.eatenForDay
+                            ? Icons.check_circle
+                            : Icons.schedule,
+                        color: widget.eatenForDay
+                            ? Colors.green[700]
+                            : Colors.orange[700],
                         size: 20,
                       ),
                       const SizedBox(width: 8),
                       Text(
                         widget.eatenForDay ? 'Идсэн хоол' : 'Идээгүй хоол',
                         style: TextStyle(
-                          color: widget.eatenForDay ? Colors.green[700] : Colors.orange[700],
+                          color: widget.eatenForDay
+                              ? Colors.green[700]
+                              : Colors.orange[700],
                           fontWeight: FontWeight.w500,
                         ),
                       ),
                     ],
                   ),
                 ),
-                
+
                 const SizedBox(height: 24),
-                
+
                 // Close button
                 SizedBox(
                   width: double.infinity,
@@ -486,7 +568,7 @@ class _FoodEatenStatusWidgetState extends State<FoodEatenStatusWidget> {
       } else {
         return 'Unknown';
       }
-      
+
       return '${dateTime.hour.toString().padLeft(2, '0')}:${dateTime.minute.toString().padLeft(2, '0')}';
     } catch (e) {
       return 'Unknown';
@@ -499,9 +581,7 @@ class _FoodEatenStatusWidgetState extends State<FoodEatenStatusWidget> {
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
         decoration: BoxDecoration(
-          border: Border(
-            bottom: BorderSide(color: Colors.grey[200]!),
-          ),
+          border: Border(bottom: BorderSide(color: Colors.grey[200]!)),
         ),
         child: Row(
           children: [
@@ -527,7 +607,7 @@ class _FoodEatenStatusWidgetState extends State<FoodEatenStatusWidget> {
                   : const Icon(Icons.fastfood, color: Colors.grey),
             ),
             const SizedBox(width: 12),
-            
+
             // Food details
             Expanded(
               child: Column(
@@ -540,20 +620,18 @@ class _FoodEatenStatusWidgetState extends State<FoodEatenStatusWidget> {
                       fontWeight: FontWeight.w500,
                     ),
                   ),
-                  if (food['description'] != null && food['description'].isNotEmpty)
+                  if (food['description'] != null &&
+                      food['description'].isNotEmpty)
                     Text(
                       food['description'],
-                      style: TextStyle(
-                        fontSize: 14,
-                        color: Colors.grey[600],
-                      ),
+                      style: TextStyle(fontSize: 14, color: Colors.grey[600]),
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                     ),
                 ],
               ),
             ),
-            
+
             // Price and tap indicator
             Row(
               mainAxisSize: MainAxisSize.min,
@@ -563,15 +641,13 @@ class _FoodEatenStatusWidgetState extends State<FoodEatenStatusWidget> {
                   style: TextStyle(
                     fontSize: 16,
                     fontWeight: FontWeight.w600,
-                    color: widget.eatenForDay ? Colors.green[700] : Colors.grey[600],
+                    color: widget.eatenForDay
+                        ? Colors.green[700]
+                        : Colors.grey[600],
                   ),
                 ),
                 const SizedBox(width: 8),
-                Icon(
-                  Icons.info_outline,
-                  size: 16,
-                  color: Colors.grey[400],
-                ),
+                Icon(Icons.info_outline, size: 16, color: Colors.grey[400]),
               ],
             ),
           ],

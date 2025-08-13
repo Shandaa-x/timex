@@ -51,11 +51,14 @@ class DataService {
 
   // Load monthly data
   static Future<Map<String, dynamic>> loadMonthlyData(
+    String userId,
     int selectedMonth,
     int selectedYear,
   ) async {
     try {
       final querySnapshot = await _firestore
+          .collection('users')
+          .doc(userId)
           .collection('calendarDays')
           .where('month', isEqualTo: selectedMonth)
           .where('year', isEqualTo: selectedYear)
@@ -77,6 +80,8 @@ class DataService {
 
         // Check if there are time entries for this day to determine if work was actually done
         final timeEntriesSnapshot = await _firestore
+            .collection('users')
+            .doc(userId)
             .collection('calendarDays')
             .doc(dateString)
             .collection('timeEntries')
@@ -142,6 +147,7 @@ class DataService {
 
   // Load single day data
   static Future<Map<String, dynamic>?> loadSelectedDayData(
+    String userId,
     int selectedDay,
     int selectedMonth,
     int selectedYear,
@@ -151,6 +157,8 @@ class DataService {
 
     try {
       final doc = await _firestore
+          .collection('users')
+          .doc(userId)
           .collection('calendarDays')
           .doc(dateString)
           .get();
@@ -160,6 +168,8 @@ class DataService {
 
         // Check for time entries
         final timeEntriesSnapshot = await _firestore
+            .collection('users')
+            .doc(userId)
             .collection('calendarDays')
             .doc(dateString)
             .collection('timeEntries')
@@ -205,6 +215,7 @@ class DataService {
 
   // Load eaten food data for the selected month
   static Future<Map<String, bool>> loadEatenFoodData(
+    String userId,
     int selectedMonth,
     int selectedYear,
   ) async {
@@ -219,6 +230,8 @@ class DataService {
 
       // Use range query to get all calendar days for the month
       final querySnapshot = await FirebaseFirestore.instance
+          .collection('users')
+          .doc(userId)
           .collection('calendarDays')
           .where(FieldPath.documentId, isGreaterThanOrEqualTo: startDocId)
           .where(FieldPath.documentId, isLessThanOrEqualTo: endDocId)

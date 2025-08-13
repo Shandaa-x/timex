@@ -29,7 +29,8 @@ class TimeTrackScreen extends StatefulWidget {
   State<TimeTrackScreen> createState() => _TimeTrackingScreenState();
 }
 
-class _TimeTrackingScreenState extends State<TimeTrackScreen> with TickerProviderStateMixin {
+class _TimeTrackingScreenState extends State<TimeTrackScreen>
+    with TickerProviderStateMixin {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   late FlutterLocalNotificationsPlugin _notificationsPlugin;
 
@@ -43,11 +44,11 @@ class _TimeTrackingScreenState extends State<TimeTrackScreen> with TickerProvide
   bool _isLoading = false;
   WorkDay? _todayData;
   DateTime? _scheduledEndTime;
-  
+
   // Multiple check-ins/check-outs with location tracking
   List<Map<String, dynamic>> _todayEntries = [];
   Position? _currentLocation;
-  
+
   // Food data for today
   List<Map<String, dynamic>> _todayFoods = [];
   bool _eatenForToday = false; // Track if food was eaten today
@@ -97,19 +98,25 @@ class _TimeTrackingScreenState extends State<TimeTrackScreen> with TickerProvide
   }
 
   void _setupAnimations() {
-    _pulseController = AnimationController(duration: const Duration(seconds: 2), vsync: this);
-    _pulseAnimation = Tween<double>(
-      begin: 1.0,
-      end: 1.1,
-    ).animate(CurvedAnimation(parent: _pulseController, curve: Curves.easeInOut));
+    _pulseController = AnimationController(
+      duration: const Duration(seconds: 2),
+      vsync: this,
+    );
+    _pulseAnimation = Tween<double>(begin: 1.0, end: 1.1).animate(
+      CurvedAnimation(parent: _pulseController, curve: Curves.easeInOut),
+    );
     _pulseController.repeat(reverse: true);
   }
 
   // Helper method to ensure calendar day document exists
   Future<void> _ensureCalendarDayExists(String dateString) async {
-    final calendarDayRef = _firestore.collection('users').doc(_userId).collection('calendarDays').doc(dateString);
+    final calendarDayRef = _firestore
+        .collection('users')
+        .doc(_userId)
+        .collection('calendarDays')
+        .doc(dateString);
     final calendarDayDoc = await calendarDayRef.get();
-    
+
     if (!calendarDayDoc.exists) {
       // Create the calendar day document first
       final now = DateTime.now();
@@ -128,7 +135,8 @@ class _TimeTrackingScreenState extends State<TimeTrackScreen> with TickerProvide
 
       // Load today's entries (no user filter needed)
       final entriesSnapshot = await _firestore
-          .collection('users').doc(_userId)
+          .collection('users')
+          .doc(_userId)
           .collection('calendarDays')
           .doc(dateString)
           .collection('timeEntries')
@@ -154,25 +162,33 @@ class _TimeTrackingScreenState extends State<TimeTrackScreen> with TickerProvide
       if (_todayEntries.isNotEmpty) {
         final lastEntry = _todayEntries.last;
         _isWorking = lastEntry['type'] == 'check_in';
-        
+
         if (_isWorking) {
           _startTime = (lastEntry['timestamp'] as Timestamp).toDate();
           _endTime = null;
           _scheduledEndTime = _getScheduledEndTime(_startTime!);
         } else {
-          _startTime = _todayEntries.isNotEmpty ? 
-              (_todayEntries.first['timestamp'] as Timestamp).toDate() : null;
+          _startTime = _todayEntries.isNotEmpty
+              ? (_todayEntries.first['timestamp'] as Timestamp).toDate()
+              : null;
           _endTime = (lastEntry['timestamp'] as Timestamp).toDate();
           _scheduledEndTime = null;
         }
       }
 
       // Calculate total working hours from all entries
-      _totalWorkingHours = _calculateTotalWorkingHours(_todayEntries, 
-        currentSessionStart: _isWorking ? _startTime : null);
+      _totalWorkingHours = _calculateTotalWorkingHours(
+        _todayEntries,
+        currentSessionStart: _isWorking ? _startTime : null,
+      );
 
       // Also load legacy calendar data for compatibility
-      final doc = await _firestore.collection('calendarDays').doc(dateString).get();
+      final doc = await _firestore
+          .collection('users')
+          .doc(_userId)
+          .collection('calendarDays')
+          .doc(dateString)
+          .get();
       if (doc.exists) {
         final data = doc.data()!;
         _todayData = WorkDay.fromMap(data);
@@ -193,8 +209,8 @@ class _TimeTrackingScreenState extends State<TimeTrackScreen> with TickerProvide
   Future<void> _loadTodayFoods(String dateString) async {
     try {
       final foodDocId = '$dateString-foods';
-      final foodDoc = await _firestore.collection('users').doc(_userId).collection('foods').doc(foodDocId).get();
-      
+      final foodDoc = await _firestore.collection('foods').doc(foodDocId).get();
+
       if (foodDoc.exists) {
         final data = foodDoc.data();
         if (data != null && data['foods'] != null) {
@@ -215,7 +231,7 @@ class _TimeTrackingScreenState extends State<TimeTrackScreen> with TickerProvide
     try {
       final now = DateTime.now();
       final foodTime = DateTime(now.year, now.month, now.day, 17, 0); // 5:00 PM
-      
+
       // Only schedule if it's in the future
       if (foodTime.isAfter(now)) {
         await _scheduleNotification(
@@ -244,7 +260,9 @@ class _TimeTrackingScreenState extends State<TimeTrackScreen> with TickerProvide
       }
 
       if (permission == LocationPermission.deniedForever) {
-        _showErrorMessage('Байршлын зөвшөөрөл байнга татгалзсан байна. Тохиргооноос нээнэ үү.');
+        _showErrorMessage(
+          'Байршлын зөвшөөрөл байнга татгалзсан байна. Тохиргооноос нээнэ үү.',
+        );
         return null;
       }
 
@@ -263,7 +281,13 @@ class _TimeTrackingScreenState extends State<TimeTrackScreen> with TickerProvide
   }
 
   DateTime _getScheduledEndTime(DateTime startTime) {
-    return DateTime(startTime.year, startTime.month, startTime.day, workEndHour, workEndMinute);
+    return DateTime(
+      startTime.year,
+      startTime.month,
+      startTime.day,
+      workEndHour,
+      workEndMinute,
+    );
   }
 
   Future<void> _scheduleEndWorkNotifications(DateTime endTime) async {
@@ -302,7 +326,8 @@ class _TimeTrackingScreenState extends State<TimeTrackScreen> with TickerProvide
         await _scheduleNotification(
           id: 3,
           title: '🎯 Ажлын цаг дууслаа',
-          body: 'Таны ажлын цаг дууслаа! "ЯВЛАА" товчийг дарж ажлаа дуусгаарай.',
+          body:
+              'Таны ажлын цаг дууслаа! "ЯВЛАА" товчийг дарж ажлаа дуусгаарай.',
           scheduledTime: endTime,
         );
         print('📅 Scheduled end-time notification for: $endTime');
@@ -319,7 +344,10 @@ class _TimeTrackingScreenState extends State<TimeTrackScreen> with TickerProvide
     required DateTime scheduledTime,
   }) async {
     try {
-      final tz.TZDateTime tzScheduledTime = tz.TZDateTime.from(scheduledTime, tz.local);
+      final tz.TZDateTime tzScheduledTime = tz.TZDateTime.from(
+        scheduledTime,
+        tz.local,
+      );
 
       // Try exact scheduling first
       await _notificationsPlugin.zonedSchedule(
@@ -366,7 +394,10 @@ class _TimeTrackingScreenState extends State<TimeTrackScreen> with TickerProvide
     required DateTime scheduledTime,
   }) async {
     try {
-      final tz.TZDateTime tzScheduledTime = tz.TZDateTime.from(scheduledTime, tz.local);
+      final tz.TZDateTime tzScheduledTime = tz.TZDateTime.from(
+        scheduledTime,
+        tz.local,
+      );
 
       await _notificationsPlugin.zonedSchedule(
         id,
@@ -414,7 +445,8 @@ class _TimeTrackingScreenState extends State<TimeTrackScreen> with TickerProvide
   }
 
   // Helper to get current user ID
-  String get _userId => FirebaseAuth.instance.currentUser?.uid ?? 'unknown_user';
+  String get _userId =>
+      FirebaseAuth.instance.currentUser?.uid ?? 'unknown_user';
 
   Future<void> _handleStartWork() async {
     print('🚀 Starting work process...');
@@ -457,7 +489,8 @@ class _TimeTrackingScreenState extends State<TimeTrackScreen> with TickerProvide
       print('💾 Saving time entry to Firestore...');
       try {
         await _firestore
-            .collection('users').doc(_userId)
+            .collection('users')
+            .doc(_userId)
             .collection('calendarDays')
             .doc(dateString)
             .collection('timeEntries')
@@ -473,18 +506,33 @@ class _TimeTrackingScreenState extends State<TimeTrackScreen> with TickerProvide
       // Update calendar day - add to existing hours instead of overwriting
       print('📝 Updating calendar day document...');
       final workDay = WorkDay.createNew(now);
-      final existingDoc = await _firestore.collection('users').doc(_userId).collection('calendarDays').doc(workDay.documentId).get();
-      
+      final existingDoc = await _firestore
+          .collection('users')
+          .doc(_userId)
+          .collection('calendarDays')
+          .doc(workDay.documentId)
+          .get();
+
       if (existingDoc.exists) {
         // Update existing document - don't overwrite
-        await _firestore.collection('users').doc(_userId).collection('calendarDays').doc(workDay.documentId).update({
-          'lastCheckIn': Timestamp.fromDate(now),
-          'updatedAt': FieldValue.serverTimestamp(),
-        });
+        await _firestore
+            .collection('users')
+            .doc(_userId)
+            .collection('calendarDays')
+            .doc(workDay.documentId)
+            .update({
+              'lastCheckIn': Timestamp.fromDate(now),
+              'updatedAt': FieldValue.serverTimestamp(),
+            });
         print('✅ Updated existing calendar day document');
       } else {
         // Create new document
-        await _firestore.collection('users').doc(_userId).collection('calendarDays').doc(workDay.documentId).set(workDay.toMap());
+        await _firestore
+            .collection('users')
+            .doc(_userId)
+            .collection('calendarDays')
+            .doc(workDay.documentId)
+            .set(workDay.toMap());
         print('✅ Created new calendar day document');
       }
 
@@ -568,7 +616,8 @@ class _TimeTrackingScreenState extends State<TimeTrackScreen> with TickerProvide
       // Save to timeEntries subcollection
       try {
         await _firestore
-            .collection('users').doc(_userId)
+            .collection('users')
+            .doc(_userId)
             .collection('calendarDays')
             .doc(dateString)
             .collection('timeEntries')
@@ -583,7 +632,8 @@ class _TimeTrackingScreenState extends State<TimeTrackScreen> with TickerProvide
 
       // Update calendar day - calculate total working hours from all entries
       final allEntries = await _firestore
-          .collection('users').doc(_userId)
+          .collection('users')
+          .doc(_userId)
           .collection('calendarDays')
           .doc(dateString)
           .collection('timeEntries')
@@ -606,11 +656,16 @@ class _TimeTrackingScreenState extends State<TimeTrackScreen> with TickerProvide
 
       final totalHours = _calculateTotalWorkingHours(allEntriesData);
 
-      await _firestore.collection('users').doc(_userId).collection('calendarDays').doc(dateString).update({
-        'endTime': Timestamp.fromDate(now),
-        'workingHours': totalHours,
-        'updatedAt': FieldValue.serverTimestamp(),
-      });
+      await _firestore
+          .collection('users')
+          .doc(_userId)
+          .collection('calendarDays')
+          .doc(dateString)
+          .update({
+            'endTime': Timestamp.fromDate(now),
+            'workingHours': totalHours,
+            'updatedAt': FieldValue.serverTimestamp(),
+          });
 
       // Cancel all scheduled notifications since work ended
       await _cancelScheduledNotifications();
@@ -622,7 +677,10 @@ class _TimeTrackingScreenState extends State<TimeTrackScreen> with TickerProvide
         _currentLocation = location;
         _totalWorkingHours = totalHours;
         if (_todayData != null) {
-          _todayData = _todayData!.copyWith(endTime: now, workingHours: totalHours);
+          _todayData = _todayData!.copyWith(
+            endTime: now,
+            workingHours: totalHours,
+          );
         }
       });
 
@@ -673,13 +731,19 @@ class _TimeTrackingScreenState extends State<TimeTrackScreen> with TickerProvide
       // Save to timeEntries subcollection
       try {
         await _firestore
+            .collection('users')
+            .doc(_userId)
             .collection('calendarDays')
             .doc(dateString)
             .collection('timeEntries')
             .add(timeEntryData);
-        debugPrint('✅ Successfully saved additional check-in time entry to Firestore');
+        debugPrint(
+          '✅ Successfully saved additional check-in time entry to Firestore',
+        );
       } catch (firestoreError) {
-        debugPrint('❌ Firestore error during additional check-in: $firestoreError');
+        debugPrint(
+          '❌ Firestore error during additional check-in: $firestoreError',
+        );
         _showErrorMessage('Өгөгдөл хадгалахад алдаа гарлаа: $firestoreError');
         setState(() => _isLoading = false);
         return;
@@ -746,10 +810,16 @@ class _TimeTrackingScreenState extends State<TimeTrackScreen> with TickerProvide
   void _scheduleAutoEndWork() {
     // Cancel any existing timer
     _autoEndTimer?.cancel();
-    
+
     final now = DateTime.now();
-    final autoEndTime = DateTime(now.year, now.month, now.day, 22, 0); // 10:00 PM
-    
+    final autoEndTime = DateTime(
+      now.year,
+      now.month,
+      now.day,
+      22,
+      0,
+    ); // 10:00 PM
+
     if (autoEndTime.isAfter(now)) {
       final duration = autoEndTime.difference(now);
       _autoEndTimer = Timer(duration, () {
@@ -770,15 +840,23 @@ class _TimeTrackingScreenState extends State<TimeTrackScreen> with TickerProvide
 
     try {
       final now = DateTime.now();
-      final autoEndTime = DateTime(now.year, now.month, now.day, 22, 0); // 10:00 PM
-      final startDate = TimeUtils.formatDateString(_startTime!); // Use start date, not auto-end date
+      final autoEndTime = DateTime(
+        now.year,
+        now.month,
+        now.day,
+        22,
+        0,
+      ); // 10:00 PM
+      final startDate = TimeUtils.formatDateString(
+        _startTime!,
+      ); // Use start date, not auto-end date
 
       // Ensure calendar day document exists
       await _ensureCalendarDayExists(startDate);
 
       // Get current location (or use last known location)
       Position? location = await _getCurrentLocation();
-      
+
       // If location fails, use a default/last known location
       location ??= Position(
         latitude: 47.9184, // Default Ulaanbaatar coordinates
@@ -811,19 +889,25 @@ class _TimeTrackingScreenState extends State<TimeTrackScreen> with TickerProvide
 
       // Save to timeEntries subcollection
       await _firestore
-          .collection('users').doc(_userId)
+          .collection('users')
+          .doc(_userId)
           .collection('calendarDays')
           .doc(startDate)
           .collection('timeEntries')
           .add(timeEntryData);
 
       // Update calendar day to mark as incomplete
-      await _firestore.collection('users').doc(_userId).collection('calendarDays').doc(startDate).update({
-        'endTime': Timestamp.fromDate(autoEndTime),
-        'incompleteWork': true, // Mark as incomplete work
-        'autoEnded': true,
-        'updatedAt': FieldValue.serverTimestamp(),
-      });
+      await _firestore
+          .collection('users')
+          .doc(_userId)
+          .collection('calendarDays')
+          .doc(startDate)
+          .update({
+            'endTime': Timestamp.fromDate(autoEndTime),
+            'incompleteWork': true, // Mark as incomplete work
+            'autoEnded': true,
+            'updatedAt': FieldValue.serverTimestamp(),
+          });
 
       // Update UI state - but don't mark as fully ended
       setState(() {
@@ -889,27 +973,33 @@ class _TimeTrackingScreenState extends State<TimeTrackScreen> with TickerProvide
   }
 
   // Method to calculate total working hours from all time entries
-  double _calculateTotalWorkingHours(List<Map<String, dynamic>> entries, {DateTime? currentSessionStart}) {
+  double _calculateTotalWorkingHours(
+    List<Map<String, dynamic>> entries, {
+    DateTime? currentSessionStart,
+  }) {
     double totalHours = 0.0;
     DateTime? sessionStart;
-    
+
     // Process all completed sessions from entries
     for (final entry in entries) {
       final timestamp = (entry['timestamp'] as Timestamp).toDate();
-      
+
       if (entry['type'] == 'check_in') {
         sessionStart = timestamp;
-      } else if ((entry['type'] == 'check_out' || entry['type'] == 'auto_check_out') && sessionStart != null) {
+      } else if ((entry['type'] == 'check_out' ||
+              entry['type'] == 'auto_check_out') &&
+          sessionStart != null) {
         totalHours += timestamp.difference(sessionStart).inMinutes / 60.0;
         sessionStart = null;
       }
     }
-    
+
     // Add current session if working
     if (currentSessionStart != null && _isWorking) {
-      totalHours += DateTime.now().difference(currentSessionStart).inMinutes / 60.0;
+      totalHours +=
+          DateTime.now().difference(currentSessionStart).inMinutes / 60.0;
     }
-    
+
     return totalHours;
   }
 
@@ -936,7 +1026,9 @@ class _TimeTrackingScreenState extends State<TimeTrackScreen> with TickerProvide
             expandedHeight: 120,
             floating: false,
             pinned: true,
-            backgroundColor: _isWorking ? const Color(0xFF059669) : const Color(0xFF3B82F6),
+            backgroundColor: _isWorking
+                ? const Color(0xFF059669)
+                : const Color(0xFF3B82F6),
             elevation: 0,
             flexibleSpace: FlexibleSpaceBar(
               background: Container(
@@ -951,7 +1043,10 @@ class _TimeTrackingScreenState extends State<TimeTrackScreen> with TickerProvide
                 ),
                 child: SafeArea(
                   child: Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 20,
+                      vertical: 16,
+                    ),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       mainAxisAlignment: MainAxisAlignment.end,
@@ -1003,7 +1098,9 @@ class _TimeTrackingScreenState extends State<TimeTrackScreen> with TickerProvide
                                   ),
                                   const SizedBox(height: 2),
                                   Text(
-                                    _isWorking ? 'Ажил хийж байна...' : 'Цагийн бүртгэл',
+                                    _isWorking
+                                        ? 'Ажил хийж байна...'
+                                        : 'Цагийн бүртгэл',
                                     style: const TextStyle(
                                       fontWeight: FontWeight.w700,
                                       fontSize: 18,
@@ -1053,7 +1150,9 @@ class _TimeTrackingScreenState extends State<TimeTrackScreen> with TickerProvide
           SliverPadding(
             padding: const EdgeInsets.all(20),
             sliver: _isLoading
-                ? const SliverFillRemaining(child: Center(child: CircularProgressIndicator()))
+                ? const SliverFillRemaining(
+                    child: Center(child: CircularProgressIndicator()),
+                  )
                 : SliverList(
                     delegate: SliverChildListDelegate([
                       // Current Time Display
@@ -1140,7 +1239,10 @@ class _TimeTrackingScreenState extends State<TimeTrackScreen> with TickerProvide
                         ),
 
                       // Additional check-in button (if not currently working but have entries)
-                      if (!_isWorking && _todayEntries.isNotEmpty && (_endTime != null || _todayEntries.last['type'] == 'check_out'))
+                      if (!_isWorking &&
+                          _todayEntries.isNotEmpty &&
+                          (_endTime != null ||
+                              _todayEntries.last['type'] == 'check_out'))
                         Column(
                           children: [
                             const SizedBox(height: 16),
@@ -1148,7 +1250,9 @@ class _TimeTrackingScreenState extends State<TimeTrackScreen> with TickerProvide
                               text: 'ДАХИН ИРЛЭЭ',
                               icon: Icons.refresh,
                               color: const Color(0xFF059669),
-                              onPressed: _isLoading ? null : _handleAdditionalCheckIn,
+                              onPressed: _isLoading
+                                  ? null
+                                  : _handleAdditionalCheckIn,
                               isLoading: _isLoading,
                             ),
                           ],

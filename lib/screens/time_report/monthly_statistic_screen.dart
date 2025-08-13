@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:timex/screens/time_report/day_info/day_info_screen.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:timex/widgets/custom_drawer.dart';
 import 'stat_widgets/index.dart';
 import 'functions/index.dart';
@@ -15,13 +16,12 @@ class MonthlyStatisticsScreen extends StatefulWidget {
 }
 
 class _MonthlyStatisticsScreenState extends State<MonthlyStatisticsScreen> {
+  String get _userId => FirebaseAuth.instance.currentUser?.uid ?? '';
   int _selectedMonth = DateTime.now().month;
   int _selectedYear = DateTime.now().year;
   int? _selectedDay;
-  int? _selectedWeekNumber;
 
-  Map<String, dynamic> _monthlyData = {};
-  List<Map<String, dynamic>> _weeklyData = [];
+  List<Map<String, dynamic>> _monthData = [];
   Map<String, dynamic>? _selectedDayData;
   bool _isLoading = true;
   double _totalHours = 0.0;
@@ -38,11 +38,11 @@ class _MonthlyStatisticsScreenState extends State<MonthlyStatisticsScreen> {
   // Track which days food was eaten
   Map<String, bool> _eatenForDayData = {};
 
-  // Chart data
-  double _monthlyHours = 0.0;
-  double _weeklyHours = 0.0;
-  List<Map<String, dynamic>> _monthlyChartData = [];
-  List<Map<String, dynamic>> _weeklyChartData = [];
+  // Filter variables
+  DateTimeRange? _filterRange;
+  bool _filterActive = false;
+  double _filteredTotalHours = 0.0;
+  List<Map<String, dynamic>> _filteredDays = [];
 
   final List<String> _monthNames = [
     '1-сар',
@@ -100,6 +100,7 @@ class _MonthlyStatisticsScreenState extends State<MonthlyStatisticsScreen> {
     }
 
     final dayData = await DataService.loadSelectedDayData(
+      _userId,
       _selectedDay!,
       _selectedMonth,
       _selectedYear,
@@ -118,63 +119,17 @@ class _MonthlyStatisticsScreenState extends State<MonthlyStatisticsScreen> {
 
     try {
       final result = await DataService.loadMonthlyData(
+        _userId,
         _selectedMonth,
         _selectedYear,
       );
 
       final processedDays = result['days'] as List<Map<String, dynamic>>;
-      final weekNumbers = result['weekNumbers'] as List<int>;
       final totalWorkedHours = result['totalHours'] as double;
 
-      List<Map<String, dynamic>> filteredData = processedDays;
-      if (_selectedWeekNumber != null) {
-        filteredData = processedDays
-            .where((day) => day['weekNumber'] == _selectedWeekNumber)
-            .toList();
-      }
-
-      // Calculate chart data
-      final chartData = ChartCalculator.calculateChartData(
-        processedDays,
-        _selectedWeekNumber,
-      );
-      _monthlyChartData = chartData.monthlyChartData;
-      _weeklyChartData = chartData.weeklyChartData;
-      _weeklyHours = chartData.weeklyHours;
-
-      // Auto-select current week if we're viewing current month/year and haven't manually selected a week
-      int? autoSelectedWeek = _selectedWeekNumber;
-      if (_selectedMonth == DateTime.now().month &&
-          _selectedYear == DateTime.now().year &&
-          _selectedWeekNumber == null) {
-        final currentWeek = DataService.getCurrentWeekNumber();
-
-        if (weekNumbers.contains(currentWeek)) {
-          autoSelectedWeek = currentWeek;
-          filteredData = processedDays
-              .where((day) => day['weekNumber'] == currentWeek)
-              .toList();
-
-          // Recalculate chart data for the auto-selected week
-          final chartData = ChartCalculator.calculateChartData(
-            processedDays,
-            autoSelectedWeek,
-          );
-          _monthlyChartData = chartData.monthlyChartData;
-          _weeklyChartData = chartData.weeklyChartData;
-          _weeklyHours = chartData.weeklyHours;
-        }
-      }
-
       setState(() {
-        _monthlyData = {
-          'days': processedDays,
-          'weekNumbers': weekNumbers,
-        };
-        _weeklyData = filteredData;
+        _monthData = processedDays;
         _totalHours = totalWorkedHours;
-        _monthlyHours = totalWorkedHours;
-        _selectedWeekNumber = autoSelectedWeek;
         _isLoading = false;
       });
 
@@ -192,6 +147,7 @@ class _MonthlyStatisticsScreenState extends State<MonthlyStatisticsScreen> {
   Future<void> _loadEatenFoodData() async {
     try {
       final eatenData = await DataService.loadEatenFoodData(
+        _userId,
         _selectedMonth,
         _selectedYear,
       );
@@ -206,7 +162,7 @@ class _MonthlyStatisticsScreenState extends State<MonthlyStatisticsScreen> {
 
   Future<void> _confirmDay(String dateString) async {
     // Find the day data
-    final dayData = _weeklyData.firstWhere((day) => day['date'] == dateString);
+    final dayData = _monthData.firstWhere((day) => day['date'] == dateString);
     final selectedImages = _selectedImages[dateString];
 
     // Add to confirming set to show loading
@@ -215,56 +171,31 @@ class _MonthlyStatisticsScreenState extends State<MonthlyStatisticsScreen> {
     });
 
     try {
-      await ImageService.confirmDay(dateString, dayData, selectedImages);
+      await ImageService.confirmDay(_userId, dateString, dayData, selectedImages);
 
-      // Update local data immediately
+      // Update local data immediately (only update _monthData, not both _monthData and _monthlyData['days'])
       setState(() {
-        // Update the day data in weekly data
-        final dayIndex = _weeklyData.indexWhere(
-          (day) => day['date'] == dateString,
-        );
+        final dayIndex = _monthData.indexWhere((day) => day['date'] == dateString);
         if (dayIndex != -1) {
-          _weeklyData[dayIndex]['confirmed'] = true;
-          // Move selected images to attachment images
+          _monthData[dayIndex]['confirmed'] = true;
           if ((selectedImages ?? []).isNotEmpty) {
+            // Only set the images once, not in both lists
             List<String> existingImages = List<String>.from(
-              _weeklyData[dayIndex]['attachmentImages'] ?? [],
+              _monthData[dayIndex]['attachmentImages'] ?? [],
             );
-            existingImages.addAll(selectedImages!);
-            _weeklyData[dayIndex]['attachmentImages'] = existingImages;
+            // Avoid duplicate images
+            for (final img in selectedImages!) {
+              if (!existingImages.contains(img)) {
+                existingImages.add(img);
+              }
+            }
+            _monthData[dayIndex]['attachmentImages'] = existingImages;
           }
         }
 
-        // Update monthly data
-        final monthlyDays = _monthlyData['days'] as List<Map<String, dynamic>>?;
-        if (monthlyDays != null) {
-          for (var day in monthlyDays) {
-            if (day['date'] == dateString) {
-              day['confirmed'] = true;
-              if ((selectedImages ?? []).isNotEmpty) {
-                List<String> existingImages = List<String>.from(
-                  day['attachmentImages'] ?? [],
-                );
-                existingImages.addAll(selectedImages!);
-                day['attachmentImages'] = existingImages;
-              }
-
-              // Update total hours if this day is now confirmed
-              if (!dayData['isHoliday'] && dayData['workingHours'] > 0) {
-                _totalHours += dayData['workingHours'];
-                _monthlyHours += dayData['workingHours'];
-              }
-              break;
-            }
-          }
-          // Recalculate chart data
-          final chartData = ChartCalculator.calculateChartData(
-            monthlyDays,
-            _selectedWeekNumber,
-          );
-          _monthlyChartData = chartData.monthlyChartData;
-          _weeklyChartData = chartData.weeklyChartData;
-          _weeklyHours = chartData.weeklyHours;
+        // Update total hours if this day is now confirmed
+        if (!dayData['isHoliday'] && dayData['workingHours'] > 0 && !(dayData['confirmed'] ?? false)) {
+          _totalHours += dayData['workingHours'];
         }
 
         // Clear selected images for this day AFTER updating the data
@@ -342,10 +273,72 @@ class _MonthlyStatisticsScreenState extends State<MonthlyStatisticsScreen> {
     }
   }
 
+  // Show date range filter dialog
+  Future<void> _showFilterDialog() async {
+    final now = DateTime.now();
+    final DateTimeRange? picked = await showDateRangePicker(
+      context: context,
+      firstDate: DateTime(now.year - 2),
+      lastDate: DateTime(now.year + 1, 12, 31),
+      initialDateRange: _filterRange,
+      helpText: 'Хугацааны интервал сонгох',
+      locale: const Locale('mn'),
+    );
+    if (picked != null) {
+      setState(() {
+        _filterRange = picked;
+        _filterActive = true;
+      });
+      _applyDateRangeFilter();
+    }
+  }
+
+  void _clearFilter() {
+    setState(() {
+      _filterRange = null;
+      _filterActive = false;
+      _filteredTotalHours = 0.0;
+      _filteredDays = [];
+    });
+  }
+
+  void _applyDateRangeFilter() {
+    if (_filterRange == null || _monthData.isEmpty) return;
+    final filtered = _monthData.where((day) {
+      final date = DateTime.tryParse(day['date'] ?? '') ?? DateTime(2000);
+      return !date.isBefore(_filterRange!.start) && !date.isAfter(_filterRange!.end);
+    }).toList();
+    final total = filtered.fold<double>(0.0, (sum, day) => sum + (day['workingHours'] ?? 0.0));
+    setState(() {
+      _filteredDays = filtered;
+      _filteredTotalHours = total;
+    });
+  }
+
+  String formatMongolianHours(double hours) {
+    final int h = hours.floor();
+    final int m = ((hours - h) * 60).round();
+    if (h > 0 && m > 0) return '$h цаг, $m минут';
+    if (h > 0) return '$h цаг';
+    return '$h цаг, $m минут';
+  }
+
   @override
   Widget build(BuildContext context) {
     final screenWidth = MediaQuery.of(context).size.width;
     final isTablet = screenWidth > 768;
+
+    // Helper: get data for cards based on filter
+    final bool isFilterActive = _filterActive && _filterRange != null;
+    final List<Map<String, dynamic>> daysForCards = isFilterActive ? _filteredDays : _monthData;
+    final double totalHoursForCard = isFilterActive ? _filteredTotalHours : _totalHours;
+
+    // For monthly statistics chart, use filtered days if filter is active
+    final List<Map<String, dynamic>> chartDays = isFilterActive ? _filteredDays : _monthData;
+    final chartData = ChartCalculator.calculateChartData(chartDays, null);
+    // For chart labels: use filter's start month/year if filtering, else selected month/year
+    final int chartMonth = isFilterActive ? _filterRange!.start.month : _selectedMonth;
+    final int chartYear = isFilterActive ? _filterRange!.start.year : _selectedYear;
 
     return PopScope(
       canPop: true,
@@ -451,10 +444,14 @@ class _MonthlyStatisticsScreenState extends State<MonthlyStatisticsScreen> {
                             setState(() {
                               _selectedMonth = value;
                               _selectedDay = null;
-                              _selectedWeekNumber = null;
                               _expandedDays.clear();
                               _selectedImages.clear();
                               _selectedDayData = null;
+                              // Clear filter when month changes
+                              _filterRange = null;
+                              _filterActive = false;
+                              _filteredTotalHours = 0.0;
+                              _filteredDays = [];
                             });
                             _loadMonthlyData();
                           },
@@ -462,17 +459,22 @@ class _MonthlyStatisticsScreenState extends State<MonthlyStatisticsScreen> {
                             setState(() {
                               _selectedYear = value;
                               _selectedDay = null;
-                              _selectedWeekNumber = null;
                               _expandedDays.clear();
                               _selectedImages.clear();
                               _selectedDayData = null;
+                              // Clear filter when year changes
+                              _filterRange = null;
+                              _filterActive = false;
+                              _filteredTotalHours = 0.0;
+                              _filteredDays = [];
                             });
                             _loadMonthlyData();
                           },
+                          filterRange: _filterRange,
+                          onDateRangeSelected: _showFilterDialog,
+                          onClearFilter: _clearFilter,
                         ),
-
-                        const SizedBox(height: 20),
-
+                        const SizedBox(height: 15),
                         // Show single day statistics if a day is selected
                         if (_selectedDay != null) ...[
                           if (_selectedDayData != null) ...[
@@ -494,7 +496,7 @@ class _MonthlyStatisticsScreenState extends State<MonthlyStatisticsScreen> {
                         if (_selectedDay == null) ...[
                           // Total Hours Display
                           TotalHoursCard(
-                            totalHours: _totalHours,
+                            totalHours: totalHoursForCard,
                             selectedMonth: _selectedMonth,
                             selectedYear: _selectedYear,
                             monthNames: _monthNames,
@@ -503,72 +505,18 @@ class _MonthlyStatisticsScreenState extends State<MonthlyStatisticsScreen> {
 
                           const SizedBox(height: 20),
 
-                          // Monthly Statistics
+                          // Monthly Statistics (show for current month or filter)
                           MonthlyStatisticsCard(
-                            monthlyHours: _monthlyHours,
+                            monthlyHours: chartDays.fold<double>(0.0, (sum, day) => sum + (day['workingHours'] ?? 0.0)),
                             monthNames: _monthNames,
-                            selectedMonth: _selectedMonth,
-                            selectedYear: _selectedYear,
-                            chartData: _monthlyChartData,
+                            selectedMonth: chartMonth,
+                            selectedYear: chartYear,
+                            chartData: chartData.monthlyChartData,
                           ),
-
                           const SizedBox(height: 20),
-
-                          // Week Selector
-                          if (_monthlyData['weekNumbers'] != null &&
-                              _monthlyData['weekNumbers'].isNotEmpty)
-                            WeekSelectorCard(
-                              weekNumbers: _monthlyData['weekNumbers'],
-                              selectedWeekNumber: _selectedWeekNumber,
-                              onWeekSelected: (weekNum) {
-                                setState(() {
-                                  _selectedWeekNumber = weekNum;
-                                  _weeklyData = weekNum == null
-                                      ? List<Map<String, dynamic>>.from(
-                                          _monthlyData['days'] ?? [],
-                                        )
-                                      : List<Map<String, dynamic>>.from(
-                                              _monthlyData['days'] ?? [],
-                                            )
-                                            .where(
-                                              (day) =>
-                                                  day['weekNumber'] == weekNum,
-                                            )
-                                            .toList();
-
-                                  final chartData =
-                                      ChartCalculator.calculateChartData(
-                                        _monthlyData['days'] ?? [],
-                                        _selectedWeekNumber,
-                                      );
-                                  _monthlyChartData =
-                                      chartData.monthlyChartData;
-                                  _weeklyChartData = chartData.weeklyChartData;
-                                  _weeklyHours = chartData.weeklyHours;
-                                });
-                              },
-                            ),
-
-                          if (_monthlyData['weekNumbers'] != null &&
-                              _monthlyData['weekNumbers'].isNotEmpty)
-                            const SizedBox(height: 20),
-
-                          // Weekly Statistics
-                          if (_selectedWeekNumber != null)
-                            WeeklyStatisticsCard(
-                              weeklyHours: _weeklyHours,
-                              selectedWeekNumber: _selectedWeekNumber!,
-                              chartData: _weeklyChartData,
-                              selectedMonth: _selectedMonth,
-                              selectedYear: _selectedYear,
-                            ),
-
-                          if (_selectedWeekNumber != null)
-                            const SizedBox(height: 20),
-
                           // Days List
                           DaysListCard(
-                            weeklyData: _weeklyData,
+                            weeklyData: daysForCards,
                             selectedMonth: _selectedMonth,
                             confirmingDays: _confirmingDays,
                             expandedDays: _expandedDays,

@@ -18,6 +18,14 @@ class MonthlyStatisticsCard extends StatelessWidget {
     required this.chartData,
   });
 
+  String formatMongolianHours(double hours) {
+    final int h = hours.floor();
+    final int m = ((hours - h) * 60).round();
+    if (h > 0 && m > 0) return '$h цаг, $m минут';
+    if (h > 0) return '$h цаг';
+    return '$h цаг, $m минут';
+  }
+
   @override
   Widget build(BuildContext context) {
     return ModernCard(
@@ -47,11 +55,11 @@ class MonthlyStatisticsCard extends StatelessWidget {
           ),
           const SizedBox(height: 16),
           Text(
-            '${monthlyHours.toStringAsFixed(1)}h',
+            formatMongolianHours(monthlyHours),
             style: const TextStyle(
-              fontSize: 32,
+              fontSize: 28,
               fontWeight: FontWeight.bold,
-              color: Color(0xFF1E293B),
+              color: Colors.black,
             ),
           ),
           const SizedBox(height: 4),
@@ -94,8 +102,8 @@ class MonthlyStatisticsCard extends StatelessWidget {
                 getTooltipItem: (group, groupIndex, rod, rodIndex) {
                   final weekData = allWeeksData[group.x.toInt()];
                   return BarTooltipItem(
-                    'Week ${weekData['week']}\n${weekData['hours'].toStringAsFixed(1)}h',
-                    const TextStyle(color: Colors.white, fontWeight: FontWeight.w100),
+                    'Week ${weekData['week']}\n${formatMongolianHours(weekData['hours'])}',
+                    const TextStyle(color: Colors.black, fontWeight: FontWeight.w100),
                   );
                 },
               ),
@@ -106,108 +114,124 @@ class MonthlyStatisticsCard extends StatelessWidget {
                 sideTitles: SideTitles(
                   showTitles: true,
                   getTitlesWidget: (value, meta) {
-                    if (value.toInt() < allWeeksData.length) {
-                      final weekData = allWeeksData[value.toInt()];
-                      return Padding(
-                        padding: const EdgeInsets.only(top: 8),
-                        child: Text(
-                          'W${weekData['week']}',
-                          style: const TextStyle(
-                            color: Color(0xFF64748B),
-                            fontSize: 12,
-                            fontWeight: FontWeight.w500,
-                          ),
-                        ),
+                    final index = value.toInt();
+                    if (index >= 0 && index < allWeeksData.length) {
+                      return Text(
+                        'W${allWeeksData[index]['week']}',
+                        style: const TextStyle(color: Color(0xFF64748B), fontSize: 12),
                       );
                     }
                     return const Text('');
                   },
+                  reservedSize: 30,
                 ),
               ),
               leftTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
               topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
               rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
             ),
-            gridData: const FlGridData(show: false),
+            gridData: FlGridData(
+              show: true,
+              horizontalInterval: 10,
+              getDrawingHorizontalLine: (value) {
+                return FlLine(
+                  color: const Color(0xFFE2E8F0),
+                  strokeWidth: 1,
+                );
+              },
+              drawVerticalLine: false,
+            ),
             borderData: FlBorderData(show: false),
             barGroups: allWeeksData.asMap().entries.map((entry) {
-              final hours = entry.value['hours'] as double;
+              final index = entry.key;
+              final weekData = entry.value;
               return BarChartGroupData(
-                x: entry.key,
+                x: index,
                 barRods: [
                   BarChartRodData(
-                    toY: hours > 0 ? hours : 0.5, // Show small bar for 0 hours
-                    color: hours > 0 ? const Color(0xFF059669) : const Color(0xFFE5E7EB),
-                    width: 32,
-                    borderRadius: BorderRadius.circular(4),
+                    toY: weekData['hours'].toDouble(),
+                    color: const Color(0xFF059669),
+                    width: 16,
+                    borderRadius: const BorderRadius.only(
+                      topLeft: Radius.circular(4),
+                      topRight: Radius.circular(4),
+                    ),
                   ),
                 ],
               );
             }).toList(),
           ),
         ),
-        // Add text labels on top of bars
-        ...allWeeksData.asMap().entries.map((entry) {
-          final index = entry.key;
-          final hours = entry.value['hours'] as double;
-          final barHeight = hours > 0 ? hours : 0.5;
-
-          return Positioned(
-            left: (index + 0.5) * (290 / allWeeksData.length) - 15,
-            bottom: 30 + (barHeight / (maxHours + 5)) * 120,
-            child: Container(
-              width: 30,
-              alignment: Alignment.center,
-              child: Text(
-                '${hours.toStringAsFixed(1)}h',
-                style: TextStyle(
-                  fontSize: 10,
-                  fontWeight: FontWeight.bold,
-                  color: hours > 0 ? const Color(0xFF059669) : const Color(0xFF64748B),
-                ),
-              ),
-            ),
-          );
-        }).toList(),
       ],
     );
   }
 
   List<Map<String, dynamic>> _generateAllWeeksData() {
-    // Get all weeks in the selected month
-    final lastDay = DateTime(selectedYear, selectedMonth + 1, 0);
-    
-    Set<int> monthWeeks = {};
-    
-    // Find all week numbers that occur in this month
-    for (int day = 1; day <= lastDay.day; day++) {
-      final date = DateTime(selectedYear, selectedMonth, day);
-      final weekNumber = _getWeekNumber(date);
-      monthWeeks.add(weekNumber);
+    // Create a map to group chart data by week
+    Map<int, double> weekHours = {};
+
+    for (final item in chartData) {
+      final week = item['week'] as int;
+      final hours = (item['hours'] as num).toDouble();
+      weekHours[week] = (weekHours[week] ?? 0.0) + hours;
     }
+
+    // Get the first and last week of the month
+    final firstDayOfMonth = DateTime(selectedYear, selectedMonth, 1);
+    final lastDayOfMonth = DateTime(selectedYear, selectedMonth + 1, 0);
+
+    final firstWeek = _getWeekNumber(firstDayOfMonth);
+    final lastWeek = _getWeekNumber(lastDayOfMonth);
+
+    // Generate data for all weeks in the range
+    List<Map<String, dynamic>> allWeeksData = [];
     
-    // Sort weeks and create data
-    List<int> sortedWeeks = monthWeeks.toList()..sort();
-    
-    return sortedWeeks.map((weekNum) {
-      // Find hours for this week from chartData
-      final existingWeek = chartData.firstWhere(
-        (week) => week['week'] == weekNum,
-        orElse: () => {'week': weekNum, 'hours': 0.0},
-      );
-      
-      return {
-        'week': weekNum,
-        'hours': (existingWeek['hours'] as num).toDouble(),
-      };
-    }).toList();
+    if (firstWeek <= lastWeek) {
+      // Normal case - all weeks are in the same year
+      for (int week = firstWeek; week <= lastWeek; week++) {
+        allWeeksData.add({
+          'week': week,
+          'hours': weekHours[week] ?? 0.0,
+        });
+      }
+    } else {
+      // Year boundary case - first week is in previous year
+      // Add weeks from first week to end of year (typically week 52 or 53)
+      for (int week = firstWeek; week <= 53; week++) {
+        allWeeksData.add({
+          'week': week,
+          'hours': weekHours[week] ?? 0.0,
+        });
+      }
+      // Add weeks from start of new year to last week
+      for (int week = 1; week <= lastWeek; week++) {
+        allWeeksData.add({
+          'week': week,
+          'hours': weekHours[week] ?? 0.0,
+        });
+      }
+    }
+
+    return allWeeksData;
   }
 
   int _getWeekNumber(DateTime date) {
-    // Get week number of year
-    final firstDayOfYear = DateTime(date.year, 1, 1);
-    final dayOfYear = date.difference(firstDayOfYear).inDays + 1;
-    final weekNumber = ((dayOfYear - date.weekday + 10) / 7).floor();
-    return weekNumber;
+    // Special handling for 2025 - week 1 starts on December 30, 2024
+    DateTime weekOneStart;
+    if (date.year == 2025) {
+      weekOneStart = DateTime(2024, 12, 30);
+    } else {
+      // For other years, use standard ISO week calculation
+      final jan4 = DateTime(date.year, 1, 4);
+      final firstWeekStart = jan4.subtract(Duration(days: jan4.weekday - 1));
+      weekOneStart = firstWeekStart;
+    }
+
+    // Calculate week number
+    final daysSinceWeekOne = date.difference(weekOneStart).inDays;
+    final weekNumber = (daysSinceWeekOne / 7).floor() + 1;
+
+    // Ensure week number is at least 1
+    return weekNumber < 1 ? 1 : weekNumber;
   }
 }
