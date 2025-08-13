@@ -54,4 +54,6 @@ flutter {
 dependencies {
     // Updated core library desugaring dependency to version 2.1.4+
     coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.1.4")
+    // Google Play Services Auth for Google Sign-In
+    implementation("com.google.android.gms:play-services-auth:20.7.0")
 }
