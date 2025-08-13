@@ -781,25 +781,194 @@ class _QRCodeScreenState extends State<QRCodeScreen> {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Open in Banking App',
+                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+              ),
+              SizedBox(height: 16),
+              // New banking apps from QPay - Enhanced with working functionality
+              ...bankingApps.entries.map((entry) {
+                final app = entry.value;
+                IconData icon;
+
+                switch (entry.key) {
+                  case 'qpay':
+                  case 'qpaywallet':
+                    icon = Icons.payment;
+                    break;
+                  case 'khanbank':
+                  case 'khan':
+                    icon = Icons.account_balance;
+                    break;
+                  case 'socialpay':
+                    icon = Icons.account_balance;
+                    break;
+                  case 'statebank':
+                  case 'state':
+                  case 'state3.0':
+                    icon = Icons.account_balance_wallet;
+                    break;
+                  case 'tdb':
+                  case 'tradeanddevelopment':
+                  case 'tradeanddevelopmentbank':
+                    icon = Icons.business;
+                    break;
+                  case 'xac':
+                    icon = Icons.credit_card;
+                    break;
+                  case 'mostmoney':
+                    icon = Icons.monetization_on;
+                    break;
+                  case 'nationalinvestment':
+                    icon = Icons.savings;
+                    break;
+                  case 'chinggiskhaan':
+                    icon = Icons.account_balance;
+                    break;
+                  case 'capitron':
+                    icon = Icons.corporate_fare;
+                    break;
+                  case 'bogd':
+                    icon = Icons.account_balance;
+                    break;
+                  case 'trans':
+                    icon = Icons.transfer_within_a_station;
+                    break;
+                  case 'm':
+                    icon = Icons.mobile_friendly;
+                    break;
+                  case 'ardapp':
+                    icon = Icons.apps;
+                    break;
+                  case 'tokiapp':
+                    icon = Icons.apps;
+                    break;
+                  case 'arig':
+                    icon = Icons.account_balance;
+                    break;
+                  case 'monpay':
+                    icon = Icons.payment;
+                    break;
+                  default:
+                    icon = Icons.open_in_new;
+                }
+
+                return ListTile(
+                  leading: Icon(icon, color: Colors.blue),
+                  title: Text(app.name),
+                  subtitle: Text(
+                    app.description.isNotEmpty
+                        ? app.description
+                        : 'Mobile banking app',
+                  ),
+                  onTap: () async {
+                    Navigator.pop(context);
+                    try {
+                      final uri = Uri.parse(app.deepLink);
+                      
+                      // Enhanced check for iOS
+                      bool canLaunch = await canLaunchUrl(uri);
+                      
+                      // If the specific link fails, try just the scheme
+                      if (!canLaunch && uri.scheme.isNotEmpty) {
+                        final schemeUri = Uri.parse('${uri.scheme}://');
+                        canLaunch = await canLaunchUrl(schemeUri);
+                      }
+                      
+                      if (canLaunch) {
+                        await launchUrl(
+                          uri,
+                          mode: LaunchMode.externalApplication,
+                        );
+                        _showMessage('Opened ${app.name}', isError: false);
+                      } else {
+                        // Check if this is an iOS issue with URL schemes
+                        _showMessage(
+                          '${app.name} not found. Please check if the app is installed and try again. Deep link: ${uri.scheme}://',
+                          isError: true,
+                        );
+                        
+                        // Debug info
+                        print('🔍 Deep link failed: ${app.deepLink}');
+                        print('🔍 Scheme: ${uri.scheme}');
+                        print('🔍 Full URI: $uri');
+                      }
+                    } catch (uriError) {
+                      print('Error launching ${app.name}: $uriError');
+                      _showMessage(
+                        'Invalid link format for ${app.name}: $uriError',
+                        isError: true,
+                      );
+                    }
+                  },
+                );
+              }).toList(),
+
+              // Legacy deep links as fallback with enhanced error handling
+              ...legacyDeepLinks.entries.map((entry) {
+                String appName;
+                IconData icon;
+
+                switch (entry.key) {
+                  case 'qpay':
+                    appName = 'QPay App';
+                    icon = Icons.payment;
+                    break;
+                  case 'socialpay':
+                    appName = 'Social Pay (Khan Bank)';
+                    icon = Icons.account_balance;
+                    break;
+                  case 'khanbank':
+                    appName = 'Khan Bank';
+                    icon = Icons.account_balance;
+                    break;
+                  default:
+                    appName = 'Banking App';
+                    icon = Icons.open_in_new;
+                }
+
+                return ListTile(
+                  leading: Icon(icon, color: Colors.blue),
+                  title: Text(appName),
+                  subtitle: Text(
                     entry.key == 'banking' ? 'Web browser' : 'Mobile app',
                   ),
                   onTap: () async {
                     Navigator.pop(context);
                     try {
                       final uri = Uri.parse(entry.value);
-                      if (await canLaunchUrl(uri)) {
+                      
+                      // Enhanced check for iOS
+                      bool canLaunch = await canLaunchUrl(uri);
+                      
+                      // If the specific link fails, try just the scheme
+                      if (!canLaunch && uri.scheme.isNotEmpty) {
+                        final schemeUri = Uri.parse('${uri.scheme}://');
+                        canLaunch = await canLaunchUrl(schemeUri);
+                      }
+                      
+                      if (canLaunch) {
                         await launchUrl(
                           uri,
                           mode: LaunchMode.externalApplication,
                         );
                         _showMessage('Opened in $appName', isError: false);
                       } else {
-                        _showMessage('$appName not installed', isError: true);
+                        _showMessage(
+                          '$appName not found. Please check if the app is installed. Scheme: ${uri.scheme}://',
+                          isError: true,
+                        );
+                        
+                        // Debug info
+                        print('🔍 Legacy deep link failed: ${entry.value}');
+                        print('🔍 App: $appName');
+                        print('🔍 Scheme: ${uri.scheme}');
                       }
                     } catch (uriError) {
                       print('Error launching $appName: $uriError');
                       _showMessage(
-                        'Invalid link format for $appName',
+                        'Invalid link format for $appName: $uriError',
                         isError: true,
                       );
                     }

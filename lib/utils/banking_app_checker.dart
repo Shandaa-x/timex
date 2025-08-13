@@ -11,6 +11,7 @@ class BankingAppChecker {
     'Khan Bank': 'khanbank://',
     'Khan Bank Alt': 'khanbankapp://',
     'Social Pay': 'socialpay://',
+    'Social Pay Payment': 'socialpay-payment://',
     'State Bank': 'statebank://',
     'State Bank Alt': 'statebankapp://',
     'TDB Bank': 'tdbbank://',
@@ -21,12 +22,20 @@ class BankingAppChecker {
     'Most Money Alt': 'mostmoney://',
     'NIB Bank': 'nibank://',
     'UB Bank': 'ulaanbaatarbank://',
+    'UB Bank Alt': 'ubbank://',
     'Chinggis Khaan Bank': 'ckbank://',
     'Chinggis Alt': 'chinggisnbank://',
     'Capitron Bank': 'capitronbank://',
     'Capitron Alt': 'capitron://',
     'Bogd Bank': 'bogdbank://',
     'Bogd Alt': 'bogd://',
+    'Arig Bank': 'arigbank://',
+    'Trans Bank': 'transbank://',
+    'M Bank': 'mbank://',
+    'Golomt Bank': 'golomtbank://',
+    'Credit Bank': 'creditbank://',
+    'Mongol Bank': 'mongolbank://',
+    'Development Bank': 'developmentbank://',
     'Candy Pay': 'candypay://',
     'Candy Alt': 'candy://',
     'QPay Wallet': 'qpay://',
@@ -40,14 +49,30 @@ class BankingAppChecker {
 
     for (final entry in bankingAppSchemes.entries) {
       try {
-        final testUri = Uri.parse('${entry.value}test');
-        final isAvailable = await canLaunchUrl(testUri);
+        // Try multiple approaches for iOS compatibility
+        final baseUri = Uri.parse(entry.value);
+        
+        // Test with just the scheme
+        bool isAvailable = await canLaunchUrl(baseUri);
+        
+        // If that fails, try with a common path
+        if (!isAvailable) {
+          final testUri = Uri.parse('${entry.value}open');
+          isAvailable = await canLaunchUrl(testUri);
+        }
+        
+        // Last attempt with different parameter
+        if (!isAvailable) {
+          final testUri = Uri.parse('${entry.value}launch');
+          isAvailable = await canLaunchUrl(testUri);
+        }
+        
         availabilityMap[entry.key] = isAvailable;
 
         if (isAvailable) {
-          AppLogger.success('${entry.key} is available');
+          AppLogger.success('${entry.key} is available (${entry.value})');
         } else {
-          AppLogger.info('${entry.key} not available');
+          AppLogger.info('${entry.key} not available (${entry.value})');
         }
       } catch (error) {
         AppLogger.error('Error checking ${entry.key}', error);
@@ -69,7 +94,16 @@ class BankingAppChecker {
   static Future<bool> testDeepLink(String deepLink) async {
     try {
       final uri = Uri.parse(deepLink);
-      final canLaunch = await canLaunchUrl(uri);
+      
+      // First try the exact link
+      bool canLaunch = await canLaunchUrl(uri);
+      
+      // If that fails, try just the scheme
+      if (!canLaunch && uri.scheme.isNotEmpty) {
+        final schemeUri = Uri.parse('${uri.scheme}://');
+        canLaunch = await canLaunchUrl(schemeUri);
+      }
+      
       AppLogger.info(
         'Deep link test: $deepLink - ${canLaunch ? 'Available' : 'Not available'}',
       );

@@ -247,8 +247,9 @@ class QRUtils {
     if (qrText.isNotEmpty) {
       final encodedQR = Uri.encodeComponent(qrText);
 
-      // Social Pay deep link (Khan Bank) - use proper format
-      deepLinks['socialpay'] = 'socialpay://qpay?qr=$encodedQR';
+      // Social Pay deep link (Khan Bank) - use the correct payment scheme that works
+      deepLinks['socialpay'] =
+          'socialpay-payment://q?qPay_QRcode=$encodedQR';
 
       // Khan Bank app deep link - try multiple formats
       deepLinks['khanbank'] = 'khanbank://q?qPay_QRcode=$encodedQR';
