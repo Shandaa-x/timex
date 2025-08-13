@@ -25,21 +25,110 @@ class FoodEatenStatusWidget extends StatefulWidget {
 class _FoodEatenStatusWidgetState extends State<FoodEatenStatusWidget> {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   bool _isUpdating = false;
+  
+  // Track selected foods
+  Map<int, bool> _selectedFoods = {};
+
+  @override
+  void initState() {
+    super.initState();
+    _initializeFoodSelections();
+  }
+
+  @override
+  void didUpdateWidget(FoodEatenStatusWidget oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.todayFoods != oldWidget.todayFoods) {
+      _initializeFoodSelections();
+    }
+  }
+
+  void _initializeFoodSelections() {
+    _selectedFoods.clear();
+    
+    for (int i = 0; i < widget.todayFoods.length; i++) {
+      _selectedFoods[i] = false;
+    }
+  }
 
   // Helper to get current user ID
   String get _userId =>
       FirebaseAuth.instance.currentUser?.uid ?? 'unknown_user';
 
+  // Calculate total price of selected foods
+  int get _selectedTotalPrice {
+    int total = 0;
+    for (int i = 0; i < widget.todayFoods.length; i++) {
+      if (_selectedFoods[i] == true) {
+        final price = widget.todayFoods[i]['price'] ?? 0;
+        total += (price as int);
+      }
+    }
+    return total;
+  }
+
+  // Get list of selected foods
+  List<Map<String, dynamic>> get _selectedFoodsList {
+    List<Map<String, dynamic>> selectedList = [];
+    for (int i = 0; i < widget.todayFoods.length; i++) {
+      if (_selectedFoods[i] == true) {
+        final food = Map<String, dynamic>.from(widget.todayFoods[i]);
+        selectedList.add(food);
+      }
+    }
+    return selectedList;
+  }
+
   Future<void> _showEatenConfirmationDialog() async {
+    final selectedFoods = _selectedFoodsList;
+    
+    if (selectedFoods.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Хоол сонгоно уу'),
+          backgroundColor: Colors.orange,
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+      return;
+    }
+
     final confirmed = await showDialog<bool>(
       context: context,
-      barrierDismissible: false, // Cannot dismiss by tapping outside
+      barrierDismissible: false,
       builder: (BuildContext context) {
         return AlertDialog(
-          title: Text('Баталгаажуулах'),
-          content: const Text(
-            'Та өнөөдөр хоол идсэн гэж баталгаажуулж байна уу?\n\nАнхааруулга: Нэгэнт идсэн гэж тэмдэглэсний дараа буцааж өөрчлөх боломжгүй!',
-            style: TextStyle(fontSize: 16),
+          title: const Text('Сонгосон хоолоо идсэн гэж баталгаажуулах'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Сонгосон хоол: ${selectedFoods.length}',
+                style: const TextStyle(fontWeight: FontWeight.w600),
+              ),
+              const SizedBox(height: 8),
+              ...selectedFoods.map((food) => Padding(
+                padding: const EdgeInsets.symmetric(vertical: 2),
+                child: Text(
+                  '• ${food['name']} = ${MoneyFormatService.formatWithSymbol(food['price'] ?? 0)}',
+                  style: const TextStyle(fontSize: 14),
+                ),
+              )),
+              const SizedBox(height: 8),
+              Text(
+                'Нийт дүн: ${MoneyFormatService.formatWithSymbol(_selectedTotalPrice)}',
+                style: const TextStyle(
+                  fontWeight: FontWeight.w600,
+                  fontSize: 16,
+                ),
+              ),
+              const SizedBox(height: 12),
+              const Text(
+                'Анхааруулга: Нэгэнт идсэн гэж тэмдэглэсний дараа буцааж өөрчлөх боломжгүй!',
+                style: TextStyle(color: Colors.orange, fontSize: 14),
+              ),
+            ],
           ),
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(16),
@@ -66,11 +155,10 @@ class _FoodEatenStatusWidgetState extends State<FoodEatenStatusWidget> {
     );
 
     if (confirmed == true) {
-      await _updateEatenStatus(true);
+      await _saveSelectedFoodsToEatens();
     }
   }
-
-  Future<void> _updateEatenStatus(bool eaten) async {
+  Future<void> _saveSelectedFoodsToEatens() async {
     setState(() => _isUpdating = true);
 
     try {
@@ -98,46 +186,42 @@ class _FoodEatenStatusWidgetState extends State<FoodEatenStatusWidget> {
         return;
       }
 
+      final selectedFoods = _selectedFoodsList;
+      final totalPrice = _selectedTotalPrice;
+
       // Update the calendarDays document
       await docRef.update({
-        'eatenForDay': eaten,
+        'eatenForDay': true,
         'updatedAt': FieldValue.serverTimestamp(),
       });
 
-      // If marking as eaten, save to eatens subcollection
-      if (eaten && widget.todayFoods.isNotEmpty) {
-        final now = DateTime.now();
-        final eatenData = {
-          'date': widget.dateString,
-          'totalPrice': _totalFoodPrice,
-          'foodCount': widget.todayFoods.length,
-          'foods': widget.todayFoods
-              .map(
-                (food) => {
-                  'name': food['name'] ?? 'Unknown Food',
-                  'price': food['price'] ?? 0,
-                  'description': food['description'] ?? '',
-                  'category': food['category'] ?? '',
-                  'image': food['image'] ?? '',
-                  'timestamp': food['timestamp'],
-                },
-              )
-              .toList(),
-          'eatenAt': Timestamp.fromDate(now),
-          'createdAt': FieldValue.serverTimestamp(),
-        };
+      // Save selected foods to eatens subcollection
+      final now = DateTime.now();
+      final eatenData = {
+        'date': widget.dateString,
+        'totalPrice': totalPrice,
+        'foodCount': selectedFoods.length,
+        'foods': selectedFoods,
+        'eatenAt': Timestamp.fromDate(now),
+        'createdAt': FieldValue.serverTimestamp(),
+      };
 
-        // Save to eatens subcollection
-        await _firestore
-            .collection('users')
-            .doc(_userId)
-            .collection('eatens')
-            .doc(widget.dateString)
-            .set(eatenData);
+      // Save to eatens subcollection
+      await _firestore
+          .collection('users')
+          .doc(_userId)
+          .collection('eatens')
+          .doc(widget.dateString)
+          .set(eatenData);
 
-        // Note: Real-time service will automatically update totalFoodAmount
-        // when the eatens collection changes via RealtimeFoodTotalService
-      }
+      // Update users collection with totalFoodAmount
+      await _firestore
+          .collection('users')
+          .doc(_userId)
+          .update({
+            'totalFoodAmount': FieldValue.increment(totalPrice),
+            'lastFoodUpdate': FieldValue.serverTimestamp(),
+          });
 
       widget.onStatusChanged();
 
@@ -145,42 +229,149 @@ class _FoodEatenStatusWidgetState extends State<FoodEatenStatusWidget> {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(
-              eaten
-                  ? 'Хоол идсэн гэж тэмдэглэлээ ✅${eaten ? ' (${MoneyFormatService.formatWithSymbol(_totalFoodPrice)} хадгалагдлаа)' : ''}'
-                  : 'Хоол идээгүй гэж тэмдэглэлээ',
+              'Сонгосон хоол хадгалагдлаа ✅ (${MoneyFormatService.formatWithSymbol(totalPrice)})',
             ),
-            backgroundColor: eaten ? Colors.green : Colors.blue,
+            backgroundColor: Colors.green,
             behavior: SnackBarBehavior.floating,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(12),
+            shape: const RoundedRectangleBorder(
+              borderRadius: BorderRadius.all(Radius.circular(12)),
             ),
           ),
         );
       }
     } catch (e) {
+      debugPrint('Error saving selected foods: $e');
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('Алдаа гарлаа: $e'),
             backgroundColor: Colors.red,
             behavior: SnackBarBehavior.floating,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(12),
+            shape: const RoundedRectangleBorder(
+              borderRadius: BorderRadius.all(Radius.circular(12)),
             ),
           ),
         );
       }
     } finally {
-      if (mounted) {
-        setState(() => _isUpdating = false);
-      }
+      setState(() => _isUpdating = false);
     }
   }
 
   int get _totalFoodPrice {
     return widget.todayFoods.fold<int>(
       0,
-      (total, food) => total + (food['price'] as int? ?? 0),
+      (total, food) => total + ((food['price'] ?? 0) as int),
+    );
+  }
+
+  Widget _buildFoodItem(Map<String, dynamic> food, int index) {
+    final isSelected = _selectedFoods[index] ?? false;
+    final price = food['price'] ?? 0;
+
+    return GestureDetector(
+      onTap: () => _showFoodDetailDialog(food),
+      child: Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          border: Border(
+            bottom: BorderSide(color: Colors.grey[200]!),
+          ),
+          color: isSelected ? Colors.green[50] : Colors.white,
+        ),
+        child: Row(
+          children: [
+            // Checkbox
+            Checkbox(
+              value: isSelected,
+              onChanged: widget.eatenForDay ? null : (bool? value) {
+                setState(() {
+                  _selectedFoods[index] = value ?? false;
+                });
+              },
+              activeColor: Colors.green,
+            ),
+            
+            // Food image
+            Container(
+              width: 48,
+              height: 48,
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(8),
+                color: Colors.grey[100],
+              ),
+              child: food['image'] != null && food['image'].isNotEmpty
+                  ? ClipRRect(
+                      borderRadius: BorderRadius.circular(8),
+                      child: Image.memory(
+                        base64Decode(food['image']),
+                        fit: BoxFit.cover,
+                        errorBuilder: (context, error, stackTrace) {
+                          return const Icon(Icons.restaurant, color: Colors.grey);
+                        },
+                      ),
+                    )
+                  : const Icon(Icons.restaurant, color: Colors.grey),
+            ),
+            
+            const SizedBox(width: 12),
+            
+            // Food details
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    food['name'] ?? 'Unknown Food',
+                    style: const TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  if (food['description'] != null && food['description'].isNotEmpty)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 4),
+                      child: Text(
+                        food['description'],
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: Colors.grey[600],
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                  const SizedBox(height: 4),
+                  Text(
+                    MoneyFormatService.formatWithSymbol(price),
+                    style: TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w500,
+                      color: isSelected ? Colors.green[700] : Colors.grey[600],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            
+            // Show selection indicator or tap indicator
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.end,
+              children: [
+                if (isSelected) ...[
+                  Icon(
+                    Icons.check_circle,
+                    color: Colors.green,
+                    size: 20,
+                  ),
+                ] else ...[
+                  Icon(Icons.info_outline, size: 16, color: Colors.grey[400]),
+                ],
+              ],
+            ),
+          ],
+        ),
+      ),
     );
   }
 
@@ -257,8 +448,18 @@ class _FoodEatenStatusWidgetState extends State<FoodEatenStatusWidget> {
                               : Colors.grey[700],
                         ),
                       ),
+                      if (!widget.eatenForDay && _selectedFoodsList.isNotEmpty) ...[
+                        Text(
+                          'Сонгосон: ${_selectedFoodsList.length} хоол • ${MoneyFormatService.formatWithSymbol(_selectedTotalPrice)}',
+                          style: TextStyle(
+                            fontSize: 14,
+                            color: Colors.green[600],
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                      ],
                       Text(
-                        '${widget.todayFoods.length} хоол • ${MoneyFormatService.formatWithSymbol(_totalFoodPrice)}',
+                        'Нийт: ${widget.todayFoods.length} хоол • ${MoneyFormatService.formatWithSymbol(_totalFoodPrice)}',
                         style: TextStyle(
                           fontSize: 14,
                           color: widget.eatenForDay
@@ -273,8 +474,84 @@ class _FoodEatenStatusWidgetState extends State<FoodEatenStatusWidget> {
             ),
           ),
 
+          // Selected foods summary (only show when foods are selected and not eaten yet)
+          if (!widget.eatenForDay && _selectedFoodsList.isNotEmpty)
+            Container(
+              margin: const EdgeInsets.symmetric(horizontal: 20),
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: Colors.green[50],
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: Colors.green[200]!),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Icon(Icons.shopping_cart, color: Colors.green[700], size: 20),
+                      const SizedBox(width: 8),
+                      Text(
+                        'Сонгосон хоол (${_selectedFoodsList.length})',
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w600,
+                          color: Colors.green[700],
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                  ..._selectedFoodsList.map((food) => Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 2),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Expanded(
+                          child: Text(
+                            '• ${food['name']}',
+                            style: const TextStyle(fontSize: 14),
+                          ),
+                        ),
+                        Text(
+                          MoneyFormatService.formatWithSymbol(food['price']),
+                          style: TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w600,
+                            color: Colors.green[700],
+                          ),
+                        ),
+                      ],
+                    ),
+                  )),
+                  const Divider(height: 16),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text(
+                        'Нийт дүн:',
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w600,
+                          color: Colors.green[700],
+                        ),
+                      ),
+                      Text(
+                        MoneyFormatService.formatWithSymbol(_selectedTotalPrice),
+                        style: TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.green[700],
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+
           // Food list
-          ...widget.todayFoods.map((food) => _buildFoodItem(food)),
+          ...widget.todayFoods.asMap().entries.map((entry) => _buildFoodItem(entry.value, entry.key)),
 
           // Action buttons
           Padding(
@@ -573,86 +850,5 @@ class _FoodEatenStatusWidgetState extends State<FoodEatenStatusWidget> {
     } catch (e) {
       return 'Unknown';
     }
-  }
-
-  Widget _buildFoodItem(Map<String, dynamic> food) {
-    return GestureDetector(
-      onTap: () => _showFoodDetailDialog(food),
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-        decoration: BoxDecoration(
-          border: Border(bottom: BorderSide(color: Colors.grey[200]!)),
-        ),
-        child: Row(
-          children: [
-            // Food image
-            Container(
-              width: 50,
-              height: 50,
-              decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(8),
-                color: Colors.grey[200],
-              ),
-              child: food['image'] != null && food['image'].isNotEmpty
-                  ? ClipRRect(
-                      borderRadius: BorderRadius.circular(8),
-                      child: Image.memory(
-                        base64Decode(food['image']),
-                        fit: BoxFit.cover,
-                        errorBuilder: (context, error, stackTrace) {
-                          return const Icon(Icons.fastfood, color: Colors.grey);
-                        },
-                      ),
-                    )
-                  : const Icon(Icons.fastfood, color: Colors.grey),
-            ),
-            const SizedBox(width: 12),
-
-            // Food details
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    food['name'] ?? 'Unknown Food',
-                    style: const TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w500,
-                    ),
-                  ),
-                  if (food['description'] != null &&
-                      food['description'].isNotEmpty)
-                    Text(
-                      food['description'],
-                      style: TextStyle(fontSize: 14, color: Colors.grey[600]),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                ],
-              ),
-            ),
-
-            // Price and tap indicator
-            Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text(
-                  MoneyFormatService.formatWithSymbol(food['price'] ?? 0),
-                  style: TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w600,
-                    color: widget.eatenForDay
-                        ? Colors.green[700]
-                        : Colors.grey[600],
-                  ),
-                ),
-                const SizedBox(width: 8),
-                Icon(Icons.info_outline, size: 16, color: Colors.grey[400]),
-              ],
-            ),
-          ],
-        ),
-      ),
-    );
   }
 }

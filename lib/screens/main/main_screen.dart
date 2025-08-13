@@ -6,6 +6,7 @@ import 'package:timex/screens/home/home_screen.dart';
 import 'package:timex/index.dart';
 import 'package:timex/screens/time_track/time_tracking_screen.dart';
 import 'package:timex/screens/qpay/qr_code_screen.dart';
+import 'package:timex/services/realtime_food_total_service.dart';
 
 class MainScreen extends StatefulWidget {
   const MainScreen({super.key});
@@ -35,6 +36,9 @@ class _MainScreenState extends State<MainScreen> {
       QRCodeScreen(),
     ];
     print('Screens initialized: ${_screens.length}');
+
+    // Start listening to real-time food total updates
+    RealtimeFoodTotalService.startListening();
   }
 
   @override
@@ -150,63 +154,63 @@ class _MainScreenState extends State<MainScreen> {
               },
             ),
             // Debug button to test QR screen
-            if (_currentIndex == 0) // Only show on first tab
-              Positioned(
-                top: 100,
-                right: 20,
-                child: FloatingActionButton(
-                  mini: true,
-                  onPressed: () {
-                    _pageController.jumpToPage(5); // Jump to QR screen (index 5)
-                    setState(() {
-                      _currentIndex = 5;
-                    });
-                  },
-                  backgroundColor: Colors.red,
-                  child: Icon(Icons.qr_code),
-                ),
-              ),
+            // if (_currentIndex == 0) // Only show on first tab
+            //   Positioned(
+            //     top: 100,
+            //     right: 20,
+            //     child: FloatingActionButton(
+            //       mini: true,
+            //       onPressed: () {
+            //         _pageController.jumpToPage(5); // Jump to QR screen (index 5)
+            //         setState(() {
+            //           _currentIndex = 5;
+            //         });
+            //       },
+            //       backgroundColor: Colors.red,
+            //       child: Icon(Icons.qr_code),
+            //     ),
+            //   ),
             // Meal Payment Test Button
-            if (_currentIndex == 0) // Only show on first tab
-              Positioned(
-                top: 160,
-                right: 20,
-                child: FloatingActionButton(
-                  mini: true,
-                  onPressed: () async {
-                    try {
-                      // Import the function at the top of this file
-                      // import '../../utils/meal_payment_example.dart';
+            // if (_currentIndex == 0) // Only show on first tab
+            //   Positioned(
+            //     top: 160,
+            //     right: 20,
+            //     child: FloatingActionButton(
+            //       mini: true,
+            //       onPressed: () async {
+            //         try {
+            //           // Import the function at the top of this file
+            //           // import '../../utils/meal_payment_example.dart';
                       
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(
-                          content: Text('🚀 Creating meal payment example...'),
-                          backgroundColor: Colors.blue,
-                        ),
-                      );
+            //           ScaffoldMessenger.of(context).showSnackBar(
+            //             const SnackBar(
+            //               content: Text('🚀 Creating meal payment example...'),
+            //               backgroundColor: Colors.blue,
+            //             ),
+            //           );
                       
-                      // Call the meal payment creation function
-                      // await createMealPaymentExample();
+            //           // Call the meal payment creation function
+            //           // await createMealPaymentExample();
                       
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(
-                          content: Text('✅ Meal payment example created! Check console.'),
-                          backgroundColor: Colors.green,
-                        ),
-                      );
-                    } catch (e) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(
-                          content: Text('❌ Error: $e'),
-                          backgroundColor: Colors.red,
-                        ),
-                      );
-                    }
-                  },
-                  backgroundColor: Colors.green,
-                  child: Icon(Icons.restaurant),
-                ),
-              ),
+            //           ScaffoldMessenger.of(context).showSnackBar(
+            //             const SnackBar(
+            //               content: Text('✅ Meal payment example created! Check console.'),
+            //               backgroundColor: Colors.green,
+            //             ),
+            //           );
+            //         } catch (e) {
+            //           ScaffoldMessenger.of(context).showSnackBar(
+            //             SnackBar(
+            //               content: Text('❌ Error: $e'),
+            //               backgroundColor: Colors.red,
+            //             ),
+            //           );
+            //         }
+            //       },
+            //       backgroundColor: Colors.green,
+            //       child: Icon(Icons.restaurant),
+            //     ),
+            //   ),
           ],
         ),
         bottomNavigationBar: _buildSegmentedTabBar(),
@@ -323,6 +327,7 @@ class _MainScreenState extends State<MainScreen> {
   @override
   void dispose() {
     _pageController.dispose();
+    RealtimeFoodTotalService.stopListening();
     super.dispose();
   }
 }
