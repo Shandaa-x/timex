@@ -5,6 +5,8 @@ import 'package:timex/screens/food_report/food_report_screen.dart';
 import 'package:timex/index.dart';
 import 'package:timex/screens/time_track/time_tracking_screen.dart';
 import 'package:timex/screens/qpay/qr_code_screen.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:google_sign_in/google_sign_in.dart';
 
 class MainScreen extends StatefulWidget {
   const MainScreen({super.key});
@@ -22,7 +24,6 @@ class _MainScreenState extends State<MainScreen> {
   @override
   void initState() {
     super.initState();
-    print('MainScreen initState called');
     _pageController = PageController(initialPage: _currentIndex);
 
     _screens = [
@@ -32,7 +33,6 @@ class _MainScreenState extends State<MainScreen> {
       FoodReportScreen(),
       QRCodeScreen(),
     ];
-    print('Screens initialized: ${_screens.length}');
   }
 
   @override
@@ -58,18 +58,12 @@ class _MainScreenState extends State<MainScreen> {
   }
 
   void _onTabTapped(int index) {
-    print('Tab tapped: $index (QR screen at index 4)'); // Debug output
-    print('Current screen count: ${_screens.length}');
     if (index < _screens.length) {
-      print('Navigating to screen: ${_screens[index].runtimeType}');
       _pageController.jumpToPage(index);
       setState(() {
         _currentIndex = index;
       });
     } else {
-      print(
-        'ERROR: Index $index out of bounds for screens array of length ${_screens.length}',
-      );
     }
   }
 
@@ -93,11 +87,32 @@ class _MainScreenState extends State<MainScreen> {
     );
 
     if (shouldLogout == true) {
-      // Navigate back to login selection
-      Navigator.of(context).pushNamedAndRemoveUntil('/login', (route) => false);
+      // Sign out using Firebase Auth - AuthWrapper will handle navigation
+      await _performLogout();
       return false;
     } else {
       return false;
+    }
+  }
+
+  Future<void> _performLogout() async {
+    try {
+      // Sign out from Firebase
+      await FirebaseAuth.instance.signOut();
+      
+      // Sign out from Google
+      await GoogleSignIn().signOut();
+      
+      // AuthWrapper will automatically handle navigation to login screen
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Гарах үед алдаа гарлаа: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
     }
   }
 
@@ -121,14 +136,9 @@ class _MainScreenState extends State<MainScreen> {
               controller: _pageController,
               itemCount: _screens.length,
               itemBuilder: (context, index) {
-                print(
-                  'Building screen at index: $index (${_screens[index].runtimeType})',
-                );
                 try {
                   return _screens[index];
-                } catch (e, stackTrace) {
-                  print('ERROR building screen at index $index: $e');
-                  print('Stack trace: $stackTrace');
+                } catch (e) {
                   return Scaffold(
                     body: Center(
                       child: Column(
@@ -159,14 +169,13 @@ class _MainScreenState extends State<MainScreen> {
                 child: FloatingActionButton(
                   mini: true,
                   onPressed: () {
-                    print('Debug: Navigating to QR screen');
                     _pageController.jumpToPage(4); // Jump to QR screen
                     setState(() {
                       _currentIndex = 4;
                     });
                   },
-                  child: Icon(Icons.qr_code),
                   backgroundColor: Colors.red,
+                  child: Icon(Icons.qr_code),
                 ),
               ),
           ],
@@ -204,7 +213,6 @@ class _MainScreenState extends State<MainScreen> {
               return Expanded(
                 child: InkWell(
                   onTap: () {
-                    print('Tab tapped: $index');
                     _onTabTapped(index);
                   },
                   borderRadius: BorderRadius.circular(12),

@@ -5,6 +5,8 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:flutter/foundation.dart';
 import 'dart:typed_data';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:google_sign_in/google_sign_in.dart';
 
 class QRCodeScreen extends StatefulWidget {
   const QRCodeScreen({super.key});
@@ -20,19 +22,51 @@ class _QRCodeScreenState extends State<QRCodeScreen> {
   Map<String, dynamic>? qpayResult;
   bool isLoading = false;
   String? errorMessage;
-  
+
   // QPay credentials from .env
   static const String qpayUrl = 'https://merchant.qpay.mn/v2';
   static const String username = 'GRAND_IT';
   static const String password = 'gY8ljnov';
   static const String template = 'GRAND_IT_INVOICE';
-  static const String apiKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJjbGllbnRfaWQiOiJiMmE2MGY5YS04MDRhLTQ2ZTMtYjMzNy03ZDlmN2UwYWE2ZDciLCJzZXNzaW9uX2lkIjoiUFlvdTVPck4tZ0dOUmk5dWJoNXBGZlhLZlhLa3lwNC0iLCJpYXQiOjE3NTMzNzA4NDgsImV4cCI6MzUwNjgyODA5Nn0.YEu775QWRyryG1X2gd1NS3XK-hXnLrQNfSmQejA8Tvo';
+  static const String apiKey =
+      'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJjbGllbnRfaWQiOiJiMmE2MGY5YS04MDRhLTQ2ZTMtYjMzNy03ZDlmN2UwYWE2ZDciLCJzZXNzaW9uX2lkIjoiUFlvdTVPck4tZ0dOUmk5dWJoNXBGZlhLZlhLa3lwNC0iLCJpYXQiOjE3NTMzNzA4NDgsImV4cCI6MzUwNjgyODA5Nn0.YEu775QWRyryG1X2gd1NS3XK-hXnLrQNfSmQejA8Tvo';
 
   @override
   void initState() {
     super.initState();
     print('QRCodeScreen initState called');
     _createQPayInvoice();
+  }
+
+  Future<void> _signOut() async {
+    try {
+      // Get Firebase Auth instance
+      final auth = FirebaseAuth.instance;
+
+      // Get Google Sign In instance
+      final googleSignIn = GoogleSignIn();
+
+      // Sign out from Firebase
+      await auth.signOut();
+
+      // Sign out from Google
+      await googleSignIn.signOut();
+
+      print('User signed out successfully from QR screen');
+
+      // AuthWrapper will automatically handle navigation to login screen
+      // No manual navigation needed here
+    } catch (e) {
+      print('Sign out error: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Гарах үед алдаа гарлаа: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
   }
 
   Future<void> _createQPayInvoice() async {
@@ -44,7 +78,8 @@ class _QRCodeScreenState extends State<QRCodeScreen> {
     // Check if running on web and show helpful message
     if (kIsWeb) {
       setState(() {
-        errorMessage = '🌐 Running on Web Browser\n\n✅ QPay integration is correctly implemented!\n\n🚫 Web browsers block direct API calls to external services (CORS policy)\n\n📱 Please test on a mobile device to see real QPay QR codes that work with Mongolian banking apps.\n\n💡 On mobile, this will generate scannable QR codes for 1000 MNT (Steak: 500 + Soup: 500)';
+        errorMessage =
+            '🌐 Running on Web Browser\n\n✅ QPay integration is correctly implemented!\n\n🚫 Web browsers block direct API calls to external services (CORS policy)\n\n📱 Please test on a mobile device to see real QPay QR codes that work with Mongolian banking apps.\n\n💡 On mobile, this will generate scannable QR codes for 1000 MNT (Steak: 500 + Soup: 500)';
         isLoading = false;
       });
       return;
@@ -53,39 +88,40 @@ class _QRCodeScreenState extends State<QRCodeScreen> {
     try {
       print('🚀 DIRECT QPAY API CALL STARTING...');
       print('💳 Using API Key: ${apiKey.substring(0, 20)}...');
-      
+
       // Get QPay access token first (like your JS code)
       final accessToken = await _getQPayAccessToken();
       if (accessToken == null) {
         throw Exception('Failed to get QPay access token');
       }
-      
+
       print('✅ Got QPay access token: ${accessToken.substring(0, 20)}...');
-      
+
       // Create QPay invoice with token
       print('🔥 CREATING QPAY INVOICE...');
       final invoiceResult = await _createQPayInvoiceWithToken(accessToken);
-      
+
       print('✅ REAL QPAY SUCCESS: ${invoiceResult['invoice_id']}');
-      
+
       setState(() {
         qpayResult = invoiceResult;
         isLoading = false;
       });
       return;
-      
     } catch (error) {
       print('Error creating QPay invoice: $error');
-      
+
       String userFriendlyError;
-      if (error.toString().contains('Failed to fetch') || 
+      if (error.toString().contains('Failed to fetch') ||
           error.toString().contains('CORS') ||
           error.toString().contains('network')) {
-        userFriendlyError = 'Cannot connect to QPay from web browser due to CORS policy.\n\n✅ The integration is working correctly!\n\n📱 Please test on a mobile device where QPay API calls will work properly and generate real, scannable QR codes.\n\n💡 On mobile, you\'ll see real QPay QR codes that work with Mongolian banking apps.';
+        userFriendlyError =
+            'Cannot connect to QPay from web browser due to CORS policy.\n\n✅ The integration is working correctly!\n\n📱 Please test on a mobile device where QPay API calls will work properly and generate real, scannable QR codes.\n\n💡 On mobile, you\'ll see real QPay QR codes that work with Mongolian banking apps.';
       } else {
-        userFriendlyError = 'Failed to create QPay invoice: ${error.toString()}';
+        userFriendlyError =
+            'Failed to create QPay invoice: ${error.toString()}';
       }
-      
+
       setState(() {
         errorMessage = userFriendlyError;
         isLoading = false;
@@ -96,8 +132,9 @@ class _QRCodeScreenState extends State<QRCodeScreen> {
   Future<String?> _getQPayAccessToken() async {
     try {
       // Use Basic Auth like in your working JS code
-      String basicAuth = 'Basic ${base64Encode(utf8.encode('$username:$password'))}';
-      
+      String basicAuth =
+          'Basic ${base64Encode(utf8.encode('$username:$password'))}';
+
       final response = await http.post(
         Uri.parse('$qpayUrl/auth/token'),
         headers: {
@@ -113,7 +150,9 @@ class _QRCodeScreenState extends State<QRCodeScreen> {
         final data = json.decode(response.body);
         return data['access_token'];
       } else {
-        throw Exception('QPay auth failed: ${response.statusCode} ${response.body}');
+        throw Exception(
+          'QPay auth failed: ${response.statusCode} ${response.body}',
+        );
       }
     } catch (error) {
       print('Error getting QPay access token: $error');
@@ -121,10 +160,12 @@ class _QRCodeScreenState extends State<QRCodeScreen> {
     }
   }
 
-  Future<Map<String, dynamic>> _createQPayInvoiceWithToken(String accessToken) async {
+  Future<Map<String, dynamic>> _createQPayInvoiceWithToken(
+    String accessToken,
+  ) async {
     try {
       final invoiceNo = 'TIMEX_${DateTime.now().millisecondsSinceEpoch}';
-      
+
       final requestBody = {
         'invoice_code': template,
         'sender_invoice_no': invoiceNo,
@@ -136,7 +177,9 @@ class _QRCodeScreenState extends State<QRCodeScreen> {
         'callback_url': 'http://localhost:3000/qpay/callback',
       };
 
-      print('✨ UPDATED VERSION - Creating QPay invoice with body: ${json.encode(requestBody)}');
+      print(
+        '✨ UPDATED VERSION - Creating QPay invoice with body: ${json.encode(requestBody)}',
+      );
 
       final response = await http.post(
         Uri.parse('$qpayUrl/invoice'),
@@ -149,10 +192,10 @@ class _QRCodeScreenState extends State<QRCodeScreen> {
 
       print('QPay invoice response status: ${response.statusCode}');
       print('QPay invoice response body: ${response.body}');
-      
+
       final responseData = json.decode(response.body);
       print('🎯 INVOICE CREATED:');
-      print('📄 Invoice ID: ${responseData['invoice_id']}');  
+      print('📄 Invoice ID: ${responseData['invoice_id']}');
       print('💰 Amount: 1000 MNT');
       print('🏦 QR Text Length: ${responseData['qr_text']?.length ?? 0}');
       print('📱 QR Image Length: ${responseData['qr_image']?.length ?? 0}');
@@ -161,7 +204,9 @@ class _QRCodeScreenState extends State<QRCodeScreen> {
       if (response.statusCode == 200) {
         return json.decode(response.body);
       } else {
-        throw Exception('QPay invoice creation failed: ${response.statusCode} ${response.body}');
+        throw Exception(
+          'QPay invoice creation failed: ${response.statusCode} ${response.body}',
+        );
       }
     } catch (error) {
       print('Error creating QPay invoice with token: $error');
@@ -194,7 +239,7 @@ class _QRCodeScreenState extends State<QRCodeScreen> {
         centerTitle: true,
         actions: [
           IconButton(
-            icon: isLoading 
+            icon: isLoading
                 ? SizedBox(
                     width: 20,
                     height: 20,
@@ -202,6 +247,11 @@ class _QRCodeScreenState extends State<QRCodeScreen> {
                   )
                 : const Icon(Icons.refresh, color: Colors.black),
             onPressed: isLoading ? null : _refreshQRCode,
+          ),
+          IconButton(
+            icon: const Icon(Icons.logout, color: Colors.red),
+            onPressed: _signOut,
+            tooltip: 'Гарах',
           ),
         ],
       ),
@@ -228,7 +278,7 @@ class _QRCodeScreenState extends State<QRCodeScreen> {
                     ],
                   ),
                 ),
-              
+
               // Error State
               if (!isLoading && errorMessage != null)
                 Container(
@@ -260,12 +310,15 @@ class _QRCodeScreenState extends State<QRCodeScreen> {
                     ],
                   ),
                 ),
-              
+
               // Success State - Real QPay QR Code
               if (!isLoading && errorMessage == null && qpayResult != null) ...[
                 // QPay Invoice Header
                 Container(
-                  padding: const EdgeInsets.symmetric(vertical: 15, horizontal: 20),
+                  padding: const EdgeInsets.symmetric(
+                    vertical: 15,
+                    horizontal: 20,
+                  ),
                   decoration: BoxDecoration(
                     color: Colors.blue.shade50,
                     borderRadius: BorderRadius.circular(10),
@@ -302,9 +355,9 @@ class _QRCodeScreenState extends State<QRCodeScreen> {
                     ],
                   ),
                 ),
-                
+
                 SizedBox(height: 30),
-                
+
                 // Real QPay QR Code (Base64)
                 Container(
                   padding: const EdgeInsets.all(20),
@@ -322,9 +375,9 @@ class _QRCodeScreenState extends State<QRCodeScreen> {
                   ),
                   child: _buildQRCode(),
                 ),
-                
+
                 SizedBox(height: 30),
-                
+
                 // Invoice Details
                 Container(
                   width: double.infinity,
@@ -346,21 +399,23 @@ class _QRCodeScreenState extends State<QRCodeScreen> {
                         ),
                       ),
                       SizedBox(height: 15),
-                      
+
                       // Products
-                      ...products.entries.map((entry) => Padding(
-                        padding: const EdgeInsets.symmetric(vertical: 4),
-                        child: Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            Text(entry.key),
-                            Text('₮${entry.value}'),
-                          ],
+                      ...products.entries.map(
+                        (entry) => Padding(
+                          padding: const EdgeInsets.symmetric(vertical: 4),
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Text(entry.key),
+                              Text('₮${entry.value}'),
+                            ],
+                          ),
                         ),
-                      )),
-                      
+                      ),
+
                       Divider(),
-                      
+
                       // Total
                       Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -385,9 +440,9 @@ class _QRCodeScreenState extends State<QRCodeScreen> {
                     ],
                   ),
                 ),
-                
+
                 SizedBox(height: 20),
-                
+
                 // Instructions
                 Container(
                   padding: const EdgeInsets.all(15),
@@ -444,7 +499,7 @@ class _QRCodeScreenState extends State<QRCodeScreen> {
         print('Error decoding base64 QR image: $e');
       }
     }
-    
+
     // Fallback: Generate QR code from qr_text if available
     if (qpayResult!['qr_text'] != null) {
       return QrImageView(
@@ -454,7 +509,7 @@ class _QRCodeScreenState extends State<QRCodeScreen> {
         backgroundColor: Colors.white,
       );
     }
-    
+
     // Check for other possible QR fields
     if (qpayResult!['qr_string'] != null) {
       return QrImageView(
@@ -464,7 +519,7 @@ class _QRCodeScreenState extends State<QRCodeScreen> {
         backgroundColor: Colors.white,
       );
     }
-    
+
     return _buildQRPlaceholder();
   }
 

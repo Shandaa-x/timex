@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:timex/screens/main/main_screen.dart';
 import 'package:timex/screens/time_track/time_tracking_screen.dart';
+import 'package:timex/screens/auth/auth_wrapper.dart';
 
 class Routes {
   static const main = 'MainScreen';
@@ -8,6 +9,7 @@ class Routes {
   static const loginScreen = 'LoginScreen';
   static const timeTrack = 'TimeTracking';
   static const addEmployee = 'AddEmployeeScreen';
+  static const authWrapper = 'AuthWrapper';
 
   final RouteObserver routeObserver;
 
@@ -20,6 +22,12 @@ class Routes {
       case Routes.main:
         route = MaterialPageRoute(
           builder: (context) => const MainScreen(),
+          settings: settings,
+        );
+        break;
+      case Routes.authWrapper:
+        route = MaterialPageRoute(
+          builder: (context) => const AuthWrapper(),
           settings: settings,
         );
         break;
