@@ -4,6 +4,7 @@ import 'package:google_sign_in/google_sign_in.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../main/main_screen.dart';
 import '../../services/firebase_test_service.dart';
+import '../../utils/debug_helper.dart';
 
 class GoogleLoginScreen extends StatefulWidget {
   const GoogleLoginScreen({super.key});
@@ -58,23 +59,25 @@ class _GoogleLoginScreenState extends State<GoogleLoginScreen> {
   Future<void> _signInWithGoogle() async {
     print('🚀 Starting Google Sign-In process...');
     
+    // Print debug information for troubleshooting
+    DebugHelper.printGoogleSignInDebugInfo();
+    
     setState(() {
       _isLoading = true;
       _error = null;
     });
     
     try {
-      // Step 1: Initialize Google Sign In with explicit configuration
+      // Step 1: Initialize Google Sign In with minimal configuration
       print('📱 Initializing Google Sign-In...');
       final GoogleSignIn googleSignIn = GoogleSignIn(
-        scopes: ['email', 'profile'],
-        // iOS-specific configuration
-        clientId: '325943660774-vfaq5nn119fbp2qo67mtc0ekbqbsogcl.apps.googleusercontent.com',
+        scopes: ['email'],
       );
       
-      // Step 2: Check if user is already signed in and sign out first
+      // Step 2: Check if user is already signed in and sign out first to clear cache
       print('🔄 Clearing previous sign-in state...');
       await googleSignIn.signOut();
+      await FirebaseAuth.instance.signOut();
       
       // Step 3: Start sign-in process
       print('🔐 Starting sign-in flow...');
@@ -87,10 +90,14 @@ class _GoogleLoginScreenState extends State<GoogleLoginScreen> {
       }
       
       print('✅ Google account selected: ${googleUser.email}');
+      print('📧 Display name: ${googleUser.displayName}');
       
       // Step 4: Get authentication details
       print('🔑 Getting authentication tokens...');
       final GoogleSignInAuthentication googleAuth = await googleUser.authentication;
+      
+      print('🔑 Access token available: ${googleAuth.accessToken != null}');
+      print('🔑 ID token available: ${googleAuth.idToken != null}');
       
       // Step 5: Check if tokens are available
       if (googleAuth.accessToken == null || googleAuth.idToken == null) {
@@ -115,7 +122,7 @@ class _GoogleLoginScreenState extends State<GoogleLoginScreen> {
         print('✅ Firebase auth successful: ${user.uid}');
         print('📧 User email: ${user.email}');
         
-        // Step 8: Save user profile to Firestore with better error handling
+        // Step 8: Save user profile to Firestore
         try {
           print('💾 Saving user data to Firestore...');
           final userDoc = FirebaseFirestore.instance.collection('users').doc(user.uid);
@@ -133,7 +140,7 @@ class _GoogleLoginScreenState extends State<GoogleLoginScreen> {
             'createdAt': userSnapshot.exists ? null : FieldValue.serverTimestamp(),
             'lastLogin': FieldValue.serverTimestamp(),
             'provider': 'google',
-            'platform': 'iOS',
+            'platform': 'android',
           };
 
           // Remove null values
@@ -165,9 +172,16 @@ class _GoogleLoginScreenState extends State<GoogleLoginScreen> {
       
       String errorMessage = 'Нэвтрэх явцад алдаа гарлаа. Дахин оролдоно уу.';
       
-      // More specific error handling
+      // More specific error handling for Android
       if (e.toString().contains('sign_in_failed')) {
-        errorMessage = 'Google нэвтрэлт тохиргооны алдаа. Дахин оролдоно уу.';
+        if (e.toString().contains('10:')) {
+          errorMessage = 'Аппыг Google Console дээр тохируулаагүй байна. Та өөрийн SHA-1 fingerprint-ийг Firebase Console дээр нэмнэ үү.';
+          print('🔧 SOLUTION: Add SHA-1 fingerprint to Firebase Console');
+          print('🔧 Current package: com.example.timex');
+          print('🔧 Project: timex-9ce03');
+        } else {
+          errorMessage = 'Google нэвтрэлт тохиргооны алдаа. Дахин оролдоно уу.';
+        }
       } else if (e.toString().contains('network_error') || e.toString().contains('network')) {
         errorMessage = 'Интернет холболтоо шалгаад дахин оролдоно уу.';
       } else if (e.toString().contains('sign_in_canceled')) {
