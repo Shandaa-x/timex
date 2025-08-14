@@ -24,21 +24,18 @@
 - tsagiin tailan harahdaa duriin udur songoh
 - ajillaij bui tsag zasah
 - default aar idewhtei bga 7 honog songogdoh
-
-
+- niit tsagiig tsag minutii nariiwchlalaar haruulah => time report screen
+- tsagiin tailan => banknii huulga shig shvvj harah
+- hoolnii zardliig hadgalah, hoolnii zardliig tootsooloh. tootsoolson bolon hadgalsan 
+  2 dvng haritsuulah
+- hoolnii tailan => sariin filteriig awah, bvh medeellee haruulah
+- hool nogoon, tsag tsenher
 
 ### 8/12 todo list
 - tulburiin tvvh harah hadgalah
-- hoolnii zardliig hadgalah, hoolnii zardliig tootsooloh. tootsoolson bolon hadgalsan 
-2 dvng haritsuulj zurvv bhgv esehiig shalgah
-- hoolnii tailan => sariin filteriig awah, bvh medeellee haruulah, niit tulsun,
-- tsagiin tailan => banknii huulga shig shvvj harah
 - tabview => tulburiin tvvh (payment statement) 
-- hool nogoon, tsag tsenher
-- niit tsagiig tsag minutii nariiwchlalaar haruulah => time report screen
-
-
 
 ### 8/13 todo list
 - google login
 - qpay integration
+- news

@@ -5,8 +5,7 @@ import 'dart:async';
 import '../../widgets/common_app_bar.dart';
 import '../../widgets/custom_drawer.dart';
 import '../../services/money_format.dart';
-import 'widgets/summary_section_widget.dart';
-import 'widgets/payment_history_section_widget.dart';
+import '../payment/payment_options_screen.dart';
 import 'widgets/filter_bottom_sheet_widget.dart';
 import 'tabview/daily_tab_screen.dart';
 import 'tabview/history_tab_screen.dart';
@@ -659,7 +658,16 @@ class _FoodReportScreenState extends State<FoodReportScreen>
                               ),
                               const SizedBox(height: 12),
                               InkWell(
-                                onTap: () {},
+                                onTap: () {
+                                  Navigator.push(
+                                    context,
+                                    MaterialPageRoute(
+                                      builder: (context) => PaymentOptionsScreen(
+                                        initialAmount: _totalPaymentAmount,
+                                      ),
+                                    ),
+                                  );
+                                },
                                 child: Container(
                                   width: double.infinity,
                                   padding: const EdgeInsets.all(12),
