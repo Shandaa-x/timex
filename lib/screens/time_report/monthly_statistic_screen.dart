@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:timex/screens/home/widgets/custom_sliver_appbar.dart';
 import 'package:timex/screens/time_report/day_info/day_info_screen.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:timex/widgets/custom_drawer.dart';
@@ -171,11 +172,18 @@ class _MonthlyStatisticsScreenState extends State<MonthlyStatisticsScreen> {
     });
 
     try {
-      await ImageService.confirmDay(_userId, dateString, dayData, selectedImages);
+      await ImageService.confirmDay(
+        _userId,
+        dateString,
+        dayData,
+        selectedImages,
+      );
 
       // Update local data immediately (only update _monthData, not both _monthData and _monthlyData['days'])
       setState(() {
-        final dayIndex = _monthData.indexWhere((day) => day['date'] == dateString);
+        final dayIndex = _monthData.indexWhere(
+          (day) => day['date'] == dateString,
+        );
         if (dayIndex != -1) {
           _monthData[dayIndex]['confirmed'] = true;
           if ((selectedImages ?? []).isNotEmpty) {
@@ -194,7 +202,9 @@ class _MonthlyStatisticsScreenState extends State<MonthlyStatisticsScreen> {
         }
 
         // Update total hours if this day is now confirmed
-        if (!dayData['isHoliday'] && dayData['workingHours'] > 0 && !(dayData['confirmed'] ?? false)) {
+        if (!dayData['isHoliday'] &&
+            dayData['workingHours'] > 0 &&
+            !(dayData['confirmed'] ?? false)) {
           _totalHours += dayData['workingHours'];
         }
 
@@ -221,7 +231,7 @@ class _MonthlyStatisticsScreenState extends State<MonthlyStatisticsScreen> {
       } else {
         errorMessage = 'Алдаа гарлаа: $e';
       }
-      
+
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(errorMessage),
@@ -245,7 +255,7 @@ class _MonthlyStatisticsScreenState extends State<MonthlyStatisticsScreen> {
   Future<void> _pickMultipleImages(String dateString) async {
     try {
       final images = await ImageService.pickMultipleImages();
-      
+
       if (images != null && images.isNotEmpty) {
         setState(() {
           if (_selectedImages[dateString] == null) {
@@ -282,6 +292,70 @@ class _MonthlyStatisticsScreenState extends State<MonthlyStatisticsScreen> {
       lastDate: DateTime(now.year + 1, 12, 31),
       initialDateRange: _filterRange,
       helpText: 'Хугацааны интервал сонгох',
+      builder: (context, child) {
+        return Theme(
+          data: Theme.of(context).copyWith(
+            colorScheme: const ColorScheme.light(
+              primary: Color(
+                0xFF3B82F6,
+              ), // Blue accent matching the monthly statistics
+              onPrimary: Colors.white,
+              secondary: Color(0xFF3B82F6),
+              onSecondary: Colors.white,
+              surface: Colors.white,
+              onSurface: Color(0xFF1E293B),
+              surfaceVariant: Color(0xFFF8FAFC), // Light background
+              onSurfaceVariant: Color(0xFF64748B),
+              outline: Color(0xFFE2E8F0),
+            ),
+            dialogBackgroundColor: Colors.white,
+            textTheme: Theme.of(context).textTheme.copyWith(
+              headlineMedium: const TextStyle(
+                color: Color(0xFF1E293B),
+                fontWeight: FontWeight.w600,
+                fontSize: 18,
+              ),
+              bodyLarge: const TextStyle(
+                color: Color(0xFF475569),
+                fontSize: 14,
+                fontWeight: FontWeight.w500,
+              ),
+              bodyMedium: const TextStyle(
+                color: Color(0xFF64748B),
+                fontSize: 13,
+              ),
+            ),
+            elevatedButtonTheme: ElevatedButtonThemeData(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFF3B82F6),
+                foregroundColor: Colors.white,
+                elevation: 2,
+                shadowColor: const Color(0xFF3B82F6).withOpacity(0.3),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+              ),
+            ),
+            textButtonTheme: TextButtonThemeData(
+              style: TextButton.styleFrom(
+                foregroundColor: const Color(0xFF3B82F6),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8),
+                ),
+              ),
+            ),
+            dialogTheme: const DialogThemeData(
+              backgroundColor: Colors.white,
+              elevation: 8,
+              shadowColor: Color(0x1A000000),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.all(Radius.circular(16)),
+              ),
+            ),
+          ),
+          child: child!,
+        );
+      },
     );
     if (picked != null) {
       setState(() {
@@ -305,9 +379,13 @@ class _MonthlyStatisticsScreenState extends State<MonthlyStatisticsScreen> {
     if (_filterRange == null || _monthData.isEmpty) return;
     final filtered = _monthData.where((day) {
       final date = DateTime.tryParse(day['date'] ?? '') ?? DateTime(2000);
-      return !date.isBefore(_filterRange!.start) && !date.isAfter(_filterRange!.end);
+      return !date.isBefore(_filterRange!.start) &&
+          !date.isAfter(_filterRange!.end);
     }).toList();
-    final total = filtered.fold<double>(0.0, (sum, day) => sum + (day['workingHours'] ?? 0.0));
+    final total = filtered.fold<double>(
+      0.0,
+      (sum, day) => sum + (day['workingHours'] ?? 0.0),
+    );
     setState(() {
       _filteredDays = filtered;
       _filteredTotalHours = total;
@@ -329,15 +407,25 @@ class _MonthlyStatisticsScreenState extends State<MonthlyStatisticsScreen> {
 
     // Helper: get data for cards based on filter
     final bool isFilterActive = _filterActive && _filterRange != null;
-    final List<Map<String, dynamic>> daysForCards = isFilterActive ? _filteredDays : _monthData;
-    final double totalHoursForCard = isFilterActive ? _filteredTotalHours : _totalHours;
+    final List<Map<String, dynamic>> daysForCards = isFilterActive
+        ? _filteredDays
+        : _monthData;
+    final double totalHoursForCard = isFilterActive
+        ? _filteredTotalHours
+        : _totalHours;
 
     // For monthly statistics chart, use filtered days if filter is active
-    final List<Map<String, dynamic>> chartDays = isFilterActive ? _filteredDays : _monthData;
+    final List<Map<String, dynamic>> chartDays = isFilterActive
+        ? _filteredDays
+        : _monthData;
     final chartData = ChartCalculator.calculateChartData(chartDays, null);
     // For chart labels: use filter's start month/year if filtering, else selected month/year
-    final int chartMonth = isFilterActive ? _filterRange!.start.month : _selectedMonth;
-    final int chartYear = isFilterActive ? _filterRange!.start.year : _selectedYear;
+    final int chartMonth = isFilterActive
+        ? _filterRange!.start.month
+        : _selectedMonth;
+    final int chartYear = isFilterActive
+        ? _filterRange!.start.year
+        : _selectedYear;
 
     return PopScope(
       canPop: true,
@@ -357,31 +445,12 @@ class _MonthlyStatisticsScreenState extends State<MonthlyStatisticsScreen> {
         body: CustomScrollView(
           slivers: [
             // Modern App Bar
-            SliverAppBar(
-              expandedHeight: 70,
-              floating: false,
-              pinned: true,
-              backgroundColor: Colors.blueAccent,
-              foregroundColor: Colors.white,
-              elevation: 0,
-              flexibleSpace: FlexibleSpaceBar(
-                title: const Text(
-                  'Тайлан',
-                  style: TextStyle(
-                    fontWeight: FontWeight.w600,
-                    fontSize: 15,
-                    color: Colors.white,
-                  ),
-                ),
-                background: Container(
-                  decoration: const BoxDecoration(color: Colors.blueAccent),
-                ),
-              ),
-              shape: const RoundedRectangleBorder(
-                borderRadius: BorderRadius.vertical(
-                  bottom: Radius.circular(20),
-                ),
-              ),
+            CustomSliverAppBar(
+              title: "Цагийн тайлан",
+              gradientColors: [
+                Colors.blueAccent,
+                Colors.blueAccent,
+              ], // Gradient
             ),
 
             // Content
@@ -506,7 +575,10 @@ class _MonthlyStatisticsScreenState extends State<MonthlyStatisticsScreen> {
 
                           // Monthly Statistics (show for current month or filter)
                           MonthlyStatisticsCard(
-                            monthlyHours: chartDays.fold<double>(0.0, (sum, day) => sum + (day['workingHours'] ?? 0.0)),
+                            monthlyHours: chartDays.fold<double>(
+                              0.0,
+                              (sum, day) => sum + (day['workingHours'] ?? 0.0),
+                            ),
                             monthNames: _monthNames,
                             selectedMonth: chartMonth,
                             selectedYear: chartYear,

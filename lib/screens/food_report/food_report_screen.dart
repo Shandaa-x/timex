@@ -1,12 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:timex/screens/home/widgets/custom_sliver_appbar.dart';
 import 'dart:async';
-import '../../widgets/common_app_bar.dart';
 import '../../widgets/custom_drawer.dart';
 import '../../services/money_format.dart';
 import '../payment/payment_options_screen.dart';
-import 'widgets/filter_bottom_sheet_widget.dart';
 import 'tabview/daily_tab_screen.dart';
 import 'tabview/history_tab_screen.dart';
 import 'services/food_data_service.dart';
@@ -34,10 +33,6 @@ class _FoodReportScreenState extends State<FoodReportScreen>
       {}; // Track which individual meals are paid for
 
   // Balance and budget tracking
-  List<Map<String, dynamic>> _paymentHistory = [];
-
-  // User statistics from totalFoodAmount
-  int _totalFoodAmount = 0;
   int _paymentBalance = 0;
   int _totalPaymentAmount = 0;
   bool _userStatsLoading = true;
@@ -45,7 +40,6 @@ class _FoodReportScreenState extends State<FoodReportScreen>
 
   // Filtering
   String? _selectedFoodFilter;
-  List<String> _availableFoodTypes = [];
 
   // Tab controller
   late TabController _tabController;
@@ -58,6 +52,12 @@ class _FoodReportScreenState extends State<FoodReportScreen>
   void initState() {
     super.initState();
     _tabController = TabController(length: 2, vsync: this);
+    // Add listener to rebuild when tab changes
+    _tabController.addListener(() {
+      if (!_tabController.indexIsChanging) {
+        setState(() {});
+      }
+    });
     _loadMonthlyFoodData();
     _loadUserSettings();
     _loadPaymentHistory();
@@ -93,7 +93,7 @@ class _FoodReportScreenState extends State<FoodReportScreen>
                 // _paymentBalance = Payment Balance (payments made - food consumed)
                 _totalPaymentAmount =
                     totalFoodConsumed; // Show totalFoodAmount as "Төлөх дүн"
-                _totalFoodAmount = totalPaymentsMade; // Total Payments Made
+                // Total Payments Made - removed unused variable
                 _paymentBalance =
                     totalPaymentsMade -
                     totalFoodConsumed; // Balance (negative if owing money)
@@ -154,14 +154,9 @@ class _FoodReportScreenState extends State<FoodReportScreen>
     }
   }
 
-  // Load payment history from service
+  // Load payment history from service - removed as not used
   Future<void> _loadPaymentHistory() async {
-    try {
-      _paymentHistory = await PaymentService.loadPaymentHistory(_selectedMonth);
-    } catch (e) {
-      print('Error loading payment history: $e');
-      _paymentHistory = [];
-    }
+    // Payment history functionality removed as it's not currently used
   }
 
   // Load user settings (for future use)
@@ -350,20 +345,10 @@ class _FoodReportScreenState extends State<FoodReportScreen>
     }
   }
 
-  // Update food filtering using service
+  // Update food filtering using service - removed as not used
   void _updateFoodFilter() {
-    _availableFoodTypes = FoodDataService.getAvailableFoodTypes(
-      _monthlyFoodData,
-    );
+    // Food filtering functionality removed as it's not currently used
   }
-
-  // Get filtered food data using service
-  Map<String, List<Map<String, dynamic>>> get _filteredFoodData =>
-      FoodCalculationService.getFilteredFoodData(
-        _monthlyFoodData,
-        _eatenForDayData,
-        _selectedFoodFilter,
-      );
 
   // Get only unpaid meals data using service
   Map<String, List<Map<String, dynamic>>> get _unpaidFoodData =>
@@ -377,30 +362,6 @@ class _FoodReportScreenState extends State<FoodReportScreen>
   // Get unpaid meals total using service
   int get _unpaidTotalAmount =>
       FoodCalculationService.calculateUnpaidTotalAmount(_unpaidFoodData);
-
-  // Get paid meals total using service
-  int get _paidTotalAmount => FoodCalculationService.calculatePaidTotalAmount(
-    _filteredFoodData,
-    _paidMeals,
-  );
-
-  void _showFilterBottomSheet() {
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (context) => FilterBottomSheetWidget(
-        availableFoodTypes: _availableFoodTypes,
-        selectedFoodFilter: _selectedFoodFilter,
-        onApplyFilter: (String? filter) {
-          setState(() {
-            _selectedFoodFilter = filter;
-          });
-          Navigator.of(context).pop();
-        },
-      ),
-    );
-  }
 
   // Check if any foods exist in the selected month
   bool get _hasAnyFoodsInMonth => _monthlyFoodData.isNotEmpty;
@@ -468,33 +429,17 @@ class _FoodReportScreenState extends State<FoodReportScreen>
           ),
         ),
         const SizedBox(height: 16),
-        // Tab content
-        LayoutBuilder(
-          builder: (context, constraints) {
-            // Calculate a reasonable height based on screen size
-            final screenHeight = MediaQuery.of(context).size.height;
-            final availableHeight = screenHeight * 0.6; // Use 60% of screen height
-            
-            return SizedBox(
-              height: availableHeight,
-              child: TabBarView(
-                controller: _tabController,
-                children: [
-                  // Tab 1: Daily Breakdown
-                  DailyTabScreen(
-                    unpaidFoodData: _unpaidFoodData,
-                    selectedFoodFilter: _selectedFoodFilter,
-                    onMarkMealAsPaid: _markMealAsPaid,
-                    onPayMonthly: _payMonthly,
-                    hasAnyFoodsInMonth: _hasAnyFoodsInMonth,
-                  ),
-                  // Tab 2: History
-                  const HistoryTabScreen(),
-                ],
-              ),
-            );
-          },
-        ),
+        // Tab content without TabBarView - just show based on selected index
+        if (_tabController.index == 0)
+          DailyTabScreen(
+            unpaidFoodData: _unpaidFoodData,
+            selectedFoodFilter: _selectedFoodFilter,
+            onMarkMealAsPaid: _markMealAsPaid,
+            onPayMonthly: _payMonthly,
+            hasAnyFoodsInMonth: _hasAnyFoodsInMonth,
+          )
+        else
+          const HistoryTabScreen(),
       ],
     );
   }
@@ -520,29 +465,20 @@ class _FoodReportScreenState extends State<FoodReportScreen>
         currentScreen: DrawerScreenType.foodReport,
         onNavigateToTab: widget.onNavigateToTab,
       ),
-      appBar: const CommonAppBar(
-        title: 'Хоолны тайлан',
-        variant: AppBarVariant.standard,
-        backgroundColor: Colors.white,
-      ),
-      body: Column(
-        children: [
-          // MonthNavigationWidget(
-          //   selectedMonth: _selectedMonth,
-          //   onPreviousMonth: _navigatePreviousMonth,
-          //   onNextMonth: _navigateNextMonth,
-          // ),
-          if (_isLoading)
-            const Expanded(child: Center(child: CircularProgressIndicator()))
-          else
-            Expanded(
-              child: RefreshIndicator(
-                onRefresh: _refreshData,
-                child: SingleChildScrollView(
+      body: _isLoading 
+        ? const Center(child: CircularProgressIndicator())
+        : RefreshIndicator(
+            onRefresh: _refreshData,
+            child: CustomScrollView(
+              slivers: [
+                CustomSliverAppBar(
+                  title: 'Хоолны тайлан',
+                  gradientColors: const [Color(0xFF10B981), Color(0xFF059669)],
+                ),
+                SliverPadding(
                   padding: const EdgeInsets.all(16),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
+                  sliver: SliverList(
+                    delegate: SliverChildListDelegate([
                       // Food Statistics Card
                       if (_userStatsLoading)
                         Container(
@@ -670,9 +606,10 @@ class _FoodReportScreenState extends State<FoodReportScreen>
                                   Navigator.push(
                                     context,
                                     MaterialPageRoute(
-                                      builder: (context) => PaymentOptionsScreen(
-                                        initialAmount: _totalPaymentAmount,
-                                      ),
+                                      builder: (context) =>
+                                          PaymentOptionsScreen(
+                                            initialAmount: _totalPaymentAmount,
+                                          ),
                                     ),
                                   );
                                 },
@@ -735,13 +672,12 @@ class _FoodReportScreenState extends State<FoodReportScreen>
                       // Tabbed breakdown section
                       _buildTabbedBreakdownSection(),
                       const SizedBox(height: 24),
-                    ],
+                    ]),
                   ),
                 ),
-              ),
+              ],
             ),
-        ],
-      ),
+          ),
     );
   }
 

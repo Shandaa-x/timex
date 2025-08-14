@@ -1,5 +1,3 @@
-
-
 ### #1 taskuud:
 - hool ustgah, editleh  #1
 -  mungun dungee oruulah eswel tuluh songoltoo hiih #1
@@ -39,3 +37,10 @@
 - google login
 - qpay integration
 - news
+
+### 
+- tsalingiin tailan tootsooloh
+- medee CRUD 
+- tulburiin tvvh 
+- uuriinhuu news iig harah 
+- 

@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:timex/screens/meal_plan/widgets/custom_app_bar.dart';
+import 'package:timex/screens/home/widgets/custom_sliver_appbar.dart';
 import '../../theme/app_theme.dart';
 import '../../widgets/custom_drawer.dart';
 import './widgets/calendar_header_widget.dart';
@@ -220,8 +220,7 @@ class _MealPlanCalendarState extends State<MealPlanCalendar>
               'description': food['description'] ?? '',
               'price': food['price'] ?? 0,
               'image': food['image'] ?? '',
-              'createdAt':
-                  food['createdAt'] ?? DateTime.now().millisecondsSinceEpoch,
+              'createdAt': food['createdAt'] ?? DateTime.now().millisecondsSinceEpoch,
               'likes': food['likes'] ?? <String>[],
               'likesCount': food['likesCount'] ?? 0,
               'comments': food['comments'] ?? <Map<String, dynamic>>[],
@@ -440,101 +439,116 @@ class _MealPlanCalendarState extends State<MealPlanCalendar>
         currentScreen: DrawerScreenType.mealPlan,
         onNavigateToTab: widget.onNavigateToTab,
       ),
-      appBar: const CustomAppBar(
-        title: 'Food Plan',
-        variant: CustomAppBarVariant.mealPlan,
-        backgroundColor: Colors.white,
-      ),
-      body: Column(
-        children: [
+      body: CustomScrollView(
+        slivers: [
+          CustomSliverAppBar(title: 'Хоолны хуваарь'),
+          
           // Offline indicator
           if (_isOffline)
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.symmetric(vertical: 8),
-              color: Colors.amber,
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(Icons.cloud_off, color: Colors.red, size: 16),
-                  const SizedBox(width: 8),
-                  Text(
-                    'Offline - Showing cached food data',
-                    style: TextStyle(
-                      color: Colors.red,
-                      fontWeight: FontWeight.w500,
+            SliverToBoxAdapter(
+              child: Container(
+                width: double.infinity,
+                padding: const EdgeInsets.symmetric(vertical: 8),
+                color: Colors.amber,
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(Icons.cloud_off, color: Colors.red, size: 16),
+                    const SizedBox(width: 8),
+                    Text(
+                      'Offline - Showing cached food data',
+                      style: TextStyle(
+                        color: Colors.red,
+                        fontWeight: FontWeight.w500,
+                      ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
             ),
-
+          
           // Calendar header
-          CalendarHeaderWidget(
-            currentDate: _currentDate,
-            isWeekView: _isWeekView,
-            onPreviousPressed: _navigatePrevious,
-            onNextPressed: _navigateNext,
-            onViewToggle: _toggleView,
-            onFilterModeToggle: _toggleFilterMode,
-            isFilterMode: _isFilterMode,
-            selectedFilter: _selectedFilter,
-          ),
-
-          // Calendar content
-          Expanded(
-            child: RefreshIndicator(
-              onRefresh: _refreshFoodData,
-              color: colorScheme.primary,
-              child: _isLoading
-                  ? Center(
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          CircularProgressIndicator(color: colorScheme.primary),
-                          const SizedBox(height: 16),
-                          Text(
-                            'Loading food data...',
-                            style: theme.textTheme.bodyMedium?.copyWith(
-                              color: colorScheme.onSurface.withOpacity(0.6),
-                            ),
-                          ),
-                        ],
-                      ),
-                    )
-                  : _isWeekView
-                  ? WeekViewWidget(
-                      currentWeek: _currentDate,
-                      weekMeals: _isFilterMode ? _filteredFoodData : _foodData,
-                      onMealTap: _onFoodTap,
-                      onAddMeal: _onAddFood,
-                      onMealLongPress:
-                          (
-                            date,
-                            mealType,
-                            food,
-                          ) {}, // Remove long press functionality
-                      onFoodUpdated: (updatedFood) {
-                        // Find which date this food belongs to and update it
-                        for (final dateKey in _foodData.keys) {
-                          final foodIndex = _foodData[dateKey]!.indexWhere(
-                            (f) => f['id'] == updatedFood['id'],
-                          );
-                          if (foodIndex != -1) {
-                            _updateFoodInCalendar(dateKey, updatedFood);
-                            break;
-                          }
-                        }
-                      },
-                    )
-                  : MonthViewWidget(
-                      currentMonth: _currentDate,
-                      monthMeals: _isFilterMode ? _filteredFoodData : _foodData,
-                      onDateTap: _onDateTap,
-                      onAddMeal: _onAddFood,
-                    ),
+          SliverToBoxAdapter(
+            child: CalendarHeaderWidget(
+              currentDate: _currentDate,
+              isWeekView: _isWeekView,
+              onPreviousPressed: _navigatePrevious,
+              onNextPressed: _navigateNext,
+              onViewToggle: _toggleView,
+              onFilterModeToggle: _toggleFilterMode,
+              isFilterMode: _isFilterMode,
+              selectedFilter: _selectedFilter,
             ),
           ),
+          
+          // Loading state
+          if (_isLoading)
+            SliverFillRemaining(
+              child: Center(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    CircularProgressIndicator(
+                      color: colorScheme.primary,
+                    ),
+                    const SizedBox(height: 16),
+                    Text(
+                      'Loading food data...',
+                      style: theme.textTheme.bodyMedium?.copyWith(
+                        color: colorScheme.onSurface.withOpacity(0.6),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          
+          // Calendar content using original widgets
+          if (!_isLoading)
+            SliverToBoxAdapter(
+              child: Container(
+                height: MediaQuery.of(context).size.height - 200, // Set a proper height
+                child: RefreshIndicator(
+                  onRefresh: _refreshFoodData,
+                  color: colorScheme.primary,
+                  child: _isWeekView
+                      ? WeekViewWidget(
+                          currentWeek: _currentDate,
+                          weekMeals: _isFilterMode
+                              ? _filteredFoodData
+                              : _foodData,
+                          onMealTap: _onFoodTap,
+                          onAddMeal: _onAddFood,
+                          onMealLongPress:
+                              (
+                                date,
+                                mealType,
+                                food,
+                              ) {}, // Remove long press functionality
+                          onFoodUpdated: (updatedFood) {
+                            // Find which date this food belongs to and update it
+                            for (final dateKey in _foodData.keys) {
+                              final foodIndex = _foodData[dateKey]!.indexWhere(
+                                (f) => f['id'] == updatedFood['id'],
+                              );
+                              if (foodIndex != -1) {
+                                _updateFoodInCalendar(dateKey, updatedFood);
+                                break;
+                              }
+                            }
+                          },
+                        )
+                      : MonthViewWidget(
+                          currentMonth: _currentDate,
+                          monthMeals: _isFilterMode
+                              ? _filteredFoodData
+                              : _foodData,
+                          onDateTap: _onDateTap,
+                          onAddMeal: _onAddFood,
+                        ),
+                ),
+              ),
+            ),
         ],
       ),
       floatingActionButton: AnimatedBuilder(
