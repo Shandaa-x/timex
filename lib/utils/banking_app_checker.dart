@@ -141,7 +141,8 @@ class BankingAppChecker {
 
     // Test schemes for each bank
     final bankSchemes = {
-      'Khan Bank': ['khanbank://', 'khanbankapp://', 'socialpay://'],
+      'Khan Bank': ['khanbank://', 'khanbankapp://'],
+      'Social Pay': ['socialpay-payment://', 'socialpay://'],
       'State Bank': ['statebank://', 'statebankapp://'],
       'TDB Bank': ['tdbbank://', 'tdb://'],
       'Xac Bank': ['xacbank://', 'xac://'],
@@ -161,6 +162,8 @@ class BankingAppChecker {
         String deepLink;
         if (workingScheme.startsWith('qpay://') && invoiceId != null) {
           deepLink = 'qpay://invoice?id=$invoiceId';
+        } else if (workingScheme.startsWith('socialpay-payment://')) {
+          deepLink = 'socialpay-payment://q?qPay_QRcode=$encodedQR';
         } else if (workingScheme.startsWith('socialpay://')) {
           deepLink = 'socialpay://qpay?qr=$encodedQR';
         } else if (workingScheme.startsWith('khanbank://')) {
