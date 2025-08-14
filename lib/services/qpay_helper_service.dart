@@ -61,11 +61,11 @@ class QPayHelperService {
       'invoice_description': invoiceDescription,
       'amount': amount.round(),
       'callback_url': callbackUrl ?? 'http://localhost:3000/qpay/webhook',
-      
+
       // Optional but recommended fields
-      'allow_partial': true,  // Allow partial payments
-      'minimum_amount': 100,  // Minimum 100 MNT
-      'allow_exceed': true,   // Allow paying more than invoice amount
+      'allow_partial': true, // Allow partial payments
+      'minimum_amount': 100, // Minimum 100 MNT
+      'allow_exceed': true, // Allow paying more than invoice amount
       'maximum_amount': (amount * 10).round(), // Up to 10x the invoice amount
     };
 
@@ -178,6 +178,7 @@ class QPayHelperService {
     required String orderId,
     required String userId,
     required String invoiceDescription,
+    required bool enableSocialPay,
     String? callbackUrl,
   }) async {
     try {

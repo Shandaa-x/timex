@@ -11,6 +11,7 @@ import '../../services/qpay_webhook_service.dart';
 import '../../services/qpay_helper_service.dart';
 import '../../utils/qr_utils.dart';
 import '../../utils/banking_app_checker.dart';
+import '../../utils/socialpay_integration.dart';
 
 class QRCodeScreen extends StatefulWidget {
   const QRCodeScreen({super.key});
@@ -54,6 +55,40 @@ class _QRCodeScreenState extends State<QRCodeScreen> {
       } catch (error) {
         print('Error checking banking apps: $error');
       }
+    }
+  }
+
+  /// Open SocialPay with deep link
+  Future<void> _openSocialPay() async {
+    if (qpayResult == null) {
+      _showMessage('No invoice available', isError: true);
+      return;
+    }
+
+    try {
+      final qrText = qpayResult!['qr_text'] ?? '';
+      final invoiceId = qpayResult!['invoice_id'] ?? '';
+
+      // Try to get SocialPay deep link
+      final socialPayLink = SocialPayIntegration.getSocialPayDeepLink(
+        qrText: qrText,
+        invoiceId: invoiceId,
+      );
+
+      if (socialPayLink != null) {
+        final uri = Uri.parse(socialPayLink);
+        if (await canLaunchUrl(uri)) {
+          await launchUrl(uri, mode: LaunchMode.externalApplication);
+          _showMessage('Opened SocialPay', isError: false);
+        } else {
+          _showMessage('SocialPay app not installed', isError: true);
+        }
+      } else {
+        _showMessage('SocialPay link not available', isError: true);
+      }
+    } catch (error) {
+      print('Error opening SocialPay: $error');
+      _showMessage('Failed to open SocialPay: $error', isError: true);
     }
   }
 
@@ -162,6 +197,7 @@ class _QRCodeScreenState extends State<QRCodeScreen> {
         invoiceDescription:
             'TIMEX Food Payment - ₮${amount.toStringAsFixed(0)}',
         callbackUrl: 'http://localhost:3000/qpay/webhook',
+        enableSocialPay: true, // Enable SocialPay deep link
       );
 
       if (result['success'] == true) {
@@ -452,9 +488,7 @@ class _QRCodeScreenState extends State<QRCodeScreen> {
     showDialog(
       context: context,
       barrierDismissible: false,
-      builder: (context) => Center(
-        child: CircularProgressIndicator(),
-      ),
+      builder: (context) => Center(child: CircularProgressIndicator()),
     );
 
     try {
@@ -504,115 +538,136 @@ class _QRCodeScreenState extends State<QRCodeScreen> {
         context: context,
         isScrollControlled: true,
         builder: (BuildContext context) {
+          // Debug: Print banking apps count
+          print('🖥️ UI: About to render ${bankingApps.length} banking apps');
+          bankingApps.forEach((key, app) {
+            print('🖥️ UI: Banking app - Key: $key, Name: ${app.name}');
+          });
+
           return Container(
             padding: const EdgeInsets.all(20),
             constraints: BoxConstraints(
               maxHeight: MediaQuery.of(context).size.height * 0.8,
             ),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'Choose Banking App',
-                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-                ),
-                SizedBox(height: 16),
-
-                // Show optimized banking apps first
-                if (optimizedLinks.isNotEmpty) ...[
+            child: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
                   Text(
-                    'Available Banking Apps:',
-                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+                    'Choose Banking App',
+                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
                   ),
-                  SizedBox(height: 8),
-                  ...optimizedLinks.entries.map((entry) {
-                    return Card(
-                      child: ListTile(
+                  SizedBox(height: 16),
+
+                  // Show optimized banking apps first
+                  if (optimizedLinks.isNotEmpty) ...[
+                    Text(
+                      'Available Banking Apps:',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    SizedBox(height: 8),
+                    ...optimizedLinks.entries.map((entry) {
+                      return Card(
+                        child: ListTile(
+                          leading: Icon(
+                            _getBankIcon(entry.key),
+                            color: Colors.green,
+                            size: 32,
+                          ),
+                          title: Text(
+                            entry.key,
+                            style: TextStyle(fontWeight: FontWeight.w600),
+                          ),
+                          subtitle: Text('Tap to open'),
+                          trailing: Icon(Icons.arrow_forward_ios),
+                          onTap: () async {
+                            Navigator.pop(context);
+                            await _launchBankingApp(entry.value, entry.key);
+                          },
+                        ),
+                      );
+                    }).toList(),
+                    SizedBox(height: 16),
+                  ],
+
+                  // Banking apps from QPay response
+                  if (bankingApps.isNotEmpty) ...[
+                    Text(
+                      'QPay Suggested Apps:',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    SizedBox(height: 8),
+                    ...bankingApps.entries.map((entry) {
+                      final app = entry.value;
+                      // Debug: Print which apps are being rendered
+                      print(
+                        '🖥️ UI: Rendering banking app: ${app.name} (key: ${entry.key})',
+                      );
+                      return ListTile(
                         leading: Icon(
-                          _getBankIcon(entry.key),
-                          color: Colors.green,
-                          size: 32,
+                          _getBankIcon(app.name),
+                          color: Colors.blue,
                         ),
-                        title: Text(
-                          entry.key,
-                          style: TextStyle(fontWeight: FontWeight.w600),
+                        title: Text(app.name),
+                        subtitle: Text(
+                          app.description.isNotEmpty
+                              ? app.description
+                              : 'Mobile banking app',
                         ),
-                        subtitle: Text('Tap to open'),
-                        trailing: Icon(Icons.arrow_forward_ios),
                         onTap: () async {
                           Navigator.pop(context);
-                          await _launchBankingApp(entry.value, entry.key);
+                          await _launchBankingApp(app.deepLink, app.name);
                         },
+                      );
+                    }).toList(),
+                    SizedBox(height: 16),
+                  ],
+
+                  // Legacy deep links as fallback
+                  if (legacyDeepLinks.isNotEmpty) ...[
+                    Text(
+                      'Other Options:',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w600,
                       ),
-                    );
-                  }).toList(),
+                    ),
+                    SizedBox(height: 8),
+                    ...legacyDeepLinks.entries.map((entry) {
+                      String appName = _getLegacyAppName(entry.key);
+                      return ListTile(
+                        leading: Icon(
+                          _getBankIcon(appName),
+                          color: Colors.orange,
+                        ),
+                        title: Text(appName),
+                        subtitle: Text(
+                          entry.key == 'banking' ? 'Web browser' : 'Mobile app',
+                        ),
+                        onTap: () async {
+                          Navigator.pop(context);
+                          await _launchBankingApp(entry.value, appName);
+                        },
+                      );
+                    }).toList(),
+                  ],
+
                   SizedBox(height: 16),
-                ],
-
-                // Banking apps from QPay response
-                if (bankingApps.isNotEmpty) ...[
-                  Text(
-                    'QPay Suggested Apps:',
-                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+                  Center(
+                    child: TextButton(
+                      onPressed: () => Navigator.pop(context),
+                      child: Text('Cancel'),
+                    ),
                   ),
-                  SizedBox(height: 8),
-                  ...bankingApps.entries.map((entry) {
-                    final app = entry.value;
-                    return ListTile(
-                      leading: Icon(
-                        _getBankIcon(app.name),
-                        color: Colors.blue,
-                      ),
-                      title: Text(app.name),
-                      subtitle: Text(
-                        app.description.isNotEmpty
-                            ? app.description
-                            : 'Mobile banking app',
-                      ),
-                      onTap: () async {
-                        Navigator.pop(context);
-                        await _launchBankingApp(app.deepLink, app.name);
-                      },
-                    );
-                  }).toList(),
-                  SizedBox(height: 16),
                 ],
-
-                // Legacy deep links as fallback
-                if (legacyDeepLinks.isNotEmpty) ...[
-                  Text(
-                    'Other Options:',
-                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
-                  ),
-                  SizedBox(height: 8),
-                  ...legacyDeepLinks.entries.map((entry) {
-                    String appName = _getLegacyAppName(entry.key);
-                    return ListTile(
-                      leading: Icon(
-                        _getBankIcon(appName),
-                        color: Colors.orange,
-                      ),
-                      title: Text(appName),
-                      subtitle: Text(
-                        entry.key == 'banking' ? 'Web browser' : 'Mobile app',
-                      ),
-                      onTap: () async {
-                        Navigator.pop(context);
-                        await _launchBankingApp(entry.value, appName);
-                      },
-                    );
-                  }).toList(),
-                ],
-
-                SizedBox(height: 16),
-                Center(
-                  child: TextButton(
-                    onPressed: () => Navigator.pop(context),
-                    child: Text('Cancel'),
-                  ),
-                ),
-              ],
+              ),
             ),
           );
         },
@@ -712,10 +767,7 @@ class _QRCodeScreenState extends State<QRCodeScreen> {
     try {
       final uri = Uri.parse(deepLink);
       if (await canLaunchUrl(uri)) {
-        await launchUrl(
-          uri,
-          mode: LaunchMode.externalApplication,
-        );
+        await launchUrl(uri, mode: LaunchMode.externalApplication);
         _showMessage('Opened $appName', isError: false);
       } else {
         _showMessage('$appName not installed', isError: true);
@@ -1234,6 +1286,25 @@ class _QRCodeScreenState extends State<QRCodeScreen> {
                   ),
 
                 SizedBox(height: 20),
+
+                // SocialPay Integration Button
+                Container(
+                  width: double.infinity,
+                  margin: EdgeInsets.only(bottom: 12),
+                  child: ElevatedButton.icon(
+                    onPressed: _openSocialPay,
+                    icon: Icon(Icons.payment),
+                    label: Text('Pay with SocialPay'),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.green.shade600,
+                      foregroundColor: Colors.white,
+                      padding: EdgeInsets.symmetric(vertical: 14),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                    ),
+                  ),
+                ),
 
                 // Mobile Banking App Buttons
                 Row(

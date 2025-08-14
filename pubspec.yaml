@@ -111,8 +111,20 @@ flutter:
   assets:
      - assets/images/
      - assets/images/google_logo.png
-
-     - assets/images/google_logo.png
+     - assets/images/ard.webp
+     - assets/images/arig.webp
+     - assets/images/bogd.webp
+     - assets/images/kapitron.webp
+     - assets/images/khan.jpg
+     - assets/images/mbank.png
+     - assets/images/mostmoney.webp
+     - assets/images/socialpay.png
+     - assets/images/state.png
+     - assets/images/tdb.png
+     - assets/images/toki.webp
+     - assets/images/trans.webp
+     - assets/images/xac.png
+     - assets/images/loader.json
      - .env.example
 
   fonts:

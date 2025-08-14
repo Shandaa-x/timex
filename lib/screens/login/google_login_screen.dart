@@ -58,74 +58,77 @@ class _GoogleLoginScreenState extends State<GoogleLoginScreen> {
 
   Future<void> _signInWithGoogle() async {
     print('🚀 Starting Google Sign-In process...');
-    
+
     // Print debug information for troubleshooting
     DebugHelper.printGoogleSignInDebugInfo();
-    
+
     setState(() {
       _isLoading = true;
       _error = null;
     });
-    
+
     try {
       // Step 1: Initialize Google Sign In with minimal configuration
       print('📱 Initializing Google Sign-In...');
-      final GoogleSignIn googleSignIn = GoogleSignIn(
-        scopes: ['email'],
-      );
-      
+      final GoogleSignIn googleSignIn = GoogleSignIn(scopes: ['email']);
+
       // Step 2: Check if user is already signed in and sign out first to clear cache
       print('🔄 Clearing previous sign-in state...');
       await googleSignIn.signOut();
       await FirebaseAuth.instance.signOut();
-      
+
       // Step 3: Start sign-in process
       print('🔐 Starting sign-in flow...');
       final GoogleSignInAccount? googleUser = await googleSignIn.signIn();
-      
+
       if (googleUser == null) {
         print('❌ User cancelled sign-in');
         setState(() => _isLoading = false);
         return; // User cancelled
       }
-      
+
       print('✅ Google account selected: ${googleUser.email}');
       print('📧 Display name: ${googleUser.displayName}');
-      
+
       // Step 4: Get authentication details
       print('🔑 Getting authentication tokens...');
-      final GoogleSignInAuthentication googleAuth = await googleUser.authentication;
-      
+      final GoogleSignInAuthentication googleAuth =
+          await googleUser.authentication;
+
       print('🔑 Access token available: ${googleAuth.accessToken != null}');
       print('🔑 ID token available: ${googleAuth.idToken != null}');
-      
+
       // Step 5: Check if tokens are available
       if (googleAuth.accessToken == null || googleAuth.idToken == null) {
         throw Exception('Failed to get authentication tokens from Google');
       }
-      
+
       print('✅ Authentication tokens received');
-      
+
       // Step 6: Create Firebase credential
       print('🔥 Creating Firebase credential...');
       final credential = GoogleAuthProvider.credential(
         accessToken: googleAuth.accessToken,
         idToken: googleAuth.idToken,
       );
-      
+
       // Step 7: Sign in to Firebase
       print('🔥 Signing in to Firebase...');
-      final userCredential = await FirebaseAuth.instance.signInWithCredential(credential);
-      
+      final userCredential = await FirebaseAuth.instance.signInWithCredential(
+        credential,
+      );
+
       final user = userCredential.user;
       if (user != null) {
         print('✅ Firebase auth successful: ${user.uid}');
         print('📧 User email: ${user.email}');
-        
+
         // Step 8: Save user profile to Firestore
         try {
           print('💾 Saving user data to Firestore...');
-          final userDoc = FirebaseFirestore.instance.collection('users').doc(user.uid);
+          final userDoc = FirebaseFirestore.instance
+              .collection('users')
+              .doc(user.uid);
 
           // Check if user document exists
           final userSnapshot = await userDoc.get();
@@ -137,7 +140,9 @@ class _GoogleLoginScreenState extends State<GoogleLoginScreen> {
             'displayName': user.displayName ?? '',
             'email': user.email ?? '',
             'photoURL': user.photoURL ?? '',
-            'createdAt': userSnapshot.exists ? null : FieldValue.serverTimestamp(),
+            'createdAt': userSnapshot.exists
+                ? null
+                : FieldValue.serverTimestamp(),
             'lastLogin': FieldValue.serverTimestamp(),
             'provider': 'google',
             'platform': 'android',
@@ -149,7 +154,6 @@ class _GoogleLoginScreenState extends State<GoogleLoginScreen> {
           // Save to Firestore
           await userDoc.set(userData, SetOptions(merge: true));
           print('✅ User saved to Firestore successfully');
-          
         } catch (firestoreError) {
           print('⚠️ Firestore save failed: $firestoreError');
           // Continue anyway - user is authenticated
@@ -165,24 +169,25 @@ class _GoogleLoginScreenState extends State<GoogleLoginScreen> {
       } else {
         throw Exception('Firebase authentication succeeded but user is null');
       }
-      
     } catch (e, stackTrace) {
       print('❌ Google Sign-In Error: $e');
       print('📍 Stack trace: $stackTrace');
-      
+
       String errorMessage = 'Нэвтрэх явцад алдаа гарлаа. Дахин оролдоно уу.';
-      
+
       // More specific error handling for Android
       if (e.toString().contains('sign_in_failed')) {
         if (e.toString().contains('10:')) {
-          errorMessage = 'Аппыг Google Console дээр тохируулаагүй байна. Та өөрийн SHA-1 fingerprint-ийг Firebase Console дээр нэмнэ үү.';
+          errorMessage =
+              'Аппыг Google Console дээр тохируулаагүй байна. Та өөрийн SHA-1 fingerprint-ийг Firebase Console дээр нэмнэ үү.';
           print('🔧 SOLUTION: Add SHA-1 fingerprint to Firebase Console');
           print('🔧 Current package: com.example.timex');
           print('🔧 Project: timex-9ce03');
         } else {
           errorMessage = 'Google нэвтрэлт тохиргооны алдаа. Дахин оролдоно уу.';
         }
-      } else if (e.toString().contains('network_error') || e.toString().contains('network')) {
+      } else if (e.toString().contains('network_error') ||
+          e.toString().contains('network')) {
         errorMessage = 'Интернет холболтоо шалгаад дахин оролдоно уу.';
       } else if (e.toString().contains('sign_in_canceled')) {
         errorMessage = 'Нэвтрэх үйлдэл цуцлагдлаа.';
@@ -191,11 +196,10 @@ class _GoogleLoginScreenState extends State<GoogleLoginScreen> {
       } else if (e.toString().contains('tokens')) {
         errorMessage = 'Google нэвтрэх токен авахад алдаа гарлаа.';
       }
-      
+
       if (mounted) {
         setState(() => _error = errorMessage);
       }
-      
     } finally {
       if (mounted) {
         setState(() => _isLoading = false);
@@ -267,16 +271,17 @@ class _GoogleLoginScreenState extends State<GoogleLoginScreen> {
                   onPressed: () async {
                     print('🧪 Running Firebase tests...');
                     final results = await FirebaseTestService.runAllTests();
-                    
+
                     if (mounted) {
                       ScaffoldMessenger.of(context).showSnackBar(
                         SnackBar(
                           content: Text(
                             'Auth: ${results['auth']! ? "✅" : "❌"} | '
-                            'Firestore: ${results['firestore']! ? "✅" : "❌"}'
+                            'Firestore: ${results['firestore']! ? "✅" : "❌"}',
                           ),
-                          backgroundColor: results.values.every((v) => v) 
-                              ? Colors.green : Colors.orange,
+                          backgroundColor: results.values.every((v) => v)
+                              ? Colors.green
+                              : Colors.orange,
                         ),
                       );
                     }
