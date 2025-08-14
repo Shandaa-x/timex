@@ -3,9 +3,12 @@ import 'package:flutter/services.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../services/money_format.dart';
 import '../../services/qpay_helper_service.dart';
+import '../../services/user_payment_service.dart';
 import '../../utils/socialpay_integration.dart';
 import '../../widgets/beautiful_circular_progress.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'dart:async';
 
 class PaymentScreen extends StatefulWidget {
   final int? initialAmount;
@@ -21,6 +24,10 @@ class _PaymentScreenState extends State<PaymentScreen> {
   int _enteredAmount = 0;
   bool _isLoading = false;
   List<Map<String, dynamic>> _availableBanks = [];
+  double _currentBalance = 0.0;
+  String _currentPaymentStatus = 'none';
+  bool _showBankOptions = false;
+  bool _isProcessingPayment = false;
 
   // Bank data with proper icons and information matching the design
   final List<Map<String, dynamic>> _bankData = [
@@ -125,11 +132,28 @@ class _PaymentScreenState extends State<PaymentScreen> {
       _enteredAmount = widget.initialAmount!;
     }
     _loadAvailableBanks();
+    _ensureUserDocument();
+    _loadCurrentBalance();
+  }
+
+  Future<void> _ensureUserDocument() async {
+    await UserPaymentService.ensureUserDocument();
+  }
+
+  Future<void> _loadCurrentBalance() async {
+    final paymentInfo = await UserPaymentService.getUserPaymentInfo();
+    if (paymentInfo['success'] == true) {
+      setState(() {
+        _currentBalance = paymentInfo['totalFoodAmount'] ?? 0.0;
+        _currentPaymentStatus = paymentInfo['qpayStatus'] ?? 'none';
+      });
+    }
   }
 
   void _onAmountChanged(String value) {
     setState(() {
       _enteredAmount = int.tryParse(value) ?? 0;
+      _showBankOptions = _enteredAmount > 0;
     });
   }
 
@@ -156,7 +180,8 @@ class _PaymentScreenState extends State<PaymentScreen> {
 
   String? _currentInvoiceId;
   String? _currentOrderId;
-  String? _processingBankId;
+  String? _currentAccessToken;
+  Map<String, dynamic>? _selectedBank;
 
   Future<void> _processPayment(Map<String, dynamic> bank) async {
     if (_enteredAmount <= 0) {
@@ -165,8 +190,8 @@ class _PaymentScreenState extends State<PaymentScreen> {
     }
 
     setState(() {
-      _isLoading = true;
-      _processingBankId = bank['name'];
+      _isProcessingPayment = true;
+      _selectedBank = bank;
     });
 
     try {
@@ -195,6 +220,7 @@ class _PaymentScreenState extends State<PaymentScreen> {
         // Store invoice details for status checking
         _currentInvoiceId = invoiceId;
         _currentOrderId = orderId;
+        _currentAccessToken = result['access_token'];
 
         // Create deep link based on bank scheme
         String deepLink;
@@ -231,15 +257,13 @@ class _PaymentScreenState extends State<PaymentScreen> {
         if (await canLaunchUrl(uri)) {
           await launchUrl(uri, mode: LaunchMode.externalApplication);
           _showSnackBar('Opening ${bank['mongolianName']}...', Colors.green);
-
-          // Show payment status bottom sheet after a delay
-          Future.delayed(const Duration(seconds: 2), () {
-            if (mounted) {
-              _showPaymentStatusBottomSheet(bank);
-            }
-          });
         } else {
           _showSnackBar('Cannot open ${bank['mongolianName']} app', Colors.red);
+        }
+
+        // Show payment status bottom sheet immediately
+        if (mounted) {
+          _showPaymentStatusBottomSheet(bank);
         }
       } else {
         throw Exception(result['error'] ?? 'Failed to create QPay invoice');
@@ -249,8 +273,7 @@ class _PaymentScreenState extends State<PaymentScreen> {
       _showSnackBar('Payment failed: $e', Colors.red);
     } finally {
       setState(() {
-        _isLoading = false;
-        _processingBankId = null;
+        _isProcessingPayment = false;
       });
     }
   }
@@ -283,29 +306,270 @@ class _PaymentScreenState extends State<PaymentScreen> {
   }
 
   Future<void> _checkPaymentStatus() async {
-    if (_currentInvoiceId == null) {
+    if (_currentInvoiceId == null || _currentAccessToken == null) {
       _showSnackBar('No payment to check', Colors.red);
       return;
     }
 
     try {
-      // Here you would implement the actual payment status check
-      // For now, we'll simulate a check
-      await Future.delayed(const Duration(seconds: 2));
+      // Get current user
+      final currentUser = FirebaseAuth.instance.currentUser;
+      if (currentUser == null) {
+        _showSnackBar('User not logged in', Colors.red);
+        return;
+      }
 
-      // Simulate random status for demo
-      final isCompleted = DateTime.now().millisecondsSinceEpoch % 2 == 0;
+      // Check payment status with QPay API
+      final paymentResult = await QPayHelperService.checkPayment(
+        _currentAccessToken!,
+        _currentInvoiceId!,
+      );
 
-      if (isCompleted) {
-        _showSnackBar('Payment completed successfully!', Colors.green);
-        // Navigate back or update UI as needed
-        Navigator.of(context).pop(); // Close bottom sheet
+      if (paymentResult['success'] == true) {
+        final int count = paymentResult['count'] ?? 0;
+
+        if (count > 0) {
+          // Payment found - extract payment details
+          final List<dynamic> rows = paymentResult['rows'] ?? [];
+          if (rows.isNotEmpty) {
+            final payment = rows[0];
+            // Handle both string and numeric payment amounts
+            final dynamic rawAmount =
+                payment['payment_amount'] ?? payment['paid_amount'] ?? 0.0;
+
+            final double paidAmount = rawAmount is String
+                ? double.tryParse(rawAmount) ?? 0.0
+                : (rawAmount as num).toDouble();
+
+            // Process payment with new partial payment logic
+            final updateResult = await UserPaymentService.processPayment(
+              userId: currentUser.uid,
+              paidAmount: paidAmount,
+              paymentMethod: 'QPay',
+              invoiceId: _currentInvoiceId!,
+              orderId: _currentOrderId,
+            );
+
+            if (updateResult['success'] == true) {
+              final double previousAmount = updateResult['previousAmount'] ?? 0;
+              final double newAmount = updateResult['newAmount'] ?? 0;
+              final String paymentStatus = updateResult['status'] ?? 'unknown';
+
+              // Refresh the balance display
+              await _loadCurrentBalance();
+
+              // Show success dialog with payment details and status
+              _showPaymentCompletedDialog(
+                paidAmount,
+                previousAmount,
+                newAmount,
+                paymentStatus,
+              );
+            } else {
+              _showSnackBar(
+                'Payment verified but failed to update balance',
+                Colors.orange,
+              );
+            }
+          } else {
+            _showSnackBar('Payment data not found', Colors.orange);
+          }
+        } else {
+          // No payment found - update status to pending
+          await UserPaymentService.updatePaymentStatus(
+            userId: currentUser.uid,
+            status: 'pending',
+          );
+
+          _showSnackBar('Payment is still pending...', Colors.orange);
+        }
       } else {
-        _showSnackBar('Payment is still pending...', Colors.orange);
+        throw Exception(
+          paymentResult['error'] ?? 'Failed to check payment status',
+        );
       }
     } catch (e) {
-      _showSnackBar('Failed to check payment status', Colors.red);
+      print('Payment check error: $e');
+      _showSnackBar('Failed to check payment status: $e', Colors.red);
+
+      // Update status to pending on error
+      try {
+        final currentUser = FirebaseAuth.instance.currentUser;
+        if (currentUser != null) {
+          await UserPaymentService.updatePaymentStatus(
+            userId: currentUser.uid,
+            status: 'pending',
+          );
+        }
+      } catch (firestoreError) {
+        print('Failed to update Firestore status: $firestoreError');
+      }
     }
+  }
+
+  Future<void> _manualPaymentStatusCheck() async {
+    if (_currentInvoiceId == null || _currentAccessToken == null) {
+      // No active payment to check
+      _showSnackBar('No active payment to check', Colors.orange);
+      return;
+    }
+
+    setState(() => _isLoading = true);
+
+    try {
+      await _checkPaymentStatus();
+    } finally {
+      setState(() => _isLoading = false);
+    }
+  }
+
+  void _showPaymentCompletedDialog(
+    double paidAmount,
+    double previousAmount,
+    double newAmount,
+    String paymentStatus,
+  ) {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (BuildContext context) {
+        return Dialog(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(20),
+          ),
+          child: Container(
+            padding: const EdgeInsets.all(24),
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(20),
+              gradient: const LinearGradient(
+                colors: [Color(0xFF10B981), Color(0xFF06B6D4)],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              ),
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                // Success icon
+                Container(
+                  width: 80,
+                  height: 80,
+                  decoration: BoxDecoration(
+                    color: Colors.white.withOpacity(0.2),
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(
+                    Icons.check_circle_rounded,
+                    size: 50,
+                    color: Colors.white,
+                  ),
+                ),
+                const SizedBox(height: 24),
+
+                // Title
+                Text(
+                  paymentStatus == 'paid'
+                      ? 'Payment Completed!'
+                      : 'Payment Processed!',
+                  style: const TextStyle(
+                    fontSize: 24,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.white,
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 16),
+
+                // Status message
+                Text(
+                  paymentStatus == 'paid'
+                      ? 'Your balance is now fully paid!'
+                      : 'Your payment has been processed.',
+                  style: const TextStyle(fontSize: 16, color: Colors.white),
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 16),
+
+                // Payment details
+                Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Column(
+                    children: [
+                      _buildPaymentDetailRow(
+                        'Amount Paid',
+                        '₮${paidAmount.toStringAsFixed(0)}',
+                      ),
+                      const SizedBox(height: 8),
+                      _buildPaymentDetailRow(
+                        'Previous Balance',
+                        '₮${previousAmount.toStringAsFixed(0)}',
+                      ),
+                      const SizedBox(height: 8),
+                      _buildPaymentDetailRow(
+                        'New Balance',
+                        '₮${newAmount.toStringAsFixed(0)}',
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 24),
+
+                // Action buttons
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton(
+                    onPressed: () {
+                      Navigator.of(context).pop(); // Close dialog
+                      Navigator.of(context).pop(); // Close bottom sheet
+                      Navigator.of(context).pop(); // Go back to previous screen
+                    },
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.white,
+                      foregroundColor: const Color(0xFF10B981),
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                    ),
+                    child: const Text(
+                      'Done',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildPaymentDetailRow(String label, String value) {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: [
+        Text(
+          label,
+          style: TextStyle(color: Colors.white.withOpacity(0.9), fontSize: 14),
+        ),
+        Text(
+          value,
+          style: const TextStyle(
+            color: Colors.white,
+            fontSize: 16,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+      ],
+    );
   }
 
   @override
@@ -328,9 +592,115 @@ class _PaymentScreenState extends State<PaymentScreen> {
           ),
         ),
         centerTitle: true,
+        actions: [
+          // Manual payment status check icon
+          IconButton(
+            icon: Icon(
+              Icons.refresh_rounded,
+              color: _currentInvoiceId != null
+                  ? const Color(0xFF10B981)
+                  : Colors.grey[400],
+            ),
+            tooltip: _currentInvoiceId != null
+                ? 'Check Payment Status'
+                : 'No active payment',
+            onPressed: _currentInvoiceId != null
+                ? _manualPaymentStatusCheck
+                : null,
+          ),
+        ],
       ),
       body: Column(
         children: [
+          // Current balance status section
+          Container(
+            margin: const EdgeInsets.all(16),
+            padding: const EdgeInsets.all(20),
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                colors: _currentPaymentStatus == 'paid'
+                    ? [const Color(0xFF10B981), const Color(0xFF06B6D4)]
+                    : _currentPaymentStatus == 'partial'
+                    ? [const Color(0xFFF59E0B), const Color(0xFFEF4444)]
+                    : [const Color(0xFF6B7280), const Color(0xFF4B5563)],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              ),
+              borderRadius: BorderRadius.circular(16),
+              boxShadow: [
+                BoxShadow(
+                  color: _currentPaymentStatus == 'paid'
+                      ? const Color(0xFF10B981).withOpacity(0.3)
+                      : _currentPaymentStatus == 'partial'
+                      ? const Color(0xFFF59E0B).withOpacity(0.3)
+                      : const Color(0xFF6B7280).withOpacity(0.3),
+                  blurRadius: 12,
+                  spreadRadius: 0,
+                  offset: const Offset(0, 4),
+                ),
+              ],
+            ),
+            child: Row(
+              children: [
+                Container(
+                  width: 56,
+                  height: 56,
+                  decoration: BoxDecoration(
+                    color: Colors.white.withOpacity(0.2),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Icon(
+                    _currentPaymentStatus == 'paid'
+                        ? Icons.check_circle_rounded
+                        : _currentPaymentStatus == 'partial'
+                        ? Icons.payments_rounded
+                        : Icons.account_balance_wallet_rounded,
+                    color: Colors.white,
+                    size: 32,
+                  ),
+                ),
+                const SizedBox(width: 16),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        _currentPaymentStatus == 'paid'
+                            ? 'Balance Fully Paid'
+                            : _currentPaymentStatus == 'partial'
+                            ? 'Partial Payment Made'
+                            : 'Outstanding Balance',
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 16,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        '₮${_currentBalance.toStringAsFixed(0)}',
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 24,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      if (_currentPaymentStatus == 'partial')
+                        const Text(
+                          'You can make another payment',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 12,
+                            fontWeight: FontWeight.w400,
+                          ),
+                        ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+
           // Amount input section
           Container(
             margin: const EdgeInsets.all(16),
@@ -379,7 +749,7 @@ class _PaymentScreenState extends State<PaymentScreen> {
                     ),
                     focusedBorder: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(8),
-                      borderSide: const BorderSide(color: Colors.blue),
+                      borderSide: const BorderSide(color: Color(0xFF10B981)),
                     ),
                     filled: true,
                     fillColor: Colors.white,
@@ -405,64 +775,170 @@ class _PaymentScreenState extends State<PaymentScreen> {
             ),
           ),
 
-          // Banks list section
-          Expanded(
-            child: _isLoading
-                ? Center(
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        BeautifulCircularProgress(
-                          size: 90,
-                          strokeWidth: 5,
-                          gradientColors: const [
-                            Color(0xFF8B5CF6),
-                            Color(0xFFA78BFA),
-                            Color(0xFFC084FC),
-                            Color(0xFFE879F9),
-                          ],
-                          backgroundColor: const Color(0x1A8B5CF6),
-                          centerGlowColor: const Color(0xFF8B5CF6),
-                          centerGlowSize: 35,
-                          animationDuration: const Duration(seconds: 2),
-                        ),
-                        const SizedBox(height: 24),
-                        Text(
-                          'Loading Banks...',
-                          style: TextStyle(
-                            fontSize: 16,
-                            color: Colors.grey[600],
-                            fontWeight: FontWeight.w500,
-                          ),
-                        ),
-                      ],
-                    ),
-                  )
-                : _availableBanks.isEmpty
-                ? const Center(
-                    child: Text(
-                      'No banking apps available',
-                      style: TextStyle(fontSize: 16, color: Colors.grey),
-                    ),
-                  )
-                : ListView.separated(
-                    padding: const EdgeInsets.symmetric(horizontal: 16),
-                    itemCount: _availableBanks.length,
-                    separatorBuilder: (context, index) =>
-                        Divider(height: 1, color: Colors.grey[200]),
-                    itemBuilder: (context, index) {
-                      final bank = _availableBanks[index];
-                      return _buildBankTile(bank);
-                    },
+          // Payment status message
+          if (_currentPaymentStatus == 'paid')
+            Container(
+              margin: const EdgeInsets.symmetric(horizontal: 16),
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: const Color(0xFF10B981).withOpacity(0.1),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(
+                  color: const Color(0xFF10B981).withOpacity(0.3),
+                ),
+              ),
+              child: Row(
+                children: [
+                  Icon(
+                    Icons.check_circle_rounded,
+                    color: const Color(0xFF10B981),
+                    size: 24,
                   ),
-          ),
+                  const SizedBox(width: 12),
+                  const Expanded(
+                    child: Text(
+                      'Your balance is fully paid! No further payments needed.',
+                      style: TextStyle(
+                        color: Color(0xFF10B981),
+                        fontSize: 14,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+
+          // Banks list section - only show after amount is entered
+          if (_showBankOptions && _currentPaymentStatus != 'paid') ...[
+            Container(
+              margin: const EdgeInsets.symmetric(horizontal: 16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Select Bank',
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w600,
+                      color: Colors.black87,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    'Choose your preferred bank to complete the payment',
+                    style: TextStyle(fontSize: 14, color: Colors.grey[600]),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 16),
+            Expanded(
+              child: _isLoading
+                  ? Center(
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          BeautifulCircularProgress(
+                            size: 90,
+                            strokeWidth: 5,
+                            gradientColors: const [
+                              Color(0xFF10B981),
+                              Color(0xFF06B6D4),
+                              Color(0xFF3B82F6),
+                              Color(0xFF1E40AF),
+                            ],
+                            backgroundColor: const Color(0x1A10B981),
+                            centerGlowColor: const Color(0xFF10B981),
+                            centerGlowSize: 35,
+                            animationDuration: const Duration(seconds: 2),
+                          ),
+                          const SizedBox(height: 24),
+                          Text(
+                            'Loading Banks...',
+                            style: TextStyle(
+                              fontSize: 16,
+                              color: Colors.grey[600],
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                        ],
+                      ),
+                    )
+                  : _availableBanks.isEmpty
+                  ? const Center(
+                      child: Text(
+                        'No banking apps available',
+                        style: TextStyle(fontSize: 16, color: Colors.grey),
+                      ),
+                    )
+                  : ListView.separated(
+                      padding: const EdgeInsets.symmetric(horizontal: 16),
+                      itemCount: _availableBanks.length,
+                      separatorBuilder: (context, index) =>
+                          Divider(height: 1, color: Colors.grey[200]),
+                      itemBuilder: (context, index) {
+                        final bank = _availableBanks[index];
+                        return _buildBankTile(bank);
+                      },
+                    ),
+            ),
+          ] else ...[
+            // Show guidance when no amount is entered
+            if (!_showBankOptions && _currentPaymentStatus != 'paid')
+              Expanded(
+                child: Center(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Container(
+                        width: 120,
+                        height: 120,
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF10B981).withOpacity(0.1),
+                          shape: BoxShape.circle,
+                        ),
+                        child: const Icon(
+                          Icons.account_balance_wallet_rounded,
+                          size: 50,
+                          color: Color(0xFF10B981),
+                        ),
+                      ),
+                      const SizedBox(height: 24),
+                      Text(
+                        'Enter Payment Amount',
+                        style: TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.w600,
+                          color: Colors.grey[700],
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      Text(
+                        'Please enter the amount you want to pay\nto see available banking options',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                          fontSize: 14,
+                          color: Colors.grey[500],
+                          height: 1.5,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            // Show "no more payments needed" for fully paid
+            if (_currentPaymentStatus == 'paid')
+              const Expanded(child: SizedBox.shrink()),
+          ],
         ],
       ),
     );
   }
 
   Widget _buildBankTile(Map<String, dynamic> bank) {
-    final isProcessing = _processingBankId == bank['name'];
+    final isProcessing =
+        _isProcessingPayment && _selectedBank?['name'] == bank['name'];
 
     return ListTile(
       contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
@@ -472,7 +948,7 @@ class _PaymentScreenState extends State<PaymentScreen> {
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(12),
           border: Border.all(
-            color: isProcessing ? Colors.purple : Colors.grey[200]!,
+            color: isProcessing ? const Color(0xFF10B981) : Colors.grey[200]!,
             width: isProcessing ? 2 : 1,
           ),
         ),
@@ -503,21 +979,13 @@ class _PaymentScreenState extends State<PaymentScreen> {
                   width: 56,
                   height: 56,
                   decoration: BoxDecoration(
-                    color: Colors.purple.withOpacity(0.8),
+                    color: const Color(0xFF10B981).withValues(alpha: 0.8),
                     borderRadius: BorderRadius.circular(12),
                   ),
-                  child: Center(
-                    child: BeautifulCircularProgress(
-                      size: 30,
+                  child: const Center(
+                    child: CircularProgressIndicator(
                       strokeWidth: 2.5,
-                      gradientColors: const [
-                        Color(0xFFFFFFFF),
-                        Color(0xFFF8FAFC),
-                        Color(0xFFE2E8F0),
-                      ],
-                      backgroundColor: Colors.transparent,
-                      showCenterGlow: false,
-                      animationDuration: const Duration(milliseconds: 1200),
+                      valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
                     ),
                   ),
                 ),
@@ -530,24 +998,20 @@ class _PaymentScreenState extends State<PaymentScreen> {
         style: TextStyle(
           fontSize: 16,
           fontWeight: FontWeight.w500,
-          color: isProcessing ? Colors.purple : Colors.black87,
+          color: isProcessing ? const Color(0xFF10B981) : Colors.black87,
         ),
       ),
       trailing: isProcessing
-          ? BeautifulCircularProgress(
-              size: 24,
-              strokeWidth: 2,
-              gradientColors: const [
-                Color(0xFF8B5CF6),
-                Color(0xFFA78BFA),
-                Color(0xFFC084FC),
-              ],
-              backgroundColor: Colors.transparent,
-              showCenterGlow: false,
-              animationDuration: const Duration(milliseconds: 1000),
+          ? const SizedBox(
+              width: 24,
+              height: 24,
+              child: CircularProgressIndicator(
+                strokeWidth: 2,
+                valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF10B981)),
+              ),
             )
           : Icon(Icons.arrow_forward_ios, size: 16, color: Colors.grey[400]),
-      onTap: (_enteredAmount > 0 && !_isLoading)
+      onTap: (_enteredAmount > 0 && !_isProcessingPayment)
           ? () => _processPayment(bank)
           : null,
     );
@@ -585,6 +1049,8 @@ class _PaymentStatusBottomSheetState extends State<PaymentStatusBottomSheet>
     with TickerProviderStateMixin {
   bool _isChecking = false;
   late AnimationController _animationController;
+  StreamSubscription<DocumentSnapshot>? _userDocumentListener;
+  String _currentPaymentStatus = 'pending';
 
   @override
   void initState() {
@@ -596,10 +1062,172 @@ class _PaymentStatusBottomSheetState extends State<PaymentStatusBottomSheet>
 
     // Start animation immediately
     _animationController.repeat();
+
+    // Start listening to payment status changes
+    _startListeningToPaymentStatus();
+  }
+
+  void _startListeningToPaymentStatus() {
+    final currentUser = FirebaseAuth.instance.currentUser;
+    if (currentUser != null) {
+      _userDocumentListener = FirebaseFirestore.instance
+          .collection('users')
+          .doc(currentUser.uid)
+          .snapshots()
+          .listen(
+            (documentSnapshot) {
+              if (documentSnapshot.exists && mounted) {
+                final data = documentSnapshot.data()!;
+                final String newStatus = data['qpayStatus'] ?? 'pending';
+
+                if (newStatus != _currentPaymentStatus && mounted) {
+                  setState(() {
+                    _currentPaymentStatus = newStatus;
+                  });
+
+                  // If payment is completed, show success (only for full payment)
+                  if (newStatus == 'paid' && mounted) {
+                    final dynamic rawPaidAmount =
+                        data['lastPaymentAmount'] ?? 0.0;
+                    final double paidAmount = rawPaidAmount is String
+                        ? double.tryParse(rawPaidAmount) ?? 0.0
+                        : (rawPaidAmount as num).toDouble();
+
+                    // Close the bottom sheet and show success
+                    Navigator.of(context).pop();
+                    _showPaymentCompletedFromListener(
+                      paidAmount,
+                      0.0, // newBalance is 0 for fully paid
+                      newStatus,
+                    );
+                  }
+                }
+              }
+            },
+            onError: (error) {
+              print('Firebase listener error: $error');
+            },
+          );
+    }
+  }
+
+  void _showPaymentCompletedFromListener(
+    double paidAmount,
+    double newBalance,
+    String paymentStatus,
+  ) {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (BuildContext context) {
+        return Dialog(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(20),
+          ),
+          child: Container(
+            padding: const EdgeInsets.all(24),
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(20),
+              gradient: const LinearGradient(
+                colors: [Color(0xFF10B981), Color(0xFF06B6D4)],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              ),
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                // Success icon
+                Container(
+                  width: 80,
+                  height: 80,
+                  decoration: BoxDecoration(
+                    color: Colors.white.withOpacity(0.2),
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(
+                    Icons.check_circle_rounded,
+                    size: 50,
+                    color: Colors.white,
+                  ),
+                ),
+                const SizedBox(height: 24),
+
+                // Payment details
+                Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Column(
+                    children: [
+                      _buildPaymentDetailRowSimple(
+                        'Amount Paid',
+                        '₮${paidAmount.toStringAsFixed(0)}',
+                      ),
+                      const SizedBox(height: 8),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 24),
+
+                // Action buttons - always show standard Done button
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton(
+                    onPressed: () {
+                      Navigator.of(context).pop(); // Close dialog
+                      Navigator.of(context).pop(); // Go back to previous screen
+                    },
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.white,
+                      foregroundColor: const Color(0xFF10B981),
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                    ),
+                    child: const Text(
+                      'Done',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildPaymentDetailRowSimple(String label, String value) {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: [
+        Text(
+          label,
+          style: TextStyle(color: Colors.white.withOpacity(0.9), fontSize: 14),
+        ),
+        Text(
+          value,
+          style: const TextStyle(
+            color: Colors.white,
+            fontSize: 16,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+      ],
+    );
   }
 
   @override
   void dispose() {
+    _userDocumentListener?.cancel();
     _animationController.dispose();
     super.dispose();
   }
@@ -656,7 +1284,7 @@ class _PaymentStatusBottomSheetState extends State<PaymentStatusBottomSheet>
                           child: CircularProgressIndicator(
                             strokeWidth: 3,
                             valueColor: AlwaysStoppedAnimation<Color>(
-                              Colors.purple.withOpacity(0.3),
+                              Color(0xFF10B981).withOpacity(0.3),
                             ),
                             backgroundColor: Colors.grey.withOpacity(0.1),
                           ),
@@ -678,7 +1306,7 @@ class _PaymentStatusBottomSheetState extends State<PaymentStatusBottomSheet>
                           decoration: BoxDecoration(
                             shape: BoxShape.circle,
                             border: Border.all(
-                              color: Colors.purple.withOpacity(
+                              color: Color(0xFF10B981).withOpacity(
                                 0.1 + (0.2 * (1 - _animationController.value)),
                               ),
                               width: 2,
@@ -695,20 +1323,20 @@ class _PaymentStatusBottomSheetState extends State<PaymentStatusBottomSheet>
                           gradient: LinearGradient(
                             colors: _isChecking
                                 ? [
-                                    const Color(0xFF8B5CF6),
-                                    const Color(0xFFA78BFA),
-                                    const Color(0xFFC084FC),
+                                    const Color(0xFF10B981),
+                                    const Color(0xFF06B6D4),
+                                    const Color(0xFF3B82F6),
                                   ]
                                 : [
-                                    const Color(0xFF8B5CF6).withOpacity(0.8),
-                                    const Color(0xFFA78BFA).withOpacity(0.9),
+                                    const Color(0xFF10B981).withOpacity(0.8),
+                                    const Color(0xFF06B6D4).withOpacity(0.9),
                                   ],
                             begin: Alignment.topLeft,
                             end: Alignment.bottomRight,
                           ),
                           boxShadow: [
                             BoxShadow(
-                              color: Colors.purple.withOpacity(0.4),
+                              color: Color(0xFF10B981).withOpacity(0.4),
                               blurRadius: 20,
                               spreadRadius: 3,
                             ),
@@ -817,7 +1445,7 @@ class _PaymentStatusBottomSheetState extends State<PaymentStatusBottomSheet>
                                     child: const Icon(
                                       Icons.account_balance_wallet_rounded,
                                       size: 18,
-                                      color: Color(0xFF8B5CF6),
+                                      color: Color(0xFF10B981),
                                     ),
                                   ),
                                 ],
@@ -841,7 +1469,7 @@ class _PaymentStatusBottomSheetState extends State<PaymentStatusBottomSheet>
                                   shape: BoxShape.circle,
                                   gradient: LinearGradient(
                                     colors: [
-                                      Colors.purple.withOpacity(
+                                      Color(0xFF10B981).withOpacity(
                                         0.3 +
                                             (0.7 *
                                                 ((i / 8) +
@@ -849,7 +1477,7 @@ class _PaymentStatusBottomSheetState extends State<PaymentStatusBottomSheet>
                                                         .value) %
                                                 1),
                                       ),
-                                      Colors.purple.withOpacity(
+                                      Color(0xFF3B82F6).withOpacity(
                                         0.6 +
                                             (0.4 *
                                                 ((i / 8) +
@@ -861,7 +1489,7 @@ class _PaymentStatusBottomSheetState extends State<PaymentStatusBottomSheet>
                                   ),
                                   boxShadow: [
                                     BoxShadow(
-                                      color: Colors.purple.withOpacity(0.3),
+                                      color: Color(0xFF10B981).withOpacity(0.3),
                                       blurRadius: 4,
                                       spreadRadius: 1,
                                     ),
@@ -881,10 +1509,14 @@ class _PaymentStatusBottomSheetState extends State<PaymentStatusBottomSheet>
             // Title with gradient text effect
             ShaderMask(
               shaderCallback: (bounds) => const LinearGradient(
-                colors: [Color(0xFF8B5CF6), Color(0xFFA78BFA)],
+                colors: [Color(0xFF10B981), Color(0xFF06B6D4)],
               ).createShader(bounds),
               child: Text(
-                _isChecking ? 'Checking Payment...' : 'Payment Pending',
+                _isChecking
+                    ? 'Checking Payment...'
+                    : _currentPaymentStatus == 'paid'
+                    ? 'Payment Completed!'
+                    : 'Payment Pending',
                 style: const TextStyle(
                   fontSize: 26,
                   fontWeight: FontWeight.bold,
@@ -892,12 +1524,13 @@ class _PaymentStatusBottomSheetState extends State<PaymentStatusBottomSheet>
                 ),
               ),
             ),
-            const SizedBox(height: 16),
 
             // Description with better typography
             Text(
               _isChecking
                   ? 'Please wait while we verify your payment status'
+                  : _currentPaymentStatus == 'paid'
+                  ? 'Your payment has been successfully processed!'
                   : 'Please check if your payment was completed in ${widget.bankName}',
               textAlign: TextAlign.center,
               style: TextStyle(
@@ -920,7 +1553,6 @@ class _PaymentStatusBottomSheetState extends State<PaymentStatusBottomSheet>
                       const Color(0xFF10B981).withOpacity(0.08), // Emerald
                       const Color(0xFF3B82F6).withOpacity(0.12), // Blue
                       const Color(0xFF06B6D4).withOpacity(0.08), // Cyan
-                      const Color(0xFF8B5CF6).withOpacity(0.06), // Purple accent
                     ],
                     begin: Alignment.topLeft,
                     end: Alignment.bottomRight,
@@ -1003,7 +1635,9 @@ class _PaymentStatusBottomSheetState extends State<PaymentStatusBottomSheet>
                             style: TextStyle(
                               fontSize: 14,
                               fontWeight: FontWeight.w600,
-                              color: const Color(0xFF059669).withOpacity(0.85), // Emerald-600
+                              color: const Color(
+                                0xFF059669,
+                              ).withOpacity(0.85), // Emerald-600
                               letterSpacing: 0.8,
                             ),
                           ),
@@ -1042,7 +1676,9 @@ class _PaymentStatusBottomSheetState extends State<PaymentStatusBottomSheet>
                       decoration: BoxDecoration(
                         gradient: LinearGradient(
                           colors: [
-                            const Color(0xFF10B981).withOpacity(0.15), // Emerald
+                            const Color(
+                              0xFF10B981,
+                            ).withOpacity(0.15), // Emerald
                             const Color(0xFF3B82F6).withOpacity(0.10), // Blue
                           ],
                           begin: Alignment.topLeft,
@@ -1056,7 +1692,9 @@ class _PaymentStatusBottomSheetState extends State<PaymentStatusBottomSheet>
                       ),
                       child: Icon(
                         Icons.account_balance_wallet_rounded,
-                        color: const Color(0xFF059669).withOpacity(0.7), // Emerald-600
+                        color: const Color(
+                          0xFF059669,
+                        ).withOpacity(0.7), // Emerald-600
                         size: 20,
                       ),
                     ),
@@ -1075,7 +1713,7 @@ class _PaymentStatusBottomSheetState extends State<PaymentStatusBottomSheet>
                 gradient: _isChecking
                     ? null
                     : const LinearGradient(
-                        colors: [Color(0xFF8B5CF6), Color(0xFFA78BFA)],
+                        colors: [Color(0xFF10B981), Color(0xFF06B6D4)],
                         begin: Alignment.centerLeft,
                         end: Alignment.centerRight,
                       ),
@@ -1083,7 +1721,7 @@ class _PaymentStatusBottomSheetState extends State<PaymentStatusBottomSheet>
                     ? null
                     : [
                         BoxShadow(
-                          color: Colors.purple.withOpacity(0.3),
+                          color: Color(0xFF10B981).withOpacity(0.3),
                           blurRadius: 12,
                           spreadRadius: 0,
                           offset: const Offset(0, 4),
