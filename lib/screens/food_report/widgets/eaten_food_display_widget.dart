@@ -191,27 +191,10 @@ class _EatenFoodDisplayWidgetState extends State<EatenFoodDisplayWidget> {
       mainAxisSize: MainAxisSize.min,
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Row(
-          children: [
-            Icon(
-              Icons.restaurant_menu,
-              size: 20,
-              color: colorScheme.primary,
-            ),
-            const SizedBox(width: 8),
-            Text(
-              'Идсэн хоолны жагсаалт',
-              style: theme.textTheme.titleMedium?.copyWith(
-                fontWeight: FontWeight.w600,
-                color: colorScheme.onSurface,
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 16),
         
-        Expanded(
+        Flexible(
           child: ListView.builder(
+            shrinkWrap: true,
             itemCount: sortedDates.length,
             itemBuilder: (context, index) {
               final dateKey = sortedDates[index];

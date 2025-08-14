@@ -1,11 +1,15 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:timex/screens/home/widgets/custom_sliver_appbar.dart';
 import 'dart:async';
-import '../../widgets/common_app_bar.dart';
 import '../../widgets/custom_drawer.dart';
 import '../../services/money_format.dart';
+<<<<<<< HEAD
 import '../payment/payment_screen.dart';
+=======
+import '../payment/payment_options_screen.dart';
+>>>>>>> c53da18dba0485247d39c7a3de44ed80e26efa54
 import 'tabview/daily_tab_screen.dart';
 import 'tabview/history_tab_screen.dart';
 import 'services/food_data_service.dart';
@@ -32,7 +36,11 @@ class _FoodReportScreenState extends State<FoodReportScreen>
   Map<String, bool> _paidMeals =
       {}; // Track which individual meals are paid for
 
+<<<<<<< HEAD
   // User statistics from totalFoodAmount
+=======
+  // Balance and budget tracking
+>>>>>>> c53da18dba0485247d39c7a3de44ed80e26efa54
   int _paymentBalance = 0;
   int _totalPaymentAmount = 0;
   bool _userStatsLoading = true;
@@ -52,6 +60,12 @@ class _FoodReportScreenState extends State<FoodReportScreen>
   void initState() {
     super.initState();
     _tabController = TabController(length: 2, vsync: this);
+    // Add listener to rebuild when tab changes
+    _tabController.addListener(() {
+      if (!_tabController.indexIsChanging) {
+        setState(() {});
+      }
+    });
     _loadMonthlyFoodData();
     _loadUserSettings();
     _loadUserStatistics();
@@ -84,7 +98,12 @@ class _FoodReportScreenState extends State<FoodReportScreen>
                 // _totalPaymentAmount = Amount to Pay (display totalFoodAmount from users collection)
                 // _paymentBalance = Payment Balance (payments made - food consumed)
                 _totalPaymentAmount =
+<<<<<<< HEAD
                     totalFoodConsumed; // Show totalFoodAmount as "Amount to Pay"
+=======
+                    totalFoodConsumed; // Show totalFoodAmount as "Төлөх дүн"
+                // Total Payments Made - removed unused variable
+>>>>>>> c53da18dba0485247d39c7a3de44ed80e26efa54
                 _paymentBalance =
                     totalPaymentsMade -
                     totalFoodConsumed; // Balance (negative if owing money)
@@ -145,6 +164,14 @@ class _FoodReportScreenState extends State<FoodReportScreen>
     }
   }
 
+<<<<<<< HEAD
+=======
+  // Load payment history from service - removed as not used
+  Future<void> _loadPaymentHistory() async {
+    // Payment history functionality removed as it's not currently used
+  }
+
+>>>>>>> c53da18dba0485247d39c7a3de44ed80e26efa54
   // Load user settings (for future use)
   Future<void> _loadUserSettings() async {
     try {
@@ -329,9 +356,13 @@ class _FoodReportScreenState extends State<FoodReportScreen>
     }
   }
 
-  // Update food filtering using service
+  // Update food filtering using service - removed as not used
   void _updateFoodFilter() {
+<<<<<<< HEAD
     // Food filtering functionality removed
+=======
+    // Food filtering functionality removed as it's not currently used
+>>>>>>> c53da18dba0485247d39c7a3de44ed80e26efa54
   }
 
   // Get only unpaid meals data using service
@@ -413,6 +444,7 @@ class _FoodReportScreenState extends State<FoodReportScreen>
           ),
         ),
         const SizedBox(height: 16),
+<<<<<<< HEAD
         // Tab content
         LayoutBuilder(
           builder: (context, constraints) {
@@ -441,6 +473,19 @@ class _FoodReportScreenState extends State<FoodReportScreen>
             );
           },
         ),
+=======
+        // Tab content without TabBarView - just show based on selected index
+        if (_tabController.index == 0)
+          DailyTabScreen(
+            unpaidFoodData: _unpaidFoodData,
+            selectedFoodFilter: _selectedFoodFilter,
+            onMarkMealAsPaid: _markMealAsPaid,
+            onPayMonthly: _payMonthly,
+            hasAnyFoodsInMonth: _hasAnyFoodsInMonth,
+          )
+        else
+          const HistoryTabScreen(),
+>>>>>>> c53da18dba0485247d39c7a3de44ed80e26efa54
       ],
     );
   }
@@ -462,6 +507,7 @@ class _FoodReportScreenState extends State<FoodReportScreen>
         currentScreen: DrawerScreenType.foodReport,
         onNavigateToTab: widget.onNavigateToTab,
       ),
+<<<<<<< HEAD
       appBar: const CommonAppBar(
         title: 'Food Report',
         variant: AppBarVariant.standard,
@@ -481,10 +527,22 @@ class _FoodReportScreenState extends State<FoodReportScreen>
               child: RefreshIndicator(
                 onRefresh: _refreshData,
                 child: SingleChildScrollView(
+=======
+      body: _isLoading 
+        ? const Center(child: CircularProgressIndicator())
+        : RefreshIndicator(
+            onRefresh: _refreshData,
+            child: CustomScrollView(
+              slivers: [
+                CustomSliverAppBar(
+                  title: 'Хоолны тайлан',
+                  gradientColors: const [Color(0xFF10B981), Color(0xFF059669)],
+                ),
+                SliverPadding(
+>>>>>>> c53da18dba0485247d39c7a3de44ed80e26efa54
                   padding: const EdgeInsets.all(16),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
+                  sliver: SliverList(
+                    delegate: SliverChildListDelegate([
                       // Food Statistics Card
                       if (_userStatsLoading)
                         Container(
@@ -606,6 +664,7 @@ class _FoodReportScreenState extends State<FoodReportScreen>
                                   ),
                                 ],
                               ),
+<<<<<<< HEAD
                               const SizedBox(height: 16),
                               // Make Payment Button
                               SizedBox(
@@ -628,6 +687,18 @@ class _FoodReportScreenState extends State<FoodReportScreen>
                                     elevation: 0,
                                     padding: const EdgeInsets.symmetric(
                                       vertical: 16,
+=======
+                              const SizedBox(height: 12),
+                              InkWell(
+                                onTap: () {
+                                  Navigator.push(
+                                    context,
+                                    MaterialPageRoute(
+                                      builder: (context) =>
+                                          PaymentOptionsScreen(
+                                            initialAmount: _totalPaymentAmount,
+                                          ),
+>>>>>>> c53da18dba0485247d39c7a3de44ed80e26efa54
                                     ),
                                     shape: RoundedRectangleBorder(
                                       borderRadius: BorderRadius.circular(8),
@@ -657,13 +728,12 @@ class _FoodReportScreenState extends State<FoodReportScreen>
                       const SizedBox(height: 15),
                       _buildTabbedBreakdownSection(),
                       const SizedBox(height: 24),
-                    ],
+                    ]),
                   ),
                 ),
-              ),
+              ],
             ),
-        ],
-      ),
+          ),
     );
   }
 

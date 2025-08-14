@@ -2,6 +2,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
+import 'package:timex/screens/home/widgets/custom_sliver_appbar.dart';
 import 'package:timex/screens/time_track/widgets/status_card.dart';
 import 'package:timex/screens/time_track/widgets/time_display_card.dart';
 import 'package:timex/screens/time_track/widgets/time_utils.dart';
@@ -1022,128 +1023,139 @@ class _TimeTrackingScreenState extends State<TimeTrackScreen>
       body: CustomScrollView(
         slivers: [
           // App Bar
-          SliverAppBar(
-            expandedHeight: 120,
-            floating: false,
-            pinned: true,
-            backgroundColor: _isWorking
-                ? const Color(0xFF059669)
-                : const Color(0xFF3B82F6),
-            elevation: 0,
-            flexibleSpace: FlexibleSpaceBar(
-              background: Container(
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                    colors: _isWorking
-                        ? [const Color(0xFF059669), const Color(0xFF047857)]
-                        : [const Color(0xFF3B82F6), const Color(0xFF1D4ED8)],
-                  ),
-                ),
-                child: SafeArea(
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 20,
-                      vertical: 16,
-                    ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      mainAxisAlignment: MainAxisAlignment.end,
-                      children: [
-                        Row(
-                          children: [
-                            // User Profile Image
-                            Container(
-                              width: 50,
-                              height: 50,
-                              decoration: BoxDecoration(
-                                shape: BoxShape.circle,
-                                border: Border.all(
-                                  color: Colors.white.withOpacity(0.3),
-                                  width: 2,
-                                ),
-                                boxShadow: [
-                                  BoxShadow(
-                                    color: Colors.black.withOpacity(0.1),
-                                    blurRadius: 8,
-                                    offset: const Offset(0, 2),
-                                  ),
-                                ],
-                              ),
-                              child: ClipOval(
-                                child: Container(
-                                  color: Colors.white.withOpacity(0.2),
-                                  child: const Icon(
-                                    Icons.person,
-                                    color: Colors.white,
-                                    size: 28,
-                                  ),
-                                ),
-                              ),
-                            ),
-                            const SizedBox(width: 16),
-                            // Hello text and status
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    'Сайн байна уу!',
-                                    style: TextStyle(
-                                      color: Colors.white.withOpacity(0.9),
-                                      fontSize: 14,
-                                      fontWeight: FontWeight.w400,
-                                    ),
-                                  ),
-                                  const SizedBox(height: 2),
-                                  Text(
-                                    _isWorking
-                                        ? 'Ажил хийж байна...'
-                                        : 'Цагийн бүртгэл',
-                                    style: const TextStyle(
-                                      fontWeight: FontWeight.w700,
-                                      fontSize: 18,
-                                      color: Colors.white,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                            // Notification Icon
-                            Container(
-                              decoration: BoxDecoration(
-                                shape: BoxShape.circle,
-                                color: Colors.white.withOpacity(0.1),
-                              ),
-                              child: IconButton(
-                                icon: const Icon(
-                                  Icons.notifications_outlined,
-                                  color: Colors.white,
-                                  size: 24,
-                                ),
-                                onPressed: () {
-                                  // TODO: Handle notification tap
-                                  ScaffoldMessenger.of(context).showSnackBar(
-                                    const SnackBar(
-                                      content: Text('Мэдэгдлүүдийг харах'),
-                                      duration: Duration(seconds: 2),
-                                    ),
-                                  );
-                                },
-                              ),
-                            ),
-                          ],
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              ),
-            ),
-            shape: const RoundedRectangleBorder(
-              borderRadius: BorderRadius.vertical(bottom: Radius.circular(24)),
-            ),
+          // SliverAppBar(
+          //   expandedHeight: 120,
+          //   floating: false,
+          //   pinned: true,
+          //   backgroundColor: _isWorking
+          //       ? const Color(0xFF059669)
+          //       : const Color(0xFF3B82F6),
+          //   elevation: 0,
+          //   flexibleSpace: FlexibleSpaceBar(
+          //     background: Container(
+          //       decoration: BoxDecoration(
+          //         gradient: LinearGradient(
+          //           begin: Alignment.topLeft,
+          //           end: Alignment.bottomRight,
+          //           colors: _isWorking
+          //               ? [const Color(0xFF059669), const Color(0xFF047857)]
+          //               : [const Color(0xFF3B82F6), const Color(0xFF1D4ED8)],
+          //         ),
+          //       ),
+          //       child: SafeArea(
+          //         child: Padding(
+          //           padding: const EdgeInsets.symmetric(
+          //             horizontal: 20,
+          //             vertical: 16,
+          //           ),
+          //           child: Column(
+          //             crossAxisAlignment: CrossAxisAlignment.start,
+          //             mainAxisAlignment: MainAxisAlignment.end,
+          //             children: [
+          //               Row(
+          //                 children: [
+          //                   // User Profile Image
+          //                   Container(
+          //                     width: 50,
+          //                     height: 50,
+          //                     decoration: BoxDecoration(
+          //                       shape: BoxShape.circle,
+          //                       border: Border.all(
+          //                         color: Colors.white.withOpacity(0.3),
+          //                         width: 2,
+          //                       ),
+          //                       boxShadow: [
+          //                         BoxShadow(
+          //                           color: Colors.black.withOpacity(0.1),
+          //                           blurRadius: 8,
+          //                           offset: const Offset(0, 2),
+          //                         ),
+          //                       ],
+          //                     ),
+          //                     child: ClipOval(
+          //                       child: Container(
+          //                         color: Colors.white.withOpacity(0.2),
+          //                         child: const Icon(
+          //                           Icons.person,
+          //                           color: Colors.white,
+          //                           size: 28,
+          //                         ),
+          //                       ),
+          //                     ),
+          //                   ),
+          //                   const SizedBox(width: 16),
+          //                   // Hello text and status
+          //                   Expanded(
+          //                     child: Column(
+          //                       crossAxisAlignment: CrossAxisAlignment.start,
+          //                       children: [
+          //                         Text(
+          //                           'Сайн байна уу!',
+          //                           style: TextStyle(
+          //                             color: Colors.white.withOpacity(0.9),
+          //                             fontSize: 14,
+          //                             fontWeight: FontWeight.w400,
+          //                           ),
+          //                         ),
+          //                         const SizedBox(height: 2),
+          //                         Text(
+          //                           _isWorking
+          //                               ? 'Ажил хийж байна...'
+          //                               : 'Цагийн бүртгэл',
+          //                           style: const TextStyle(
+          //                             fontWeight: FontWeight.w700,
+          //                             fontSize: 18,
+          //                             color: Colors.white,
+          //                           ),
+          //                         ),
+          //                       ],
+          //                     ),
+          //                   ),
+          //                   // Notification Icon
+          //                   Container(
+          //                     decoration: BoxDecoration(
+          //                       shape: BoxShape.circle,
+          //                       color: Colors.white.withOpacity(0.1),
+          //                     ),
+          //                     child: IconButton(
+          //                       icon: const Icon(
+          //                         Icons.notifications_outlined,
+          //                         color: Colors.white,
+          //                         size: 24,
+          //                       ),
+          //                       onPressed: () {
+          //                         // TODO: Handle notification tap
+          //                         ScaffoldMessenger.of(context).showSnackBar(
+          //                           const SnackBar(
+          //                             content: Text('Мэдэгдлүүдийг харах'),
+          //                             duration: Duration(seconds: 2),
+          //                           ),
+          //                         );
+          //                       },
+          //                     ),
+          //                   ),
+          //                 ],
+          //               ),
+          //             ],
+          //           ),
+          //         ),
+          //       ),
+          //     ),
+          //   ),
+          //   shape: const RoundedRectangleBorder(
+          //     borderRadius: BorderRadius.vertical(bottom: Radius.circular(24)),
+          //   ),
+          // ),
+          CustomSliverAppBar(
+            leftIcon: Icons.person,
+            onLeftTap: () => print("Home tapped"),
+            rightIcon: Icons.notifications,
+            onRightTap: () => print("Settings tapped"),
+            subtitle: "Сайн байна уу!",
+            title: _isWorking ? 'Ажил хийж байна...' : 'Цагийн бүртгэл',
+            gradientColors: _isWorking
+                ? [const Color(0xFF059669), const Color(0xFF3B82F6)]
+                : [const Color(0xFF3B82F6), const Color(0xFF3B82F6)],
           ),
 
           // Content

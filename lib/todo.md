@@ -1,5 +1,3 @@
-
-
 ### #1 taskuud:
 - hool ustgah, editleh  #1
 -  mungun dungee oruulah eswel tuluh songoltoo hiih #1
@@ -32,10 +30,17 @@
 - hool nogoon, tsag tsenher
 
 ### 8/12 todo list
-- tulburiin tvvh harah hadgalah 
+- tulburiin tvvh harah hadgalah ()
 - tabview => tulburiin tvvh (payment statement) 
 
 ### 8/13 todo list
 - google login
 - qpay integration
 - news
+
+### 
+- tsalingiin tailan tootsooloh
+- medee CRUD 
+- tulburiin tvvh 
+- uuriinhuu news iig harah 
+- 

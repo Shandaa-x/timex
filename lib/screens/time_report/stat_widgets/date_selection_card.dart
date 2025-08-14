@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
-import 'modern_dropdown.dart';
 import 'modern_card.dart';
 
 class DateSelectionCard extends StatelessWidget {
@@ -37,7 +36,6 @@ class DateSelectionCard extends StatelessWidget {
     final now = DateTime.now();
     final firstDayOfMonth = DateTime(now.year, now.month, 1);
     final lastDayOfMonth = DateTime(now.year, now.month + 1, 0);
-    final bool showCurrentMonth = filterRange == null;
     final String currentMonthRange = '${DateFormat('yyyy.MM.dd').format(firstDayOfMonth)} - ${DateFormat('yyyy.MM.dd').format(lastDayOfMonth)}';
 
     return ModernCard(
@@ -58,10 +56,10 @@ class DateSelectionCard extends StatelessWidget {
                   onPressed: onDateRangeSelected,
                 ),
               ),
-              const SizedBox(width: 8),
+              const SizedBox(width: 5),
               Text(
                 'Хугацаа:',
-                style: const TextStyle(color: Color(0xFF64748B), fontWeight: FontWeight.w500),
+                style: const TextStyle(color: Color(0xFF64748B), fontWeight: FontWeight.w500, fontSize: 13),
               ),
               const SizedBox(width: 5),
               if (filterRange != null)
@@ -69,10 +67,10 @@ class DateSelectionCard extends StatelessWidget {
                   children: [
                     Text(
                       '${DateFormat('yyyy.MM.dd').format(filterRange!.start)} - ${DateFormat('yyyy.MM.dd').format(filterRange!.end)}',
-                      style: const TextStyle(color: Color(0xFF3B82F6), fontWeight: FontWeight.w500),
+                      style: const TextStyle(color: Color(0xFF3B82F6), fontWeight: FontWeight.w500, fontSize: 13),
                     ),
                     IconButton(
-                      icon: const Icon(Icons.clear, size: 18, color: Color(0xFF64748B)),
+                      icon: const Icon(Icons.clear, size: 15, color: Color(0xFF64748B)),
                       tooltip: 'Шүүлт цуцлах',
                       onPressed: onClearFilter,
                     ),
@@ -192,8 +190,92 @@ class DateSelectionCard extends StatelessWidget {
           //     ),
           //   ],
           // ),
+          
+          // Month navigation
+          Container(
+            margin: const EdgeInsets.only(top: 16),
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 12),
+            decoration: BoxDecoration(
+              color: Colors.grey[50],
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(color: Colors.grey[200]!),
+            ),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                // Previous month button
+                InkWell(
+                  onTap: () => _navigateMonth(-1),
+                  child: Container(
+                    width: 32,
+                    height: 32,
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(6),
+                      border: Border.all(color: Colors.grey[300]!),
+                    ),
+                    child: Icon(
+                      Icons.chevron_left,
+                      color: Colors.grey[600],
+                      size: 20,
+                    ),
+                  ),
+                ),
+                // Current month display
+                Expanded(
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                    child: Text(
+                      '${monthNames[selectedMonth - 1]} $selectedYear',
+                      style: const TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w600,
+                        color: Colors.black87,
+                      ),
+                      textAlign: TextAlign.center,
+                    ),
+                  ),
+                ),
+                // Next month button
+                InkWell(
+                  onTap: () => _navigateMonth(1),
+                  child: Container(
+                    width: 32,
+                    height: 32,
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(6),
+                      border: Border.all(color: Colors.grey[300]!),
+                    ),
+                    child: Icon(
+                      Icons.chevron_right,
+                      color: Colors.grey[600],
+                      size: 20,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
         ],
       ),
     );
+  }
+
+  void _navigateMonth(int direction) {
+    int newMonth = selectedMonth + direction;
+    int newYear = selectedYear;
+
+    if (newMonth > 12) {
+      newMonth = 1;
+      newYear++;
+      onYearChanged(newYear);
+    } else if (newMonth < 1) {
+      newMonth = 12;
+      newYear--;
+      onYearChanged(newYear);
+    }
+
+    onMonthChanged(newMonth);
   }
 }
