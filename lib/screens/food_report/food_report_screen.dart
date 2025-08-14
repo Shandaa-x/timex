@@ -5,8 +5,7 @@ import 'dart:async';
 import '../../widgets/common_app_bar.dart';
 import '../../widgets/custom_drawer.dart';
 import '../../services/money_format.dart';
-import 'widgets/summary_section_widget.dart';
-import 'widgets/payment_history_section_widget.dart';
+import '../payment/payment_options_screen.dart';
 import 'widgets/filter_bottom_sheet_widget.dart';
 import 'tabview/daily_tab_screen.dart';
 import 'tabview/history_tab_screen.dart';
@@ -470,23 +469,31 @@ class _FoodReportScreenState extends State<FoodReportScreen>
         ),
         const SizedBox(height: 16),
         // Tab content
-        SizedBox(
-          height: 600, // Fixed height for the tab content
-          child: TabBarView(
-            controller: _tabController,
-            children: [
-              // Tab 1: Daily Breakdown
-              DailyTabScreen(
-                unpaidFoodData: _unpaidFoodData,
-                selectedFoodFilter: _selectedFoodFilter,
-                onMarkMealAsPaid: _markMealAsPaid,
-                onPayMonthly: _payMonthly,
-                hasAnyFoodsInMonth: _hasAnyFoodsInMonth,
+        LayoutBuilder(
+          builder: (context, constraints) {
+            // Calculate a reasonable height based on screen size
+            final screenHeight = MediaQuery.of(context).size.height;
+            final availableHeight = screenHeight * 0.6; // Use 60% of screen height
+            
+            return SizedBox(
+              height: availableHeight,
+              child: TabBarView(
+                controller: _tabController,
+                children: [
+                  // Tab 1: Daily Breakdown
+                  DailyTabScreen(
+                    unpaidFoodData: _unpaidFoodData,
+                    selectedFoodFilter: _selectedFoodFilter,
+                    onMarkMealAsPaid: _markMealAsPaid,
+                    onPayMonthly: _payMonthly,
+                    hasAnyFoodsInMonth: _hasAnyFoodsInMonth,
+                  ),
+                  // Tab 2: History
+                  const HistoryTabScreen(),
+                ],
               ),
-              // Tab 2: History
-              const HistoryTabScreen(),
-            ],
-          ),
+            );
+          },
         ),
       ],
     );
@@ -631,7 +638,7 @@ class _FoodReportScreenState extends State<FoodReportScreen>
                                           CrossAxisAlignment.start,
                                       children: [
                                         Text(
-                                          'Төлбөрийн үлдэгдэл',
+                                          'Үлдэгдэл',
                                           style: TextStyle(
                                             color: Colors.white.withOpacity(
                                               0.8,
@@ -659,7 +666,16 @@ class _FoodReportScreenState extends State<FoodReportScreen>
                               ),
                               const SizedBox(height: 12),
                               InkWell(
-                                onTap: () {},
+                                onTap: () {
+                                  Navigator.push(
+                                    context,
+                                    MaterialPageRoute(
+                                      builder: (context) => PaymentOptionsScreen(
+                                        initialAmount: _totalPaymentAmount,
+                                      ),
+                                    ),
+                                  );
+                                },
                                 child: Container(
                                   width: double.infinity,
                                   padding: const EdgeInsets.all(12),

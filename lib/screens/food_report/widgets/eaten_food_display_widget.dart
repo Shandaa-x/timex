@@ -210,9 +210,8 @@ class _EatenFoodDisplayWidgetState extends State<EatenFoodDisplayWidget> {
         ),
         const SizedBox(height: 16),
         
-        Flexible(
+        Expanded(
           child: ListView.builder(
-            shrinkWrap: true,
             itemCount: sortedDates.length,
             itemBuilder: (context, index) {
               final dateKey = sortedDates[index];

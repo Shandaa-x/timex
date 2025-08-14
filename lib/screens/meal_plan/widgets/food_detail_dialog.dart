@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import '../../../theme/app_theme.dart';
 import '../../../services/money_format.dart';
 
@@ -26,7 +27,8 @@ class _FoodDetailDialogState extends State<FoodDetailDialog> {
   late Map<String, dynamic> _foodData;
   bool _isLoading = false;
   bool _isLiked = false;
-  final String _currentUserId = 'user_123'; // Mock user ID - in real app, get from auth
+  
+  String get _currentUserId => FirebaseAuth.instance.currentUser?.uid ?? 'anonymous';
 
   @override
   void initState() {
@@ -42,13 +44,32 @@ class _FoodDetailDialogState extends State<FoodDetailDialog> {
   }
 
   void _checkIfLiked() {
+    final currentUser = FirebaseAuth.instance.currentUser;
+    if (currentUser == null) {
+      setState(() {
+        _isLiked = false;
+      });
+      return;
+    }
+
     final likes = _foodData['likes'] as List<dynamic>? ?? [];
     setState(() {
-      _isLiked = likes.contains(_currentUserId);
+      _isLiked = likes.contains(currentUser.uid);
     });
   }
 
   Future<void> _toggleLike() async {
+    final currentUser = FirebaseAuth.instance.currentUser;
+    if (currentUser == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Please sign in to like this food'),
+          backgroundColor: Colors.orange,
+        ),
+      );
+      return;
+    }
+
     // Add haptic feedback
     HapticFeedback.lightImpact();
     
@@ -80,11 +101,11 @@ class _FoodDetailDialogState extends State<FoodDetailDialog> {
       
       if (_isLiked) {
         // Remove like
-        likes.remove(_currentUserId);
+        likes.remove(currentUser.uid);
       } else {
         // Add like
-        if (!likes.contains(_currentUserId)) {
-          likes.add(_currentUserId);
+        if (!likes.contains(currentUser.uid)) {
+          likes.add(currentUser.uid);
         }
       }
       
@@ -124,11 +145,32 @@ class _FoodDetailDialogState extends State<FoodDetailDialog> {
     final commentText = _commentController.text.trim();
     if (commentText.isEmpty) return;
 
+    final currentUser = FirebaseAuth.instance.currentUser;
+    if (currentUser == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Please sign in to add comments'),
+          backgroundColor: Colors.orange,
+        ),
+      );
+      return;
+    }
+
     setState(() {
       _isLoading = true;
     });
 
     try {
+      // Get user information from users collection
+      final userDoc = await FirebaseFirestore.instance
+          .collection('users')
+          .doc(currentUser.uid)
+          .get();
+      
+      final userData = userDoc.data();
+      final authorName = userData?['name'] ?? currentUser.displayName ?? 'Anonymous User';
+      final authorPhotoUrl = userData?['photoUrl'] ?? currentUser.photoURL ?? '';
+
       final documentId = '${widget.dateKey}-foods';
       final docRef = FirebaseFirestore.instance.collection('foods').doc(documentId);
       
@@ -153,8 +195,9 @@ class _FoodDetailDialogState extends State<FoodDetailDialog> {
       // Create new comment
       final newComment = {
         'id': DateTime.now().millisecondsSinceEpoch.toString(),
-        'userId': _currentUserId,
-        'userName': 'You', // In real app, get from user profile
+        'userId': currentUser.uid,
+        'authorName': authorName,
+        'authorPhotoUrl': authorPhotoUrl,
         'text': commentText,
         'createdAt': DateTime.now().millisecondsSinceEpoch,
         'likes': <String>[],
@@ -180,6 +223,13 @@ class _FoodDetailDialogState extends State<FoodDetailDialog> {
       });
       
       widget.onFoodUpdated(_foodData);
+      
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Comment added successfully! ✅'),
+          backgroundColor: Colors.green,
+        ),
+      );
       
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -348,55 +398,173 @@ class _FoodDetailDialogState extends State<FoodDetailDialog> {
                       ),
                     ),
                   
-                  Row(
-                    children: [
-                      Text(
-                        'Price: ${MoneyFormatService.formatWithSymbol(_foodData['price'] ?? 0)}',
-                        style: theme.textTheme.titleMedium?.copyWith(
-                          fontWeight: FontWeight.w600,
-                          color: AppTheme.successLight,
+                  // Stats row
+                  Container(
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: Colors.grey[200]!),
+                    ),
+                    child: Row(
+                      children: [
+                        Expanded(
+                          child: Column(
+                            children: [
+                              Text(
+                                MoneyFormatService.formatWithSymbol(_foodData['price'] ?? 0),
+                                style: theme.textTheme.titleLarge?.copyWith(
+                                  fontWeight: FontWeight.w700,
+                                  color: AppTheme.successLight,
+                                ),
+                              ),
+                              Text(
+                                'Price',
+                                style: theme.textTheme.bodySmall?.copyWith(
+                                  color: Colors.grey[600],
+                                ),
+                              ),
+                            ],
+                          ),
                         ),
-                      ),
-                      const Spacer(),
-                      Text(
-                        '$likesCount ${likesCount == 1 ? 'like' : 'likes'}',
-                        style: theme.textTheme.bodySmall?.copyWith(
-                          color: Colors.grey[600],
+                        Container(
+                          width: 1,
+                          height: 40,
+                          color: Colors.grey[300],
                         ),
-                      ),
-                    ],
+                        Expanded(
+                          child: Column(
+                            children: [
+                              Text(
+                                likesCount.toString(),
+                                style: theme.textTheme.titleLarge?.copyWith(
+                                  fontWeight: FontWeight.w700,
+                                  color: const Color(0xFFEF4444),
+                                ),
+                              ),
+                              Text(
+                                likesCount == 1 ? 'Like' : 'Likes',
+                                style: theme.textTheme.bodySmall?.copyWith(
+                                  color: Colors.grey[600],
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        Container(
+                          width: 1,
+                          height: 40,
+                          color: Colors.grey[300],
+                        ),
+                        Expanded(
+                          child: Column(
+                            children: [
+                              Text(
+                                comments.length.toString(),
+                                style: theme.textTheme.titleLarge?.copyWith(
+                                  fontWeight: FontWeight.w700,
+                                  color: const Color(0xFF3B82F6),
+                                ),
+                              ),
+                              Text(
+                                comments.length == 1 ? 'Comment' : 'Comments',
+                                style: theme.textTheme.bodySmall?.copyWith(
+                                  color: Colors.grey[600],
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
                 ],
               ),
             ),
 
-            // Like button
+            // Action buttons
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
               child: Row(
                 children: [
                   Expanded(
-                    child: ElevatedButton.icon(
-                      onPressed: _isLoading ? null : _toggleLike,
-                      icon: Icon(
-                        _isLiked ? Icons.favorite : Icons.favorite_border,
-                        color: _isLiked ? Colors.red : Colors.grey,
-                        size: 20,
-                      ),
-                      label: Text(
-                        _isLiked ? 'Liked' : 'Like',
-                        style: TextStyle(
-                          color: _isLiked ? Colors.red : Colors.grey[700],
-                          fontWeight: FontWeight.w500,
+                    child: GestureDetector(
+                      onTap: _isLoading ? null : _toggleLike,
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(vertical: 12),
+                        decoration: BoxDecoration(
+                          color: _isLiked 
+                              ? const Color(0xFFEF4444).withOpacity(0.1)
+                              : Colors.grey[100],
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(
+                            color: _isLiked 
+                                ? const Color(0xFFEF4444).withOpacity(0.3)
+                                : Colors.grey[300]!,
+                          ),
+                        ),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            _isLoading
+                                ? SizedBox(
+                                    width: 20,
+                                    height: 20,
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 2,
+                                      color: _isLiked 
+                                          ? const Color(0xFFEF4444)
+                                          : Colors.grey[600],
+                                    ),
+                                  )
+                                : Icon(
+                                    _isLiked ? Icons.favorite : Icons.favorite_border,
+                                    color: _isLiked ? const Color(0xFFEF4444) : Colors.grey[600],
+                                    size: 20,
+                                  ),
+                            const SizedBox(width: 8),
+                            Text(
+                              _isLiked ? 'Liked' : 'Like',
+                              style: TextStyle(
+                                color: _isLiked ? const Color(0xFFEF4444) : Colors.grey[700],
+                                fontWeight: FontWeight.w600,
+                                fontSize: 14,
+                              ),
+                            ),
+                          ],
                         ),
                       ),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.grey[100],
-                        elevation: 0,
-                        side: BorderSide(color: Colors.grey[300]!),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(8),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF3B82F6).withOpacity(0.1),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(
+                          color: const Color(0xFF3B82F6).withOpacity(0.3),
                         ),
+                      ),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(
+                            Icons.comment_outlined,
+                            color: const Color(0xFF3B82F6),
+                            size: 20,
+                          ),
+                          const SizedBox(width: 8),
+                          Text(
+                            'Comment',
+                            style: TextStyle(
+                              color: const Color(0xFF3B82F6),
+                              fontWeight: FontWeight.w600,
+                              fontSize: 14,
+                            ),
+                          ),
+                        ],
                       ),
                     ),
                   ),
@@ -443,30 +611,37 @@ class _FoodDetailDialogState extends State<FoodDetailDialog> {
                                   Row(
                                     children: [
                                       CircleAvatar(
-                                        radius: 16,
-                                        backgroundColor: AppTheme.primaryLight,
-                                        child: Text(
-                                          (comment['userName'] as String? ?? 'U')[0].toUpperCase(),
-                                          style: const TextStyle(
-                                            color: Colors.white,
-                                            fontWeight: FontWeight.w600,
-                                          ),
-                                        ),
+                                        radius: 18,
+                                        backgroundColor: Colors.grey[300],
+                                        backgroundImage: (comment['authorPhotoUrl'] != null && comment['authorPhotoUrl'].isNotEmpty)
+                                            ? NetworkImage(comment['authorPhotoUrl'])
+                                            : null,
+                                        child: (comment['authorPhotoUrl'] == null || comment['authorPhotoUrl'].isEmpty)
+                                            ? Text(
+                                                (comment['authorName'] as String? ?? comment['userName'] as String? ?? 'U')[0].toUpperCase(),
+                                                style: const TextStyle(
+                                                  color: Colors.white,
+                                                  fontWeight: FontWeight.w600,
+                                                  fontSize: 14,
+                                                ),
+                                              )
+                                            : null,
                                       ),
-                                      const SizedBox(width: 8),
+                                      const SizedBox(width: 12),
                                       Expanded(
                                         child: Column(
                                           crossAxisAlignment: CrossAxisAlignment.start,
                                           children: [
                                             Text(
-                                              comment['userName'] ?? 'Unknown User',
-                                              style: theme.textTheme.labelMedium?.copyWith(
+                                              comment['authorName'] ?? comment['userName'] ?? 'Unknown User',
+                                              style: theme.textTheme.titleSmall?.copyWith(
                                                 fontWeight: FontWeight.w600,
+                                                color: const Color(0xFF1F2937),
                                               ),
                                             ),
                                             Text(
                                               _formatCommentTime(comment['createdAt']),
-                                              style: theme.textTheme.labelSmall?.copyWith(
+                                              style: theme.textTheme.bodySmall?.copyWith(
                                                 color: Colors.grey[600],
                                               ),
                                             ),
@@ -475,10 +650,22 @@ class _FoodDetailDialogState extends State<FoodDetailDialog> {
                                       ),
                                     ],
                                   ),
-                                  const SizedBox(height: 8),
-                                  Text(
-                                    comment['text'] ?? '',
-                                    style: theme.textTheme.bodyMedium,
+                                  const SizedBox(height: 10),
+                                  Container(
+                                    width: double.infinity,
+                                    padding: const EdgeInsets.all(12),
+                                    decoration: BoxDecoration(
+                                      color: Colors.white,
+                                      borderRadius: BorderRadius.circular(8),
+                                      border: Border.all(color: Colors.grey[100]!),
+                                    ),
+                                    child: Text(
+                                      comment['text'] ?? '',
+                                      style: theme.textTheme.bodyMedium?.copyWith(
+                                        height: 1.4,
+                                        color: const Color(0xFF374151),
+                                      ),
+                                    ),
                                   ),
                                   const SizedBox(height: 8),
                                   Row(
@@ -531,15 +718,23 @@ class _FoodDetailDialogState extends State<FoodDetailDialog> {
               child: Row(
                 children: [
                   CircleAvatar(
-                    radius: 16,
-                    backgroundColor: AppTheme.primaryLight,
-                    child: const Text(
-                      'Y',
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
+                    radius: 18,
+                    backgroundColor: Colors.grey[300],
+                    backgroundImage: (FirebaseAuth.instance.currentUser?.photoURL != null)
+                        ? NetworkImage(FirebaseAuth.instance.currentUser!.photoURL!)
+                        : null,
+                    child: (FirebaseAuth.instance.currentUser?.photoURL == null)
+                        ? Text(
+                            (FirebaseAuth.instance.currentUser?.displayName?.isNotEmpty == true
+                                ? FirebaseAuth.instance.currentUser!.displayName![0]
+                                : 'A').toUpperCase(),
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontWeight: FontWeight.w600,
+                              fontSize: 14,
+                            ),
+                          )
+                        : null,
                   ),
                   const SizedBox(width: 12),
                   Expanded(
@@ -548,20 +743,22 @@ class _FoodDetailDialogState extends State<FoodDetailDialog> {
                       decoration: InputDecoration(
                         hintText: 'Write a comment...',
                         border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(20),
+                          borderRadius: BorderRadius.circular(25),
                           borderSide: BorderSide(color: Colors.grey[300]!),
                         ),
                         enabledBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(20),
+                          borderRadius: BorderRadius.circular(25),
                           borderSide: BorderSide(color: Colors.grey[300]!),
                         ),
                         focusedBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(20),
+                          borderRadius: BorderRadius.circular(25),
                           borderSide: BorderSide(color: AppTheme.primaryLight),
                         ),
+                        fillColor: Colors.white,
+                        filled: true,
                         contentPadding: const EdgeInsets.symmetric(
                           horizontal: 16,
-                          vertical: 8,
+                          vertical: 12,
                         ),
                       ),
                       maxLines: null,
@@ -569,22 +766,29 @@ class _FoodDetailDialogState extends State<FoodDetailDialog> {
                       onSubmitted: (_) => _addComment(),
                     ),
                   ),
-                  const SizedBox(width: 8),
-                  IconButton(
-                    onPressed: _isLoading ? null : _addComment,
-                    icon: _isLoading
-                        ? SizedBox(
-                            width: 20,
-                            height: 20,
-                            child: CircularProgressIndicator(
-                              strokeWidth: 2,
-                              color: AppTheme.primaryLight,
+                  const SizedBox(width: 12),
+                  Container(
+                    decoration: BoxDecoration(
+                      color: AppTheme.primaryLight,
+                      shape: BoxShape.circle,
+                    ),
+                    child: IconButton(
+                      onPressed: _isLoading ? null : _addComment,
+                      icon: _isLoading
+                          ? SizedBox(
+                              width: 20,
+                              height: 20,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                color: Colors.white,
+                              ),
+                            )
+                          : const Icon(
+                              Icons.send,
+                              color: Colors.white,
+                              size: 20,
                             ),
-                          )
-                        : Icon(
-                            Icons.send,
-                            color: AppTheme.primaryLight,
-                          ),
+                    ),
                   ),
                 ],
               ),
@@ -604,12 +808,15 @@ class _FoodDetailDialogState extends State<FoodDetailDialog> {
     
     if (difference.inMinutes < 1) {
       return 'Just now';
-    } else if (difference.inHours < 1) {
-      return '${difference.inMinutes}m ago';
-    } else if (difference.inDays < 1) {
-      return '${difference.inHours}h ago';
+    } else if (difference.inMinutes < 60) {
+      return '${difference.inMinutes} min ago';
+    } else if (difference.inHours < 24) {
+      return '${difference.inHours} hour${difference.inHours > 1 ? 's' : ''} ago';
+    } else if (difference.inDays < 7) {
+      return '${difference.inDays} day${difference.inDays > 1 ? 's' : ''} ago';
     } else {
-      return '${difference.inDays}d ago';
+      // Format as actual date for older comments
+      return '${commentTime.day}/${commentTime.month}/${commentTime.year}';
     }
   }
 }

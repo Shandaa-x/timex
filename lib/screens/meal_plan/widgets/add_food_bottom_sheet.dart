@@ -95,20 +95,19 @@ class _AddFoodBottomSheetState extends State<AddFoodBottomSheet> {
     });
 
     try {
-      // Generate unique document ID for each food item
+      // Generate unique food item ID
       final foodId = DateTime.now().millisecondsSinceEpoch.toString();
       final dateString = '${selectedDateTime.year}-${selectedDateTime.month.toString().padLeft(2, '0')}-${selectedDateTime.day.toString().padLeft(2, '0')}';
+      
+      // Document ID format: YYYY-MM-DD-foods
+      final documentId = '$dateString-foods';
 
-      final foodData = {
+      final foodItemData = {
         'id': foodId,
         'name': _nameController.text.trim(),
         'description': _descriptionController.text.trim(),
         'price': int.parse(_priceController.text.trim()),
         'image': _imageBase64 ?? '',
-        'date': dateString,
-        'day': selectedDateTime.day,
-        'month': selectedDateTime.month,
-        'year': selectedDateTime.year,
         'createdAt': DateTime.now().millisecondsSinceEpoch,
         'likes': <String>[], // Array of user IDs who liked this food
         'likesCount': 0,
@@ -116,15 +115,33 @@ class _AddFoodBottomSheetState extends State<AddFoodBottomSheet> {
         'commentsCount': 0,
       };
 
-      // Store each food as a separate document
       final docRef = FirebaseFirestore.instance
           .collection('foods')
-          .doc(foodId);
+          .doc(documentId);
 
-      await docRef.set(foodData);
+      // Check if document exists, if not create it with date metadata
+      final docSnapshot = await docRef.get();
+      
+      if (!docSnapshot.exists) {
+        // Create new document with date metadata and foods array
+        await docRef.set({
+          'createdAt': DateTime.now().millisecondsSinceEpoch,
+          'lastUpdated': DateTime.now().millisecondsSinceEpoch,
+          'day': selectedDateTime.day,
+          'month': selectedDateTime.month,
+          'year': selectedDateTime.year,
+          'foods': [foodItemData],
+        });
+      } else {
+        // Add food item to existing foods array
+        await docRef.update({
+          'lastUpdated': DateTime.now().millisecondsSinceEpoch,
+          'foods': FieldValue.arrayUnion([foodItemData]),
+        });
+      }
 
       // Call the callback function with the food data
-      widget.onFoodAdded(foodData);
+      widget.onFoodAdded(foodItemData);
 
       Navigator.pop(context);
 
