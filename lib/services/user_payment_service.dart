@@ -5,7 +5,7 @@ import '../utils/logger.dart';
 /// Service for handling user payment status and food amount updates in Firestore
 class UserPaymentService {
   static final FirebaseFirestore _firestore = FirebaseFirestore.instance;
-  
+
   /// Process payment and update user's balance with partial payment support
   static Future<Map<String, dynamic>> processPayment({
     required String userId,
@@ -15,38 +15,41 @@ class UserPaymentService {
     String? orderId,
   }) async {
     try {
-      AppLogger.info('Processing payment for user: $userId, amount: ₮$paidAmount');
-      
+      AppLogger.info(
+        'Processing payment for user: $userId, amount: ₮$paidAmount',
+      );
+
       final userDocRef = _firestore.collection('users').doc(userId);
       final paymentsRef = userDocRef.collection('payments');
-      
+
       return await _firestore.runTransaction((transaction) async {
         // Get current user document
         final userDoc = await transaction.get(userDocRef);
-        
+
         if (!userDoc.exists) {
           throw Exception('User document not found');
         }
-        
+
         final userData = userDoc.data()!;
         final dynamic rawTotalFoodAmount = userData['totalFoodAmount'] ?? 0.0;
-        final double currentTotalFoodAmount = rawTotalFoodAmount is String 
-            ? double.tryParse(rawTotalFoodAmount) ?? 0.0 
+        final double currentTotalFoodAmount = rawTotalFoodAmount is String
+            ? double.tryParse(rawTotalFoodAmount) ?? 0.0
             : (rawTotalFoodAmount as num).toDouble();
-        
+
         // Calculate new balance after payment
-        final double newTotalFoodAmount = (currentTotalFoodAmount - paidAmount).clamp(0.0, double.infinity);
-        
+        final double newTotalFoodAmount = (currentTotalFoodAmount - paidAmount)
+            .clamp(0.0, double.infinity);
+
         // Determine payment status based on remaining balance
         String paymentStatus;
         if (newTotalFoodAmount == 0.0) {
-          paymentStatus = 'paid';  // Fully paid
+          paymentStatus = 'paid'; // Fully paid
         } else if (newTotalFoodAmount < currentTotalFoodAmount) {
-          paymentStatus = 'partial';  // Partial payment made
+          paymentStatus = 'partial'; // Partial payment made
         } else {
-          paymentStatus = 'pending';  // No effective payment (edge case)
+          paymentStatus = 'pending'; // No effective payment (edge case)
         }
-        
+
         // Create payment record
         final paymentDocRef = paymentsRef.doc();
         final paymentRecord = {
@@ -60,26 +63,27 @@ class UserPaymentService {
           'newBalance': newTotalFoodAmount,
           'createdAt': FieldValue.serverTimestamp(),
         };
-        
+
         transaction.set(paymentDocRef, paymentRecord);
-        
-        // Update user document
+
+        // Update user document with payment tracking
         Map<String, dynamic> updateData = {
           'totalFoodAmount': newTotalFoodAmount,
+          'totalPaymentsMade': FieldValue.increment(paidAmount),
           'qpayStatus': paymentStatus,
           'lastPaymentAmount': paidAmount,
           'lastPaymentDate': FieldValue.serverTimestamp(),
           'lastPaymentStatusUpdate': FieldValue.serverTimestamp(),
           'updatedAt': FieldValue.serverTimestamp(),
         };
-        
+
         transaction.update(userDocRef, updateData);
-        
+
         AppLogger.success(
           'Payment processed: ₮$paidAmount deducted. '
-          'Previous: ₮$currentTotalFoodAmount, New: ₮$newTotalFoodAmount, Status: $paymentStatus'
+          'Previous: ₮$currentTotalFoodAmount, New: ₮$newTotalFoodAmount, Status: $paymentStatus',
         );
-        
+
         return {
           'success': true,
           'previousAmount': currentTotalFoodAmount,
@@ -89,16 +93,12 @@ class UserPaymentService {
           'paymentId': paymentDocRef.id,
         };
       });
-      
     } catch (error) {
       AppLogger.error('Error processing payment: $error');
-      return {
-        'success': false,
-        'error': error.toString(),
-      };
+      return {'success': false, 'error': error.toString()};
     }
   }
-  
+
   /// Update payment status (for pending payments)
   static Future<Map<String, dynamic>> updatePaymentStatus({
     required String userId,
@@ -106,73 +106,70 @@ class UserPaymentService {
   }) async {
     try {
       AppLogger.info('Updating payment status for user: $userId to $status');
-      
+
       final userDocRef = _firestore.collection('users').doc(userId);
-      
+
       await userDocRef.update({
         'qpayStatus': status,
         'lastPaymentStatusUpdate': FieldValue.serverTimestamp(),
       });
-      
-      return {
-        'success': true,
-        'status': status,
-      };
-      
+
+      return {'success': true, 'status': status};
     } catch (error) {
       AppLogger.error('Error updating payment status: $error');
-      return {
-        'success': false,
-        'error': error.toString(),
-      };
+      return {'success': false, 'error': error.toString()};
     }
   }
-  
+
   /// Get current user's payment status and food amount
-  static Future<Map<String, dynamic>> getUserPaymentInfo([String? userId]) async {
+  static Future<Map<String, dynamic>> getUserPaymentInfo([
+    String? userId,
+  ]) async {
     try {
       final String uid = userId ?? FirebaseAuth.instance.currentUser?.uid ?? '';
-      
+
       if (uid.isEmpty) {
         throw Exception('No user ID provided');
       }
-      
+
       final userDoc = await _firestore.collection('users').doc(uid).get();
-      
+
       if (!userDoc.exists) {
         throw Exception('User document not found');
       }
-      
+
       final data = userDoc.data()!;
-      
+
       // Safe parsing for potentially string values from Firebase
       final dynamic rawTotalFoodAmount = data['totalFoodAmount'] ?? 0.0;
       final dynamic rawLastPaymentAmount = data['lastPaymentAmount'] ?? 0.0;
-      
+      final dynamic rawTotalPaymentsMade = data['totalPaymentsMade'] ?? 0.0;
+
       return {
         'success': true,
-        'totalFoodAmount': rawTotalFoodAmount is String 
-            ? double.tryParse(rawTotalFoodAmount) ?? 0.0 
+        'totalFoodAmount': rawTotalFoodAmount is String
+            ? double.tryParse(rawTotalFoodAmount) ?? 0.0
             : (rawTotalFoodAmount as num).toDouble(),
+        'totalPaymentsMade': rawTotalPaymentsMade is String
+            ? double.tryParse(rawTotalPaymentsMade) ?? 0.0
+            : (rawTotalPaymentsMade as num).toDouble(),
         'qpayStatus': data['qpayStatus'] ?? 'none',
-        'lastPaymentAmount': rawLastPaymentAmount is String 
-            ? double.tryParse(rawLastPaymentAmount) ?? 0.0 
+        'lastPaymentAmount': rawLastPaymentAmount is String
+            ? double.tryParse(rawLastPaymentAmount) ?? 0.0
             : (rawLastPaymentAmount as num).toDouble(),
         'lastPaymentDate': data['lastPaymentDate'],
         'lastPaymentStatusUpdate': data['lastPaymentStatusUpdate'],
       };
-      
     } catch (error) {
       AppLogger.error('Error getting user payment info: $error');
-      return {
-        'success': false,
-        'error': error.toString(),
-      };
+      return {'success': false, 'error': error.toString()};
     }
   }
-  
+
   /// Get payment history for a user
-  static Future<List<Map<String, dynamic>>> getPaymentHistory(String userId) async {
+  static Future<List<Map<String, dynamic>>> getPaymentHistory(
+    String userId,
+  ) async {
     try {
       final paymentsQuery = await _firestore
           .collection('users')
@@ -181,7 +178,7 @@ class UserPaymentService {
           .orderBy('date', descending: true)
           .limit(20)
           .get();
-      
+
       return paymentsQuery.docs.map((doc) {
         final data = doc.data();
         return {
@@ -196,36 +193,35 @@ class UserPaymentService {
           'newBalance': data['newBalance'] ?? 0.0,
         };
       }).toList();
-      
     } catch (error) {
       AppLogger.error('Error getting payment history: $error');
       return [];
     }
   }
-  
+
   /// Initialize or ensure user document exists with default values
   static Future<void> ensureUserDocument([String? userId]) async {
     try {
       final String uid = userId ?? FirebaseAuth.instance.currentUser?.uid ?? '';
-      
+
       if (uid.isEmpty) {
         throw Exception('No user ID provided');
       }
-      
+
       final userDocRef = _firestore.collection('users').doc(uid);
       final userDoc = await userDocRef.get();
-      
+
       if (!userDoc.exists) {
         await userDocRef.set({
           'totalFoodAmount': 0.0,
+          'totalPaymentsMade': 0.0,
           'qpayStatus': 'none',
           'createdAt': FieldValue.serverTimestamp(),
           'lastUpdated': FieldValue.serverTimestamp(),
         });
-        
+
         AppLogger.info('User document created with default values');
       }
-      
     } catch (error) {
       AppLogger.error('Error ensuring user document: $error');
     }

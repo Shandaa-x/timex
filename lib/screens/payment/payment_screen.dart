@@ -525,7 +525,9 @@ class _PaymentScreenState extends State<PaymentScreen> {
                     onPressed: () {
                       Navigator.of(context).pop(); // Close dialog
                       Navigator.of(context).pop(); // Close bottom sheet
-                      Navigator.of(context).pop(); // Go back to previous screen
+                      Navigator.of(context).pop(
+                        true,
+                      ); // Go back to previous screen with success result
                     },
                     style: ElevatedButton.styleFrom(
                       backgroundColor: Colors.white,
@@ -1178,7 +1180,9 @@ class _PaymentStatusBottomSheetState extends State<PaymentStatusBottomSheet>
                   child: ElevatedButton(
                     onPressed: () {
                       Navigator.of(context).pop(); // Close dialog
-                      Navigator.of(context).pop(); // Go back to previous screen
+                      Navigator.of(context).pop(
+                        true,
+                      ); // Go back to previous screen with success result
                     },
                     style: ElevatedButton.styleFrom(
                       backgroundColor: Colors.white,
