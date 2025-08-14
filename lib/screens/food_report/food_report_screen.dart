@@ -5,8 +5,7 @@ import 'dart:async';
 import '../../widgets/common_app_bar.dart';
 import '../../widgets/custom_drawer.dart';
 import '../../services/money_format.dart';
-import '../payment/payment_options_screen.dart';
-import 'widgets/filter_bottom_sheet_widget.dart';
+import '../payment/payment_screen.dart';
 import 'tabview/daily_tab_screen.dart';
 import 'tabview/history_tab_screen.dart';
 import 'services/food_data_service.dart';
@@ -33,11 +32,7 @@ class _FoodReportScreenState extends State<FoodReportScreen>
   Map<String, bool> _paidMeals =
       {}; // Track which individual meals are paid for
 
-  // Balance and budget tracking
-  List<Map<String, dynamic>> _paymentHistory = [];
-
   // User statistics from totalFoodAmount
-  int _totalFoodAmount = 0;
   int _paymentBalance = 0;
   int _totalPaymentAmount = 0;
   bool _userStatsLoading = true;
@@ -45,7 +40,6 @@ class _FoodReportScreenState extends State<FoodReportScreen>
 
   // Filtering
   String? _selectedFoodFilter;
-  List<String> _availableFoodTypes = [];
 
   // Tab controller
   late TabController _tabController;
@@ -60,7 +54,6 @@ class _FoodReportScreenState extends State<FoodReportScreen>
     _tabController = TabController(length: 2, vsync: this);
     _loadMonthlyFoodData();
     _loadUserSettings();
-    _loadPaymentHistory();
     _loadUserStatistics();
   }
 
@@ -89,11 +82,9 @@ class _FoodReportScreenState extends State<FoodReportScreen>
 
               setState(() {
                 // _totalPaymentAmount = Amount to Pay (display totalFoodAmount from users collection)
-                // _totalFoodAmount = Total Payments Made (amount actually paid)
                 // _paymentBalance = Payment Balance (payments made - food consumed)
                 _totalPaymentAmount =
-                    totalFoodConsumed; // Show totalFoodAmount as "Төлөх дүн"
-                _totalFoodAmount = totalPaymentsMade; // Total Payments Made
+                    totalFoodConsumed; // Show totalFoodAmount as "Amount to Pay"
                 _paymentBalance =
                     totalPaymentsMade -
                     totalFoodConsumed; // Balance (negative if owing money)
@@ -140,7 +131,7 @@ class _FoodReportScreenState extends State<FoodReportScreen>
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Өгөгдөл ачаалахад алдаа гарлаа: $e'),
+            content: Text('Error loading data: $e'),
             backgroundColor: Colors.red,
             behavior: SnackBarBehavior.floating,
           ),
@@ -151,16 +142,6 @@ class _FoodReportScreenState extends State<FoodReportScreen>
       setState(() {
         _isLoading = false;
       });
-    }
-  }
-
-  // Load payment history from service
-  Future<void> _loadPaymentHistory() async {
-    try {
-      _paymentHistory = await PaymentService.loadPaymentHistory(_selectedMonth);
-    } catch (e) {
-      print('Error loading payment history: $e');
-      _paymentHistory = [];
     }
   }
 
@@ -197,7 +178,7 @@ class _FoodReportScreenState extends State<FoodReportScreen>
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(
-              '${FoodDataService.getFoodName(food)} төлбөр төлөгдлөө',
+              '${FoodDataService.getFoodName(food)} payment completed',
             ),
             backgroundColor: Colors.green,
             behavior: SnackBarBehavior.floating,
@@ -208,7 +189,7 @@ class _FoodReportScreenState extends State<FoodReportScreen>
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('Алдаа гарлаа'),
+            content: Text('An error occurred'),
             backgroundColor: Colors.red,
           ),
         );
@@ -222,7 +203,7 @@ class _FoodReportScreenState extends State<FoodReportScreen>
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('Төлөх хоол байхгүй байна'),
+            content: Text('No meals to pay for'),
             backgroundColor: Colors.orange,
           ),
         );
@@ -242,30 +223,28 @@ class _FoodReportScreenState extends State<FoodReportScreen>
       context: context,
       builder: (BuildContext context) {
         return AlertDialog(
-          title: const Text('Сарын төлбөр төлөх'),
+          title: const Text('Pay Monthly Bill'),
           content: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                'Сарын нийт төлбөр: ${MoneyFormatService.formatWithSymbol(totalAmount)}',
+                'Total monthly bill: ${MoneyFormatService.formatWithSymbol(totalAmount)}',
               ),
               const SizedBox(height: 8),
-              Text('Нийт хоол: $totalFoods'),
+              Text('Total meals: $totalFoods'),
               const SizedBox(height: 16),
-              const Text(
-                'Та энэ сарын бүх хоолны төлбөрийг төлөхийг хүсэж байна уу?',
-              ),
+              const Text('Do you want to pay for all meals this month?'),
             ],
           ),
           actions: [
             TextButton(
               onPressed: () => Navigator.of(context).pop(false),
-              child: const Text('Үгүй'),
+              child: const Text('No'),
             ),
             ElevatedButton(
               onPressed: () => Navigator.of(context).pop(true),
-              child: const Text('Тийм'),
+              child: const Text('Yes'),
             ),
           ],
         );
@@ -318,7 +297,7 @@ class _FoodReportScreenState extends State<FoodReportScreen>
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
               content: Text(
-                'Сарын төлбөр амжилттай төлөгдлөө! ${MoneyFormatService.formatWithSymbol(totalAmount)}',
+                'Monthly payment successful! ${MoneyFormatService.formatWithSymbol(totalAmount)}',
               ),
               backgroundColor: Colors.green,
               behavior: SnackBarBehavior.floating,
@@ -331,7 +310,7 @@ class _FoodReportScreenState extends State<FoodReportScreen>
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
-              content: Text('Төлбөр төлөхөд алдаа гарлаа. Дахин оролдоно уу.'),
+              content: Text('Error processing payment. Please try again.'),
               backgroundColor: Colors.red,
             ),
           );
@@ -342,7 +321,7 @@ class _FoodReportScreenState extends State<FoodReportScreen>
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Алдаа гарлаа: $e'),
+            content: Text('Error occurred: $e'),
             backgroundColor: Colors.red,
           ),
         );
@@ -352,18 +331,8 @@ class _FoodReportScreenState extends State<FoodReportScreen>
 
   // Update food filtering using service
   void _updateFoodFilter() {
-    _availableFoodTypes = FoodDataService.getAvailableFoodTypes(
-      _monthlyFoodData,
-    );
+    // Food filtering functionality removed
   }
-
-  // Get filtered food data using service
-  Map<String, List<Map<String, dynamic>>> get _filteredFoodData =>
-      FoodCalculationService.getFilteredFoodData(
-        _monthlyFoodData,
-        _eatenForDayData,
-        _selectedFoodFilter,
-      );
 
   // Get only unpaid meals data using service
   Map<String, List<Map<String, dynamic>>> get _unpaidFoodData =>
@@ -377,30 +346,6 @@ class _FoodReportScreenState extends State<FoodReportScreen>
   // Get unpaid meals total using service
   int get _unpaidTotalAmount =>
       FoodCalculationService.calculateUnpaidTotalAmount(_unpaidFoodData);
-
-  // Get paid meals total using service
-  int get _paidTotalAmount => FoodCalculationService.calculatePaidTotalAmount(
-    _filteredFoodData,
-    _paidMeals,
-  );
-
-  void _showFilterBottomSheet() {
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (context) => FilterBottomSheetWidget(
-        availableFoodTypes: _availableFoodTypes,
-        selectedFoodFilter: _selectedFoodFilter,
-        onApplyFilter: (String? filter) {
-          setState(() {
-            _selectedFoodFilter = filter;
-          });
-          Navigator.of(context).pop();
-        },
-      ),
-    );
-  }
 
   // Check if any foods exist in the selected month
   bool get _hasAnyFoodsInMonth => _monthlyFoodData.isNotEmpty;
@@ -450,7 +395,7 @@ class _FoodReportScreenState extends State<FoodReportScreen>
                   children: [
                     Icon(Icons.restaurant_menu, size: 14),
                     SizedBox(width: 6),
-                    Text('Хоолны жагсаалт'),
+                    Text('Food List'),
                   ],
                 ),
               ),
@@ -460,7 +405,7 @@ class _FoodReportScreenState extends State<FoodReportScreen>
                   children: [
                     Icon(Icons.payment, size: 14),
                     SizedBox(width: 6),
-                    Text('Төлбөрийн түүх'),
+                    Text('Payment History'),
                   ],
                 ),
               ),
@@ -473,8 +418,9 @@ class _FoodReportScreenState extends State<FoodReportScreen>
           builder: (context, constraints) {
             // Calculate a reasonable height based on screen size
             final screenHeight = MediaQuery.of(context).size.height;
-            final availableHeight = screenHeight * 0.6; // Use 60% of screen height
-            
+            final availableHeight =
+                screenHeight * 0.6; // Use 60% of screen height
+
             return SizedBox(
               height: availableHeight,
               child: TabBarView(
@@ -502,11 +448,7 @@ class _FoodReportScreenState extends State<FoodReportScreen>
   Future<void> _refreshData() async {
     setState(() => _isLoading = true);
     try {
-      await Future.wait([
-        _loadMonthlyFoodData(),
-        _loadPaymentHistory(),
-        _loadUserStatistics(),
-      ]);
+      await Future.wait([_loadMonthlyFoodData(), _loadUserStatistics()]);
     } finally {
       setState(() => _isLoading = false);
     }
@@ -521,7 +463,7 @@ class _FoodReportScreenState extends State<FoodReportScreen>
         onNavigateToTab: widget.onNavigateToTab,
       ),
       appBar: const CommonAppBar(
-        title: 'Хоолны тайлан',
+        title: 'Food Report',
         variant: AppBarVariant.standard,
         backgroundColor: Colors.white,
       ),
@@ -586,7 +528,7 @@ class _FoodReportScreenState extends State<FoodReportScreen>
                                   ),
                                   SizedBox(width: 8),
                                   Text(
-                                    'Хоолны зардал',
+                                    'Food Expenses',
                                     style: TextStyle(
                                       color: Colors.white,
                                       fontSize: 18,
@@ -604,7 +546,7 @@ class _FoodReportScreenState extends State<FoodReportScreen>
                                           CrossAxisAlignment.start,
                                       children: [
                                         Text(
-                                          'Төлөх дүн',
+                                          'Amount to Pay',
                                           style: TextStyle(
                                             color: Colors.white.withOpacity(
                                               0.8,
@@ -638,7 +580,7 @@ class _FoodReportScreenState extends State<FoodReportScreen>
                                           CrossAxisAlignment.start,
                                       children: [
                                         Text(
-                                          'Үлдэгдэл',
+                                          'Balance',
                                           style: TextStyle(
                                             color: Colors.white.withOpacity(
                                               0.8,
@@ -664,75 +606,55 @@ class _FoodReportScreenState extends State<FoodReportScreen>
                                   ),
                                 ],
                               ),
-                              const SizedBox(height: 12),
-                              InkWell(
-                                onTap: () {
-                                  Navigator.push(
-                                    context,
-                                    MaterialPageRoute(
-                                      builder: (context) => PaymentOptionsScreen(
-                                        initialAmount: _totalPaymentAmount,
+                              const SizedBox(height: 16),
+                              // Make Payment Button
+                              SizedBox(
+                                width: double.infinity,
+                                child: ElevatedButton(
+                                  onPressed: () {
+                                    // Navigate to payment screen with the total amount
+                                    Navigator.push(
+                                      context,
+                                      MaterialPageRoute(
+                                        builder: (context) => PaymentScreen(
+                                          initialAmount: _totalPaymentAmount,
+                                        ),
                                       ),
+                                    );
+                                  },
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: Colors.white,
+                                    foregroundColor: const Color(0xFF10B981),
+                                    elevation: 0,
+                                    padding: const EdgeInsets.symmetric(
+                                      vertical: 16,
                                     ),
-                                  );
-                                },
-                                child: Container(
-                                  width: double.infinity,
-                                  padding: const EdgeInsets.all(12),
-                                  decoration: BoxDecoration(
-                                    color: Colors.green[100],
-                                    borderRadius: BorderRadius.circular(12),
-                                    border: Border.all(
-                                      color: Colors.green[300]!,
-                                      width: 1,
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(8),
                                     ),
                                   ),
-                                  child: Text(
-                                    'Төлбөр төлөх',
-                                    textAlign: TextAlign.center,
-                                    style: TextStyle(
-                                      color: Colors.green[800],
-                                      fontSize: 17,
-                                      fontWeight: FontWeight.w600,
-                                    ),
+                                  child: const Row(
+                                    mainAxisAlignment: MainAxisAlignment.center,
+                                    children: [
+                                      Icon(Icons.payment, size: 20),
+                                      SizedBox(width: 8),
+                                      Text(
+                                        'Make Payment',
+                                        style: TextStyle(
+                                          fontSize: 16,
+                                          fontWeight: FontWeight.w600,
+                                        ),
+                                      ),
+                                    ],
                                   ),
                                 ),
                               ),
+                              const SizedBox(height: 12),
+                              // Payment button removed - no direct payment from food report
                             ],
                           ),
                         ),
-                      // const SizedBox(height: 24),
-
-                      // // Summary cards
-                      // SummarySectionWidget(
-                      //   unpaidCount: _unpaidFoodData.values.fold(
-                      //     0,
-                      //     (total, foods) => total + foods.length,
-                      //   ),
-                      //   paidTotal: _paidTotalAmount,
-                      //   totalCost: _unpaidTotalAmount + _paidTotalAmount,
-                      //   paymentBalance:
-                      //       _paymentHistory.fold<double>(
-                      //         0.0,
-                      //         (total, payment) => total + (payment['amount'] as num).toDouble(),
-                      //       ) -
-                      //       (_unpaidTotalAmount + _paidTotalAmount),
-                      //   selectedFoodFilter: _selectedFoodFilter,
-                      //   onFilterPressed: _showFilterBottomSheet,
-                      // ),
                       const SizedBox(height: 15),
-                      // Payment history
-                      // if (_paymentHistory.isNotEmpty) ...[
-                      //   PaymentHistorySectionWidget(paymentHistory: _paymentHistory),
-                      //   const SizedBox(height: 24),
-                      // ],
-                      // Food frequency chart
-                      // FoodFrequencySectionWidget(
-                      //   foodStats: _getUnpaidFoodStats(),
-                      //   selectedFoodFilter: _selectedFoodFilter,
-                      // ),
-                      // const SizedBox(height: 24),
-                      // Tabbed breakdown section
                       _buildTabbedBreakdownSection(),
                       const SizedBox(height: 24),
                     ],

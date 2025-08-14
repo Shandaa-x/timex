@@ -51,22 +51,22 @@ class BankingAppChecker {
       try {
         // Try multiple approaches for iOS compatibility
         final baseUri = Uri.parse(entry.value);
-        
+
         // Test with just the scheme
         bool isAvailable = await canLaunchUrl(baseUri);
-        
+
         // If that fails, try with a common path
         if (!isAvailable) {
           final testUri = Uri.parse('${entry.value}open');
           isAvailable = await canLaunchUrl(testUri);
         }
-        
+
         // Last attempt with different parameter
         if (!isAvailable) {
           final testUri = Uri.parse('${entry.value}launch');
           isAvailable = await canLaunchUrl(testUri);
         }
-        
+
         availabilityMap[entry.key] = isAvailable;
 
         if (isAvailable) {
@@ -94,16 +94,16 @@ class BankingAppChecker {
   static Future<bool> testDeepLink(String deepLink) async {
     try {
       final uri = Uri.parse(deepLink);
-      
+
       // First try the exact link
       bool canLaunch = await canLaunchUrl(uri);
-      
+
       // If that fails, try just the scheme
       if (!canLaunch && uri.scheme.isNotEmpty) {
         final schemeUri = Uri.parse('${uri.scheme}://');
         canLaunch = await canLaunchUrl(schemeUri);
       }
-      
+
       AppLogger.info(
         'Deep link test: $deepLink - ${canLaunch ? 'Available' : 'Not available'}',
       );
@@ -151,6 +151,9 @@ class BankingAppChecker {
       'Chinggis Khaan Bank': ['ckbank://', 'chinggisnbank://'],
       'Capitron Bank': ['capitronbank://', 'capitron://'],
       'Bogd Bank': ['bogdbank://', 'bogd://'],
+      'Arig Bank': ['arigbank://', 'arig://'],
+      'Trans Bank': ['transbank://'],
+      'M Bank': ['mbank://'],
       'Candy Pay': ['candypay://', 'candy://'],
       'QPay Wallet': ['qpay://'],
     };
@@ -168,6 +171,10 @@ class BankingAppChecker {
           deepLink = 'socialpay://qpay?qr=$encodedQR';
         } else if (workingScheme.startsWith('khanbank://')) {
           deepLink = 'khanbank://q?qPay_QRcode=$encodedQR';
+        } else if (workingScheme.startsWith('tdbbank://')) {
+          deepLink = 'tdbbank://q?qPay_QRcode=$encodedQR';
+        } else if (workingScheme.startsWith('xacbank://')) {
+          deepLink = 'xacbank://q?qPay_QRcode=$encodedQR';
         } else {
           // Generic format for other banks
           deepLink = '${workingScheme}qpay?qr=$encodedQR';
