@@ -18,7 +18,6 @@ class MonthViewWidget extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final colorScheme = Colors.white;
     
     final firstDayOfMonth = DateTime(currentMonth.year, currentMonth.month, 1);
     final lastDayOfMonth =
@@ -63,7 +62,7 @@ class MonthViewWidget extends StatelessWidget {
             child: GridView.builder(
               gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
                 crossAxisCount: 7,
-                childAspectRatio: 0.8,
+                childAspectRatio: 0.7, // Increased from 0.8 to give more height
                 crossAxisSpacing: 1,
                 mainAxisSpacing: 1,
               ),
@@ -95,7 +94,7 @@ class MonthViewWidget extends StatelessWidget {
                       children: [
                         // Date number
                         Container(
-                          padding: const EdgeInsets.symmetric(vertical: 8),
+                          padding: const EdgeInsets.symmetric(vertical: 4), // Reduced from 8
                           child: Text(
                             '${date.day}',
                             style: theme.textTheme.labelMedium?.copyWith(
@@ -106,6 +105,7 @@ class MonthViewWidget extends StatelessWidget {
                                   : Colors.black.withOpacity(0.4),
                               fontWeight:
                                   isToday ? FontWeight.w700 : FontWeight.w500,
+                              fontSize: 12, // Reduced font size
                             ),
                           ),
                         ),
@@ -113,7 +113,7 @@ class MonthViewWidget extends StatelessWidget {
                         // Food indicators
                         Expanded(
                           child: Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 4),
+                            padding: const EdgeInsets.symmetric(horizontal: 2, vertical: 2), // Reduced padding
                             child: dayMeals.isNotEmpty
                                 ? _buildFoodIndicators(context, dayMeals)
                                 : _buildEmptyIndicator(
@@ -135,25 +135,23 @@ class MonthViewWidget extends StatelessWidget {
   Widget _buildFoodIndicators(BuildContext context, List<Map<String, dynamic>> dayFoods) {
     final theme = Theme.of(context);
     
-    // Calculate total likes and comments
-    final totalLikes = dayFoods.fold<int>(0, (sum, food) => sum + ((food['likesCount'] as int?) ?? 0));
-    final totalComments = dayFoods.fold<int>(0, (sum, food) => sum + ((food['commentsCount'] as int?) ?? 0));
-    
     return Column(
       mainAxisAlignment: MainAxisAlignment.center,
+      mainAxisSize: MainAxisSize.min,
       children: [
         // Show food count as a badge
         Container(
-          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+          padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
           decoration: BoxDecoration(
             color: AppTheme.successLight,
-            borderRadius: BorderRadius.circular(8),
+            borderRadius: BorderRadius.circular(6),
           ),
           child: Text(
             '${dayFoods.length}',
             style: theme.textTheme.labelSmall?.copyWith(
               color: AppTheme.onPrimaryLight,
               fontWeight: FontWeight.w600,
+              fontSize: 10,
             ),
           ),
         ),
@@ -166,47 +164,6 @@ class MonthViewWidget extends StatelessWidget {
           color: AppTheme.successLight,
           size: 12,
         ),
-        
-        // Show interaction counts if any
-        if (totalLikes > 0 || totalComments > 0) ...[
-          const SizedBox(height: 2),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              if (totalLikes > 0) ...[
-                Icon(
-                  Icons.favorite,
-                  color: Colors.red,
-                  size: 8,
-                ),
-                Text(
-                  '$totalLikes',
-                  style: theme.textTheme.labelSmall?.copyWith(
-                    fontSize: 8,
-                    color: Colors.red,
-                    fontWeight: FontWeight.w500,
-                  ),
-                ),
-              ],
-              if (totalLikes > 0 && totalComments > 0) const SizedBox(width: 2),
-              if (totalComments > 0) ...[
-                Icon(
-                  Icons.chat_bubble,
-                  color: AppTheme.primaryLight,
-                  size: 8,
-                ),
-                Text(
-                  '$totalComments',
-                  style: theme.textTheme.labelSmall?.copyWith(
-                    fontSize: 8,
-                    color: AppTheme.primaryLight,
-                    fontWeight: FontWeight.w500,
-                  ),
-                ),
-              ],
-            ],
-          ),
-        ],
       ],
     );
   }

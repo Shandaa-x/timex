@@ -101,9 +101,9 @@ class _MainScreenState extends State<MainScreen> {
 
     if (shouldLogout == true) {
       // Navigate back to login selection
-      Navigator.of(context).pushNamedAndRemoveUntil('/login', (route) => false);
+      Navigator.of(context).pushNamedAndRemoveUntil(Routes.googleLogin, (route) => false);
       return false;
-    } else {
+    } else {  
       return false;
     }
   }

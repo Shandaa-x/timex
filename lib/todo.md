@@ -32,7 +32,7 @@
 - hool nogoon, tsag tsenher
 
 ### 8/12 todo list
-- tulburiin tvvh harah hadgalah
+- tulburiin tvvh harah hadgalah 
 - tabview => tulburiin tvvh (payment statement) 
 
 ### 8/13 todo list

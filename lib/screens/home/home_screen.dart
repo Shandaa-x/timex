@@ -47,18 +47,45 @@ class _HomeScreenState extends State<HomeScreen> {
 
   Future<void> _loadNews() async {
     try {
-      // Fetch news from the public 'news' collection only
-      final newsSnapshot = await _firestore.collection('news').orderBy('publishedAt', descending: true).get();
+      // Fetch news from both collections simultaneously
+      final List<Future<QuerySnapshot>> futures = [
+        _firestore.collection('news').orderBy('publishedAt', descending: true).get(),
+        _firestore.collection('_news').orderBy('publishedAt', descending: true).get(),
+      ];
+      
+      final results = await Future.wait(futures);
+      final newsSnapshot = results[0];
+      final _newsSnapshot = results[1];
+      
       List<Map<String, dynamic>> allNews = [];
+      
+      // Process news from 'news' collection
       for (var doc in newsSnapshot.docs) {
-        final data = doc.data();
+        final data = doc.data() as Map<String, dynamic>;
         data['id'] = doc.id;
+        data['source_collection'] = 'news'; // Add identifier for source collection
         allNews.add(data);
       }
+      
+      // Process news from '_news' collection
+      for (var doc in _newsSnapshot.docs) {
+        final data = doc.data() as Map<String, dynamic>;
+        data['id'] = doc.id;
+        data['source_collection'] = '_news'; // Add identifier for source collection
+        allNews.add(data);
+      }
+      
+      // Sort all news by publishedAt in descending order (newest first)
+      allNews.sort((a, b) {
+        final aTime = (a['publishedAt'] as Timestamp?)?.toDate() ?? DateTime(1970);
+        final bTime = (b['publishedAt'] as Timestamp?)?.toDate() ?? DateTime(1970);
+        return bTime.compareTo(aTime);
+      });
+      
       setState(() {
         _newsList = allNews;
       });
-      debugPrint('Loaded ${allNews.length} news items');
+      debugPrint('Loaded ${allNews.length} news items (${newsSnapshot.docs.length} from news, ${_newsSnapshot.docs.length} from _news)');
     } catch (e) {
       debugPrint('Error loading news: $e');
       rethrow;

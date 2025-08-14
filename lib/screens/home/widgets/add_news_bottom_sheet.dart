@@ -80,6 +80,17 @@ class _AddNewsBottomSheetState extends State<AddNewsBottomSheet> {
       }
 
       final now = DateTime.now();
+      
+      // Get user information
+      final userDoc = await FirebaseFirestore.instance
+          .collection('users')
+          .doc(user.uid)
+          .get();
+      
+      final userData = userDoc.data();
+      final authorName = userData?['name'] ?? user.displayName ?? 'Нэргүй хэрэглэгч';
+      final authorPhotoUrl = userData?['photoUrl'] ?? user.photoURL ?? '';
+      
       final newsData = {
         'title': _titleController.text.trim(),
         'name': _titleController.text.trim(), // For compatibility
@@ -92,10 +103,12 @@ class _AddNewsBottomSheetState extends State<AddNewsBottomSheet> {
         'category': _selectedCategory,
         'imageUrl': _base64Image ?? '',
         'authorId': user.uid,
-        'authorName': user.displayName ?? user.email ?? 'Зэвэр нилээд',
+        'authorName': authorName,
+        'authorPhotoUrl': authorPhotoUrl,
         'source': 'user',
         'isPublished': true,
         'likes': 0,
+        'likedBy': [], // Array to store user IDs who liked
         'comments': 0,
         'readingTime': '${(_contentController.text.trim().split(' ').length / 200).ceil()} min read',
         'publishedAt': Timestamp.fromDate(now),

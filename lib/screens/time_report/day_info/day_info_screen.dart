@@ -32,6 +32,14 @@ class _DayInfoScreenState extends State<DayInfoScreen> {
     _loadTimeEntries();
   }
 
+  String formatMongolianHours(double hours) {
+    final int h = hours.floor();
+    final int m = ((hours - h) * 60).round();
+    if (h > 0 && m > 0) return '$h цаг, $m минут';
+    if (h > 0) return '$h цаг';
+    return '$h цаг, $m минут';
+  }
+
   Future<void> _loadTimeEntries() async {
     try {
       final entriesSnapshot = await _firestore
@@ -662,7 +670,7 @@ class _DayInfoScreenState extends State<DayInfoScreen> {
 
                   _buildStatCard(
                     'Ажилласан цаг',
-                    '${_getTotalWorkedHours().toStringAsFixed(1)}ц',
+                    '${formatMongolianHours(_getTotalWorkedHours())}',
                     Icons.access_time,
                     const Color(0xFF3B82F6),
                   ),

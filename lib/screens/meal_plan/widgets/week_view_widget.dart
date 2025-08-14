@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import '../../../theme/app_theme.dart';
 import '../../../services/money_format.dart';
 
@@ -32,12 +33,13 @@ class WeekViewWidget extends StatefulWidget {
 class _WeekViewWidgetState extends State<WeekViewWidget> {
   final Map<String, TextEditingController> _commentControllers = {};
   final Map<String, bool> _expandedFoods = {};
-  final String _currentUserId = 'user_123'; // Mock user ID - in real app, get from auth
   bool _isLoading = false;
+  
+  String get _currentUserId => FirebaseAuth.instance.currentUser?.uid ?? 'anonymous';
   
   // Payment and eaten status tracking
   Map<String, bool> _eatenForDayData = {}; // Track which days food was eaten
-  Map<String, bool> _paidMeals = {}; // Track which individual meals are paid for
+
 
   @override
   void initState() {
@@ -93,16 +95,12 @@ class _WeekViewWidgetState extends State<WeekViewWidget> {
           .get();
 
       if (docSnapshot.exists) {
-        final data = docSnapshot.data()!;
-        _paidMeals = Map<String, bool>.from(data['paidMeals'] ?? {});
-      } else {
-        _paidMeals = {};
+        // Payment status loading removed as feature is not used
       }
       
       if (mounted) setState(() {});
     } catch (e) {
       print('Error loading meal payment status: $e');
-      _paidMeals = {};
     }
   }
 
@@ -635,6 +633,17 @@ class _WeekViewWidgetState extends State<WeekViewWidget> {
   }
 
   Future<void> _toggleLike(String dateKey, Map<String, dynamic> food) async {
+    final currentUser = FirebaseAuth.instance.currentUser;
+    if (currentUser == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Please sign in to like this food'),
+          backgroundColor: Colors.orange,
+        ),
+      );
+      return;
+    }
+
     // Add haptic feedback
     HapticFeedback.lightImpact();
     
@@ -673,12 +682,12 @@ class _WeekViewWidgetState extends State<WeekViewWidget> {
       final currentFood = Map<String, dynamic>.from(foods[foodIndex]);
       final likes = List<String>.from(currentFood['likes'] ?? []);
       
-      if (likes.contains(_currentUserId)) {
+      if (likes.contains(currentUser.uid)) {
         // Remove like
-        likes.remove(_currentUserId);
+        likes.remove(currentUser.uid);
       } else {
         // Add like
-        likes.add(_currentUserId);
+        likes.add(currentUser.uid);
       }
       
       // Update the food item
@@ -721,11 +730,32 @@ class _WeekViewWidgetState extends State<WeekViewWidget> {
     final commentText = _getCommentController(foodId).text.trim();
     if (commentText.isEmpty) return;
 
+    final currentUser = FirebaseAuth.instance.currentUser;
+    if (currentUser == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Please sign in to add comments'),
+          backgroundColor: Colors.orange,
+        ),
+      );
+      return;
+    }
+
     setState(() {
       _isLoading = true;
     });
 
     try {
+      // Get user information from users collection
+      final userDoc = await FirebaseFirestore.instance
+          .collection('users')
+          .doc(currentUser.uid)
+          .get();
+      
+      final userData = userDoc.data();
+      final authorName = userData?['name'] ?? currentUser.displayName ?? 'Anonymous User';
+      final authorPhotoUrl = userData?['photoUrl'] ?? currentUser.photoURL ?? '';
+
       final documentId = '${dateKey}-foods';
       final docRef = FirebaseFirestore.instance.collection('foods').doc(documentId);
       
@@ -755,11 +785,13 @@ class _WeekViewWidgetState extends State<WeekViewWidget> {
       final currentFood = Map<String, dynamic>.from(foods[foodIndex]);
       final comments = List<Map<String, dynamic>>.from(currentFood['comments'] ?? []);
       
-      // Create new comment
+      // Create new comment with proper user information
       final newComment = {
         'id': DateTime.now().millisecondsSinceEpoch.toString(),
-        'userId': _currentUserId,
-        'userName': 'You', // In real app, get from user profile
+        'userId': currentUser.uid,
+        'userName': authorName, // Keep for backward compatibility
+        'authorName': authorName, // Use consistent naming with food detail dialog
+        'authorPhotoUrl': authorPhotoUrl,
         'text': commentText,
         'createdAt': DateTime.now().millisecondsSinceEpoch,
         'likes': <String>[],
@@ -784,6 +816,13 @@ class _WeekViewWidgetState extends State<WeekViewWidget> {
         widget.weekMeals[dateKey]?[widget.weekMeals[dateKey]!.indexWhere((f) => f['id'] == food['id'])] = currentFood;
         _getCommentController(foodId).clear();
       });
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Comment added successfully! ✅'),
+          backgroundColor: Colors.green,
+        ),
+      );
       
       // Notify parent if callback provided
       if (widget.onFoodUpdated != null) {
@@ -920,14 +959,19 @@ class _WeekViewWidgetState extends State<WeekViewWidget> {
               CircleAvatar(
                 radius: 14,
                 backgroundColor: AppTheme.primaryLight,
-                child: Text(
-                  (comment['userName'] as String? ?? 'U')[0].toUpperCase(),
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontWeight: FontWeight.w600,
-                    fontSize: 10,
-                  ),
-                ),
+                backgroundImage: (comment['authorPhotoUrl'] as String?)?.isNotEmpty == true
+                    ? NetworkImage(comment['authorPhotoUrl'])
+                    : null,
+                child: (comment['authorPhotoUrl'] as String?)?.isNotEmpty != true
+                    ? Text(
+                        (comment['authorName'] as String? ?? comment['userName'] as String? ?? 'U')[0].toUpperCase(),
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontWeight: FontWeight.w600,
+                          fontSize: 10,
+                        ),
+                      )
+                    : null,
               ),
               const SizedBox(width: 8),
               Expanded(
@@ -935,7 +979,7 @@ class _WeekViewWidgetState extends State<WeekViewWidget> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      comment['userName'] ?? 'Unknown User',
+                      comment['authorName'] ?? comment['userName'] ?? 'Unknown User',
                       style: theme.textTheme.labelMedium?.copyWith(
                         fontWeight: FontWeight.w600,
                       ),
@@ -1040,73 +1084,5 @@ class _WeekViewWidgetState extends State<WeekViewWidget> {
     return months[month - 1];
   }
 
-  Widget _buildPaymentStatusSection(BuildContext context, String dateKey, List<Map<String, dynamic>> dayFoods) {
-    final theme = Theme.of(context);
-    final wasEaten = _eatenForDayData[dateKey] ?? false;
-    
-    if (dayFoods.isEmpty) {
-      return const SizedBox.shrink();
-    }
 
-    // Check payment status
-    bool hasUnpaidMeals = false;
-    bool hasAnyMeals = dayFoods.isNotEmpty;
-    
-    if (hasAnyMeals && wasEaten) {
-      for (int i = 0; i < dayFoods.length; i++) {
-        final mealKey = '${dateKey}_$i';
-        final isPaid = _paidMeals[mealKey] ?? false;
-        if (!isPaid) {
-          hasUnpaidMeals = true;
-          break;
-        }
-      }
-    }
-
-    String statusText;
-    Color statusColor;
-    IconData statusIcon;
-
-    if (!hasAnyMeals) {
-      return const SizedBox.shrink();
-    } else if (!wasEaten) {
-      statusText = 'Хоол идээгүй';
-      statusColor = Colors.grey;
-      statusIcon = Icons.cancel_outlined;
-    } else if (hasUnpaidMeals) {
-      statusText = 'Төлбөр төлөх';
-      statusColor = Colors.orange;
-      statusIcon = Icons.payment;
-    } else {
-      statusText = 'Төлбөр төлсөн';
-      statusColor = Colors.green;
-      statusIcon = Icons.check_circle;
-    }
-
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-      decoration: BoxDecoration(
-        color: statusColor.withOpacity(0.1),
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: statusColor.withOpacity(0.3)),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(statusIcon, size: 16, color: statusColor),
-          const SizedBox(width: 6),
-          Flexible(
-            child: Text(
-              statusText,
-              style: theme.textTheme.bodySmall?.copyWith(
-                color: statusColor,
-                fontWeight: FontWeight.w600,
-              ),
-              overflow: TextOverflow.ellipsis,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
 }

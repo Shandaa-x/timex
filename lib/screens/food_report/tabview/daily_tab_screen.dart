@@ -19,7 +19,8 @@ class DailyTabScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return SingleChildScrollView(
+    return const Padding(
+      padding: EdgeInsets.all(16.0),
       child: EatenFoodDisplayWidget(),
     );
   }
