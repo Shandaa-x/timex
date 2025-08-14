@@ -58,10 +58,10 @@ class DateSelectionCard extends StatelessWidget {
                   onPressed: onDateRangeSelected,
                 ),
               ),
-              const SizedBox(width: 8),
+              const SizedBox(width: 5),
               Text(
                 'Хугацаа:',
-                style: const TextStyle(color: Color(0xFF64748B), fontWeight: FontWeight.w500),
+                style: const TextStyle(color: Color(0xFF64748B), fontWeight: FontWeight.w500, fontSize: 13),
               ),
               const SizedBox(width: 5),
               if (filterRange != null)
@@ -69,10 +69,10 @@ class DateSelectionCard extends StatelessWidget {
                   children: [
                     Text(
                       '${DateFormat('yyyy.MM.dd').format(filterRange!.start)} - ${DateFormat('yyyy.MM.dd').format(filterRange!.end)}',
-                      style: const TextStyle(color: Color(0xFF3B82F6), fontWeight: FontWeight.w500),
+                      style: const TextStyle(color: Color(0xFF3B82F6), fontWeight: FontWeight.w500, fontSize: 13),
                     ),
                     IconButton(
-                      icon: const Icon(Icons.clear, size: 18, color: Color(0xFF64748B)),
+                      icon: const Icon(Icons.clear, size: 15, color: Color(0xFF64748B)),
                       tooltip: 'Шүүлт цуцлах',
                       onPressed: onClearFilter,
                     ),

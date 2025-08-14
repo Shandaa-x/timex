@@ -282,7 +282,6 @@ class _MonthlyStatisticsScreenState extends State<MonthlyStatisticsScreen> {
       lastDate: DateTime(now.year + 1, 12, 31),
       initialDateRange: _filterRange,
       helpText: 'Хугацааны интервал сонгох',
-      locale: const Locale('mn'),
     );
     if (picked != null) {
       setState(() {
