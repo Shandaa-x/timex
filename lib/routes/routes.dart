@@ -9,6 +9,7 @@ class Routes {
   static const location = 'LocationScreen';
   static const loginScreen = 'LoginScreen';
   static const googleLogin = 'GoogleLoginScreen';
+  static const login = '/login'; // Add this for backward compatibility
   static const timeTrack = 'TimeTracking';
   static const addEmployee = 'AddEmployeeScreen';
   static const authWrapper = 'AuthWrapper';
@@ -22,6 +23,13 @@ class Routes {
 
     switch (settings.name) {
       case Routes.googleLogin:
+        route = MaterialPageRoute(
+          builder: (context) => const GoogleLoginScreen(),
+          settings: settings,
+        );
+        break;
+      case Routes.login:
+        // Redirect /login to GoogleLoginScreen for backward compatibility
         route = MaterialPageRoute(
           builder: (context) => const GoogleLoginScreen(),
           settings: settings,

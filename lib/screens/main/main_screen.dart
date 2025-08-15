@@ -5,9 +5,7 @@ import 'package:timex/screens/food_report/food_report_screen.dart';
 import 'package:timex/screens/home/home_screen.dart';
 import 'package:timex/index.dart';
 import 'package:timex/screens/time_track/time_tracking_screen.dart';
-import 'package:timex/screens/qpay/qr_code_screen.dart';
 import 'package:timex/services/realtime_food_total_service.dart';
-import 'package:timex/utils/export_user_data.dart';
 
 class MainScreen extends StatefulWidget {
   const MainScreen({super.key});
@@ -34,7 +32,6 @@ class _MainScreenState extends State<MainScreen> {
       MonthlyStatisticsScreen(),
       MealPlanCalendar(),
       FoodReportScreen(),
-      QRCodeScreen(),
     ];
     print('Screens initialized: ${_screens.length}');
 
@@ -62,11 +59,10 @@ class _MainScreenState extends State<MainScreen> {
     _screens[2] = MonthlyStatisticsScreen();
     _screens[3] = MealPlanCalendar();
     _screens[4] = FoodReportScreen();
-    _screens[5] = QRCodeScreen();
   }
 
   void _onTabTapped(int index) {
-    print('Tab tapped: $index (QR screen at index 4)'); // Debug output
+    print('Tab tapped: $index'); // Debug output
     print('Current screen count: ${_screens.length}');
     if (index < _screens.length) {
       print('Navigating to screen: ${_screens[index].runtimeType}');
@@ -111,6 +107,15 @@ class _MainScreenState extends State<MainScreen> {
 
   @override
   Widget build(BuildContext context) {
+    // Return loading screen if _screens is not initialized yet
+    if (_screens.isEmpty) {
+      return Scaffold(
+        body: Center(
+          child: CircularProgressIndicator(),
+        ),
+      );
+    }
+
     return PopScope(
       canPop: false,
       onPopInvokedWithResult: (didPop, result) async {
@@ -154,19 +159,7 @@ class _MainScreenState extends State<MainScreen> {
                 });
               },
             ),
-            // Debug button to test QR screen
-            // if (_currentIndex == 0) // Only show on first tab
-            //   Positioned(
-            //     top: 100,
-            //     right: 20,
-            //     child: FloatingActionButton(
-            //       mini: true,
-            //       onPressed: () {
-            //         _pageController.jumpToPage(5); // Jump to QR screen (index 5)
-            //         setState(() {
-            //           _currentIndex = 5;
-            //         });
-            //       },
+            // Debug button removed - QR screen no longer available
             //       backgroundColor: Colors.red,
             //       child: Icon(Icons.qr_code),
             //     ),
@@ -212,20 +205,6 @@ class _MainScreenState extends State<MainScreen> {
             //       child: Icon(Icons.restaurant),
             //     ),
             //   ),
-            // Debug Export User Data Button
-            if (_currentIndex == 0) // Only show on first tab
-              Positioned(
-                top: 220,
-                right: 20,
-                child: FloatingActionButton(
-                  mini: true,
-                  onPressed: () async {
-                    await exportUserData(context, 'IjLl3CSTwaTN4tM42yRNxakxDYx1');
-                  },
-                  backgroundColor: Colors.purple,
-                  child: const Icon(Icons.download),
-                ),
-              ),
           ],
         ),
         bottomNavigationBar: _buildSegmentedTabBar(),
@@ -246,7 +225,6 @@ class _MainScreenState extends State<MainScreen> {
       {'icon': Icons.note, 'label': 'Цагийн тайлан'},
       {'icon': Icons.food_bank, 'label': 'Хоолны хуваарь'},
       {'icon': Icons.analytics, 'label': 'Хоолны тайлан'},
-      {'icon': Icons.qr_code, 'label': 'QR code'},
     ];
 
     return Container(
@@ -309,32 +287,6 @@ class _MainScreenState extends State<MainScreen> {
             }),
           ),
         ),
-      ),
-    );
-  }
-
-  void _showAboutDialog() {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('TimeX App-ын тухай'),
-        content: const Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text('Хувилбар: 1.0.0'),
-            SizedBox(height: 8),
-            Text('Цаг хугацаа болон хоолны менежментийн програм'),
-            SizedBox(height: 8),
-            Text('© 2025 TimeX App'),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(),
-            child: const Text('Хаах'),
-          ),
-        ],
       ),
     );
   }

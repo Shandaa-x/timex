@@ -1,4 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:timex/routes/routes.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:google_sign_in/google_sign_in.dart';
 
 enum DrawerScreenType {
   home,
@@ -596,9 +599,22 @@ class CustomDrawer extends StatelessWidget {
             child: const Text('Цуцлах'),
           ),
           TextButton(
-            onPressed: () {
+            onPressed: () async {
               Navigator.of(context).pop();
-              Navigator.of(context).pushNamedAndRemoveUntil('/login', (route) => false);
+              
+              // Perform proper Firebase and Google sign out
+              try {
+                await FirebaseAuth.instance.signOut();
+                await GoogleSignIn().signOut();
+                print('User signed out successfully from drawer');
+              } catch (e) {
+                print('Sign out error: $e');
+              }
+              
+              // Navigate to login screen
+              if (context.mounted) {
+                Navigator.of(context).pushNamedAndRemoveUntil(Routes.googleLogin, (route) => false);
+              }
             },
             style: TextButton.styleFrom(
               foregroundColor: const Color(0xFFE74C3C),

@@ -106,7 +106,7 @@ class FoodDetailDialog extends StatelessWidget {
                           borderRadius: BorderRadius.circular(8),
                         ),
                         child: Text(
-                          MoneyFormatService.formatWithSymbol(food['price'] ?? 0),
+                          MoneyFormatService.formatDoubleWithSymbol((food['price'] as num?)?.toDouble() ?? 0.0),
                           style: const TextStyle(
                             fontSize: 18,
                             color: Color(0xFF059669),

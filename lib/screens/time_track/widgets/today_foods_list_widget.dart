@@ -136,7 +136,7 @@ class TodayFoodsListWidget extends StatelessWidget {
                                 ),
                               if (food['price'] != null)
                                 Text(
-                                  MoneyFormatService.formatWithSymbol(food['price'] ?? 0),
+                                  MoneyFormatService.formatDoubleWithSymbol((food['price'] as num?)?.toDouble() ?? 0.0),
                                   style: const TextStyle(
                                     fontSize: 14,
                                     color: Color(0xFF059669),

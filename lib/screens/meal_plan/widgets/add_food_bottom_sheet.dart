@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import '../../../theme/app_theme.dart';
 
 class AddFoodBottomSheet extends StatefulWidget {
@@ -97,46 +98,57 @@ class _AddFoodBottomSheetState extends State<AddFoodBottomSheet> {
     try {
       // Generate unique food item ID
       final foodId = DateTime.now().millisecondsSinceEpoch.toString();
-      final dateString = '${selectedDateTime.year}-${selectedDateTime.month.toString().padLeft(2, '0')}-${selectedDateTime.day.toString().padLeft(2, '0')}';
+      final price = double.parse(_priceController.text.trim());
       
-      // Document ID format: YYYY-MM-DD-foods
-      final documentId = '$dateString-foods';
-
       final foodItemData = {
         'id': foodId,
         'name': _nameController.text.trim(),
         'description': _descriptionController.text.trim(),
-        'price': int.parse(_priceController.text.trim()),
+        'price': price,
         'image': _imageBase64 ?? '',
-        'createdAt': DateTime.now().millisecondsSinceEpoch,
-        'likes': <String>[], // Array of user IDs who liked this food
+        'createdAt': FieldValue.serverTimestamp(),
+        'selectedDate': Timestamp.fromDate(selectedDateTime),
+        'day': selectedDateTime.day,
+        'month': selectedDateTime.month,
+        'year': selectedDateTime.year,
+        'date': '${selectedDateTime.year}-${selectedDateTime.month.toString().padLeft(2, '0')}-${selectedDateTime.day.toString().padLeft(2, '0')}',
+        'likes': [],
         'likesCount': 0,
-        'comments': <Map<String, dynamic>>[], // Array of comment objects
+        'comments': [],
         'commentsCount': 0,
+        // Payment-related fields for per-food payment system
+        'paidAmount': 0.0,
+        'remainingBalance': price,
+        'paymentStatus': 'unpaid',
+        'paymentHistory': [],
       };
 
-      final docRef = FirebaseFirestore.instance
+      // Save as individual food document to avoid document size limits
+      final foodDocRef = FirebaseFirestore.instance
           .collection('foods')
-          .doc(documentId);
+          .doc(foodId);
 
-      // Check if document exists, if not create it with date metadata
-      final docSnapshot = await docRef.get();
-      
-      if (!docSnapshot.exists) {
-        // Create new document with date metadata and foods array
-        await docRef.set({
-          'createdAt': DateTime.now().millisecondsSinceEpoch,
-          'lastUpdated': DateTime.now().millisecondsSinceEpoch,
-          'day': selectedDateTime.day,
-          'month': selectedDateTime.month,
-          'year': selectedDateTime.year,
-          'foods': [foodItemData],
-        });
-      } else {
-        // Add food item to existing foods array
-        await docRef.update({
-          'lastUpdated': DateTime.now().millisecondsSinceEpoch,
-          'foods': FieldValue.arrayUnion([foodItemData]),
+      await foodDocRef.set(foodItemData);
+
+      // Also save to user's individual food collection for per-food payment tracking
+      final currentUser = FirebaseAuth.instance.currentUser;
+      if (currentUser != null) {
+        await FirebaseFirestore.instance
+            .collection('users')
+            .doc(currentUser.uid)
+            .collection('foods')
+            .doc(foodId)
+            .set({
+          'id': foodId,
+          'name': _nameController.text.trim(),
+          'price': price,
+          'image': _imageBase64 ?? '',
+          'selectedDate': Timestamp.fromDate(selectedDateTime),
+          'paidAmount': 0.0,
+          'remainingBalance': price,
+          'paymentStatus': 'unpaid',
+          'paymentHistory': [],
+          'createdAt': FieldValue.serverTimestamp(),
         });
       }
 

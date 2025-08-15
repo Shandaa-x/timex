@@ -1,6 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:firebase_auth/firebase_auth.dart';
 import '../models/food_payment_models.dart';
 import '../services/integrated_food_payment_service.dart';
 import '../services/money_format.dart';
@@ -12,10 +10,12 @@ class IndividualFoodPaymentHistory extends StatefulWidget {
   const IndividualFoodPaymentHistory({super.key});
 
   @override
-  State<IndividualFoodPaymentHistory> createState() => _IndividualFoodPaymentHistoryState();
+  State<IndividualFoodPaymentHistory> createState() =>
+      _IndividualFoodPaymentHistoryState();
 }
 
-class _IndividualFoodPaymentHistoryState extends State<IndividualFoodPaymentHistory> {
+class _IndividualFoodPaymentHistoryState
+    extends State<IndividualFoodPaymentHistory> {
   List<FoodItem> _foodItems = [];
   bool _isLoading = false;
   final DateTime _selectedMonth = DateTime.now();
@@ -41,9 +41,8 @@ class _IndividualFoodPaymentHistoryState extends State<IndividualFoodPaymentHist
     });
 
     // Listen to real-time food items stream
-    _foodItemsSubscription = IntegratedFoodPaymentService
-        .getFoodItemsStream(_selectedMonth)
-        .listen(
+    _foodItemsSubscription =
+        IntegratedFoodPaymentService.getFoodItemsStream(_selectedMonth).listen(
           (foodItems) {
             if (mounted) {
               setState(() {
@@ -68,16 +67,18 @@ class _IndividualFoodPaymentHistoryState extends State<IndividualFoodPaymentHist
 
       // Sync existing Firebase food data to new structure
       await IntegratedFoodPaymentService.syncExistingFoodData(_selectedMonth);
-      
-      // If still no data, create sample data
-      final foodItems = await IntegratedFoodPaymentService.convertFirebaseFoodsToFoodItems(_selectedMonth);
-      
+
+      // Load real food data only - no sample data
+      final foodItems =
+          await IntegratedFoodPaymentService.convertFirebaseFoodsToFoodItems(
+            _selectedMonth,
+          );
+
       if (foodItems.isEmpty) {
-        await _createAndLoadSampleData();
+        print('Debug: No food items found for current user');
       }
     } catch (e) {
-      // Fallback to sample data
-      await _createAndLoadSampleData();
+      print('Error loading food data: $e');
     } finally {
       setState(() {
         _isLoading = false;
@@ -87,7 +88,9 @@ class _IndividualFoodPaymentHistoryState extends State<IndividualFoodPaymentHist
 
   Future<void> _loadPaymentSummary() async {
     try {
-      final summary = await IntegratedFoodPaymentService.getPaymentSummary(_selectedMonth);
+      final summary = await IntegratedFoodPaymentService.getPaymentSummary(
+        _selectedMonth,
+      );
       if (mounted) {
         setState(() {
           _paymentSummary = summary;
@@ -95,114 +98,6 @@ class _IndividualFoodPaymentHistoryState extends State<IndividualFoodPaymentHist
       }
     } catch (e) {
       // Error loading summary
-    }
-  }
-
-  Future<void> _createAndLoadSampleData() async {
-    // Create sample food items with different payment statuses
-    final sampleFoods = [
-      FoodItem(
-        id: 'demo_burger_001',
-        name: 'Classic Beef Burger',
-        price: 15000,
-        selectedDate: DateTime.now().subtract(const Duration(hours: 3)),
-        paidAmount: 15000, // Fully paid
-        paymentHistory: [
-          FoodPaymentRecord(
-            id: 'payment_001',
-            amount: 15000,
-            paymentDate: DateTime.now().subtract(const Duration(hours: 2)),
-            method: 'qpay',
-            transactionId: 'txn_001',
-            invoiceId: 'inv_001',
-          ),
-        ],
-      ),
-      FoodItem(
-        id: 'demo_pizza_002',
-        name: 'Margherita Pizza',
-        price: 25000,
-        selectedDate: DateTime.now().subtract(const Duration(hours: 2)),
-        paidAmount: 10000, // Partially paid
-        paymentHistory: [
-          FoodPaymentRecord(
-            id: 'payment_002',
-            amount: 10000,
-            paymentDate: DateTime.now().subtract(const Duration(hours: 1)),
-            method: 'qpay',
-            transactionId: 'txn_002',
-            invoiceId: 'inv_002',
-          ),
-        ],
-      ),
-      FoodItem(
-        id: 'demo_salad_003',
-        name: 'Caesar Salad',
-        price: 8000,
-        selectedDate: DateTime.now().subtract(const Duration(hours: 1)),
-        paidAmount: 0, // Unpaid
-        paymentHistory: [],
-      ),
-      FoodItem(
-        id: 'demo_cake_004',
-        name: 'Chocolate Cake',
-        price: 6000,
-        selectedDate: DateTime.now().subtract(const Duration(minutes: 30)),
-        paidAmount: 3000, // Partially paid
-        paymentHistory: [
-          FoodPaymentRecord(
-            id: 'payment_003',
-            amount: 3000,
-            paymentDate: DateTime.now().subtract(const Duration(minutes: 15)),
-            method: 'qpay',
-            transactionId: 'txn_003',
-            invoiceId: 'inv_003',
-          ),
-        ],
-      ),
-      FoodItem(
-        id: 'demo_drink_005',
-        name: 'Fresh Orange Juice',
-        price: 4000,
-        selectedDate: DateTime.now().subtract(const Duration(minutes: 15)),
-        paidAmount: 4000, // Fully paid
-        paymentHistory: [
-          FoodPaymentRecord(
-            id: 'payment_004',
-            amount: 4000,
-            paymentDate: DateTime.now().subtract(const Duration(minutes: 10)),
-            method: 'qpay',
-            transactionId: 'txn_004',
-            invoiceId: 'inv_004',
-          ),
-        ],
-      ),
-    ];
-
-    // Save sample foods to Firebase using integrated service
-    try {
-      // Convert to the new integrated structure and save
-      final batch = FirebaseFirestore.instance.batch();
-      final userId = FirebaseAuth.instance.currentUser?.uid ?? 'demo_user';
-      
-      for (final food in sampleFoods) {
-        final ref = FirebaseFirestore.instance
-            .collection('users')
-            .doc(userId)
-            .collection('foods')
-            .doc(food.id);
-        batch.set(ref, food.toMap());
-      }
-      
-      await batch.commit();
-      
-      // The stream will automatically update the UI
-    } catch (e) {
-      // If save fails, just show the sample data locally
-      setState(() {
-        _foodItems = sampleFoods;
-        _isLoading = false;
-      });
     }
   }
 
@@ -236,11 +131,8 @@ class _IndividualFoodPaymentHistoryState extends State<IndividualFoodPaymentHist
             ElevatedButton(
               onPressed: () async {
                 await _syncExistingData();
-                if (_foodItems.isEmpty) {
-                  await _createAndLoadSampleData();
-                }
               },
-              child: const Text('Load Sample Data'),
+              child: const Text('Refresh Data'),
             ),
           ],
         ),
@@ -255,9 +147,8 @@ class _IndividualFoodPaymentHistoryState extends State<IndividualFoodPaymentHist
       child: Column(
         children: [
           // Payment Summary
-          if (_paymentSummary != null)
-            _buildPaymentSummary(_paymentSummary!),
-          
+          if (_paymentSummary != null) _buildPaymentSummary(_paymentSummary!),
+
           // Food Items List
           Expanded(
             child: ListView.builder(
@@ -337,7 +228,7 @@ class _IndividualFoodPaymentHistoryState extends State<IndividualFoodPaymentHist
                 ),
               ),
               const SizedBox(width: 12),
-              
+
               // Food details
               Expanded(
                 child: Column(
@@ -362,10 +253,13 @@ class _IndividualFoodPaymentHistoryState extends State<IndividualFoodPaymentHist
                   ],
                 ),
               ),
-              
+
               // Status badge
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 6,
+                ),
                 decoration: BoxDecoration(
                   color: statusColor,
                   borderRadius: BorderRadius.circular(16),
@@ -414,15 +308,21 @@ class _IndividualFoodPaymentHistoryState extends State<IndividualFoodPaymentHist
                     Expanded(
                       child: _buildAmountColumn(
                         'Paid',
-                        MoneyFormatService.formatWithSymbol(food.paidAmount.toInt()),
+                        MoneyFormatService.formatWithSymbol(
+                          food.paidAmount.toInt(),
+                        ),
                         Colors.green[600]!,
                       ),
                     ),
                     Expanded(
                       child: _buildAmountColumn(
                         'Remaining',
-                        MoneyFormatService.formatWithSymbol(food.remainingBalance.toInt()),
-                        food.remainingBalance > 0 ? Colors.red[600]! : Colors.grey[600]!,
+                        MoneyFormatService.formatWithSymbol(
+                          food.remainingBalance.toInt(),
+                        ),
+                        food.remainingBalance > 0
+                            ? Colors.red[600]!
+                            : Colors.grey[600]!,
                       ),
                     ),
                   ],
@@ -439,7 +339,10 @@ class _IndividualFoodPaymentHistoryState extends State<IndividualFoodPaymentHist
                       children: [
                         const Text(
                           'Payment Progress',
-                          style: TextStyle(fontSize: 12, fontWeight: FontWeight.w500),
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w500,
+                          ),
                         ),
                         Text(
                           '${(food.paymentProgress * 100).toStringAsFixed(0)}%',
@@ -469,13 +372,12 @@ class _IndividualFoodPaymentHistoryState extends State<IndividualFoodPaymentHist
             const SizedBox(height: 16),
             Text(
               'Payment History (${food.paymentHistory.length} transactions)',
-              style: const TextStyle(
-                fontSize: 14,
-                fontWeight: FontWeight.w500,
-              ),
+              style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w500),
             ),
             const SizedBox(height: 8),
-            ...food.paymentHistory.map((payment) => _buildPaymentRecord(payment)),
+            ...food.paymentHistory.map(
+              (payment) => _buildPaymentRecord(payment),
+            ),
           ],
 
           // Selection date
@@ -493,10 +395,7 @@ class _IndividualFoodPaymentHistoryState extends State<IndividualFoodPaymentHist
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(
-          label,
-          style: const TextStyle(fontSize: 11, color: Colors.grey),
-        ),
+        Text(label, style: const TextStyle(fontSize: 11, color: Colors.grey)),
         const SizedBox(height: 2),
         Text(
           amount,
@@ -535,7 +434,7 @@ class _IndividualFoodPaymentHistoryState extends State<IndividualFoodPaymentHist
             ),
           ),
           const SizedBox(width: 8),
-          
+
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -544,7 +443,9 @@ class _IndividualFoodPaymentHistoryState extends State<IndividualFoodPaymentHist
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
                     Text(
-                      MoneyFormatService.formatWithSymbol(payment.amount.toInt()),
+                      MoneyFormatService.formatWithSymbol(
+                        payment.amount.toInt(),
+                      ),
                       style: const TextStyle(
                         fontWeight: FontWeight.w600,
                         fontSize: 12,
@@ -612,35 +513,41 @@ class _IndividualFoodPaymentHistoryState extends State<IndividualFoodPaymentHist
             ],
           ),
           const SizedBox(height: 16),
-          
+
           // Summary stats
           Row(
             children: [
               Expanded(
                 child: _buildSummaryItem(
                   'Total Value',
-                  MoneyFormatService.formatWithSymbol(summary.totalFoodValue.toInt()),
+                  MoneyFormatService.formatWithSymbol(
+                    summary.totalFoodValue.toInt(),
+                  ),
                   Colors.blue[700]!,
                 ),
               ),
               Expanded(
                 child: _buildSummaryItem(
                   'Paid Amount',
-                  MoneyFormatService.formatWithSymbol(summary.totalPaidAmount.toInt()),
+                  MoneyFormatService.formatWithSymbol(
+                    summary.totalPaidAmount.toInt(),
+                  ),
                   Colors.green[700]!,
                 ),
               ),
             ],
           ),
-          
+
           const SizedBox(height: 8),
-          
+
           Row(
             children: [
               Expanded(
                 child: _buildSummaryItem(
                   'Remaining',
-                  MoneyFormatService.formatWithSymbol(summary.totalRemainingBalance.toInt()),
+                  MoneyFormatService.formatWithSymbol(
+                    summary.totalRemainingBalance.toInt(),
+                  ),
                   Colors.red[700]!,
                 ),
               ),
@@ -653,9 +560,9 @@ class _IndividualFoodPaymentHistoryState extends State<IndividualFoodPaymentHist
               ),
             ],
           ),
-          
+
           const SizedBox(height: 12),
-          
+
           // Progress bar
           Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -663,8 +570,13 @@ class _IndividualFoodPaymentHistoryState extends State<IndividualFoodPaymentHist
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  const Text('Payment Progress', style: TextStyle(fontWeight: FontWeight.w500)),
-                  Text('${(summary.paymentProgress * 100).toStringAsFixed(1)}%'),
+                  const Text(
+                    'Payment Progress',
+                    style: TextStyle(fontWeight: FontWeight.w500),
+                  ),
+                  Text(
+                    '${(summary.paymentProgress * 100).toStringAsFixed(1)}%',
+                  ),
                 ],
               ),
               const SizedBox(height: 4),
@@ -675,15 +587,19 @@ class _IndividualFoodPaymentHistoryState extends State<IndividualFoodPaymentHist
               ),
             ],
           ),
-          
+
           const SizedBox(height: 12),
-          
+
           // Status counts
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceAround,
             children: [
               _buildStatusCount('Unpaid', summary.unpaidCount, Colors.red),
-              _buildStatusCount('Partial', summary.partiallyPaidCount, Colors.orange),
+              _buildStatusCount(
+                'Partial',
+                summary.partiallyPaidCount,
+                Colors.orange,
+              ),
               _buildStatusCount('Paid', summary.fullyPaidCount, Colors.green),
             ],
           ),
@@ -696,10 +612,7 @@ class _IndividualFoodPaymentHistoryState extends State<IndividualFoodPaymentHist
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(
-          label,
-          style: const TextStyle(fontSize: 12, color: Colors.grey),
-        ),
+        Text(label, style: const TextStyle(fontSize: 12, color: Colors.grey)),
         Text(
           value,
           style: TextStyle(
@@ -724,17 +637,11 @@ class _IndividualFoodPaymentHistoryState extends State<IndividualFoodPaymentHist
           ),
           child: Text(
             count.toString(),
-            style: TextStyle(
-              fontWeight: FontWeight.bold,
-              color: color[700],
-            ),
+            style: TextStyle(fontWeight: FontWeight.bold, color: color[700]),
           ),
         ),
         const SizedBox(height: 4),
-        Text(
-          label,
-          style: const TextStyle(fontSize: 12, color: Colors.grey),
-        ),
+        Text(label, style: const TextStyle(fontSize: 12, color: Colors.grey)),
       ],
     );
   }

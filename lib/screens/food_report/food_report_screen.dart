@@ -5,7 +5,6 @@ import 'package:timex/screens/home/widgets/custom_sliver_appbar.dart';
 import 'dart:async';
 import '../../widgets/custom_drawer.dart';
 import '../../services/money_format.dart';
-import '../payment/payment_screen.dart';
 import 'tabview/daily_tab_screen.dart';
 import 'tabview/history_tab_screen.dart';
 import 'services/food_data_service.dart';
@@ -602,8 +601,8 @@ class _FoodReportScreenState extends State<FoodReportScreen>
                                     Navigator.push(
                                       context,
                                       MaterialPageRoute(
-                                        builder: (context) => PaymentScreen(
-                                          initialAmount: _totalPaymentAmount.round(),
+                                        builder: (context) => Scaffold(
+                                          appBar: AppBar(title: const Text("Payment")), body: const Center(child: Text("Use per-food payment system")),
                                         ),
                                       ),
                                     );

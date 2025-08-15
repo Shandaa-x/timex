@@ -412,7 +412,7 @@ class _FoodDetailDialogState extends State<FoodDetailDialog> {
                           child: Column(
                             children: [
                               Text(
-                                MoneyFormatService.formatWithSymbol(_foodData['price'] ?? 0),
+                                MoneyFormatService.formatDoubleWithSymbol((_foodData['price'] as num?)?.toDouble() ?? 0.0),
                                 style: theme.textTheme.titleLarge?.copyWith(
                                   fontWeight: FontWeight.w700,
                                   color: AppTheme.successLight,

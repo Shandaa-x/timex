@@ -392,7 +392,11 @@ class _WeekViewWidgetState extends State<WeekViewWidget> {
                       borderRadius: BorderRadius.circular(8),
                     ),
                     child: Text(
-                      MoneyFormatService.formatWithSymbol(food['price'] ?? 0),
+                      MoneyFormatService.formatDoubleWithSymbol(
+                        food['price'] is num 
+                          ? (food['price'] as num).toDouble() 
+                          : 0.0
+                      ),
                       style: theme.textTheme.titleSmall?.copyWith(
                         fontWeight: FontWeight.w600,
                         color: AppTheme.successLight,

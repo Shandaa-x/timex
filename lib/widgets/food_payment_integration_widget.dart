@@ -4,7 +4,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import '../models/food_payment_models.dart';
 import '../services/integrated_food_payment_service.dart';
 import '../services/money_format.dart';
-import '../screens/payment/payment_screen.dart';
+import 'food_payment_processor_widget.dart';
 
 /// Widget that integrates food selection with QPay payment processing
 class FoodPaymentIntegrationWidget extends StatefulWidget {
@@ -113,13 +113,22 @@ class _FoodPaymentIntegrationWidgetState extends State<FoodPaymentIntegrationWid
 
       if (result.success) {
         if (mounted) {
-          // Navigate to payment screen with QPay invoice
+          // Navigate to food payment processor instead of old payment screen
           Navigator.of(context).push(
             MaterialPageRoute(
-              builder: (context) => PaymentScreen(
-                invoiceData: result.toJson(),
-                onPaymentComplete: _handlePaymentComplete,
-                foodItems: selectedFoods,
+              builder: (context) => FoodPaymentProcessorWidget(
+                selectedFoodIds: _selectedFoodIds.toList(),
+                onPaymentCompleted: (result) {
+                  if (result.success) {
+                    // Handle payment completion
+                    _handlePaymentComplete({
+                      'invoiceId': result.paymentTransaction?.invoiceId ?? '',
+                      'transactionId': result.paymentTransaction?.id ?? '',
+                      'amount': result.paymentTransaction?.totalAmount ?? 0.0,
+                      'status': 'completed',
+                    });
+                  }
+                },
               ),
             ),
           );

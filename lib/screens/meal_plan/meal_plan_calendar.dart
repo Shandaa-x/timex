@@ -125,7 +125,7 @@ class _MealPlanCalendarState extends State<MealPlanCalendar>
                       'food_${DateTime.now().millisecondsSinceEpoch}_${foods.indexOf(food)}', // Ensure unique ID
                   'name': food['name'] ?? 'Unknown Food',
                   'description': food['description'] ?? '',
-                  'price': food['price'] ?? 0,
+                  'price': (food['price'] as num?)?.toDouble() ?? 0.0,
                   'image': food['image'] ?? '',
                   'createdAt':
                       food['createdAt'] ??
@@ -218,7 +218,7 @@ class _MealPlanCalendarState extends State<MealPlanCalendar>
                   'food_${DateTime.now().millisecondsSinceEpoch}_${foods.indexOf(food)}', // Ensure unique ID
               'name': food['name'] ?? 'Unknown Food',
               'description': food['description'] ?? '',
-              'price': food['price'] ?? 0,
+              'price': (food['price'] as num?)?.toDouble() ?? 0.0,
               'image': food['image'] ?? '',
               'createdAt': food['createdAt'] ?? DateTime.now().millisecondsSinceEpoch,
               'likes': food['likes'] ?? <String>[],
@@ -280,8 +280,8 @@ class _MealPlanCalendarState extends State<MealPlanCalendar>
       final filteredFoods = entry.value.where((food) {
         switch (_selectedFilter) {
           case 'High Price':
-            return (food['price'] as int? ?? 0) >=
-                8000; // Foods 8000₮ and above
+            return ((food['price'] as num?)?.toDouble() ?? 0.0) >=
+                8000.0; // Foods 8000₮ and above
           case 'Popular':
             return (food['likesCount'] as int? ?? 0) >=
                 3; // Foods with 3+ likes
