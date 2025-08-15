@@ -43,4 +43,3 @@
 - medee CRUD 
 - tulburiin tvvh 
 - uuriinhuu news iig harah 
-- 

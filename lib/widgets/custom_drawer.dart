@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../index.dart';
+
 enum DrawerScreenType {
   home,
   timeTracking,
@@ -59,7 +61,7 @@ class CustomDrawer extends StatelessWidget {
                       'TimeX App',
                       style: TextStyle(
                         color: Colors.white,
-                        fontSize: 24,
+                        fontSize: 22,
                         fontWeight: FontWeight.bold,
                       ),
                     ),
@@ -193,10 +195,7 @@ class CustomDrawer extends StatelessWidget {
             icon: Icons.refresh,
             title: 'Мэдээлэл шинэчлэх',
             onTap: () {
-              Navigator.pop(context);
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Мэдээлэл шинэчлэгдэж байна...')),
-              );
+              Navigator.pushNamed(context, Routes.myNews);
             },
           ),
         ];
