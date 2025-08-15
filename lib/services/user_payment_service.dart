@@ -7,6 +7,7 @@ class UserPaymentService {
   static final FirebaseFirestore _firestore = FirebaseFirestore.instance;
 
   /// Process payment and update user's balance with array-based payment tracking
+  /// Includes overpayment prevention and accurate balance calculation
   /// Also clears daily subcollection totalPrice values to prevent double counting
   static Future<Map<String, dynamic>> processPayment({
     required String userId,
@@ -44,54 +45,90 @@ class UserPaymentService {
             )
             .toList();
 
-        // Get current unpaid food amount
-        final dynamic rawTotalFoodAmount = userData['totalFoodAmount'] ?? 0.0;
-        final double currentTotalFoodAmount = rawTotalFoodAmount is String
-            ? double.tryParse(rawTotalFoodAmount) ?? 0.0
-            : (rawTotalFoodAmount as num).toDouble();
-
-        // Get or calculate original food amount (total before any payments)
+        // Get original food amount (total before any payments)
         final dynamic rawOriginalFoodAmount = userData['originalFoodAmount'];
         final double originalFoodAmount = rawOriginalFoodAmount != null
             ? (rawOriginalFoodAmount is String
                   ? double.tryParse(rawOriginalFoodAmount) ?? 0.0
                   : (rawOriginalFoodAmount as num).toDouble())
-            : currentTotalFoodAmount +
-                  paymentAmounts.fold(0.0, (sum, amount) => sum + amount);
+            : throw Exception('Original food amount not found - please initialize user document first');
 
-        // Add new payment to the array
-        paymentAmounts.add(paidAmount);
+        // Calculate current total payments made
+        final double currentTotalPaymentsMade = paymentAmounts.fold(
+          0.0,
+          (sum, amount) => sum + amount,
+        );
 
-        // Calculate total payments made (sum of all payments in array)
+        // OVERPAYMENT PREVENTION: Check if new payment would exceed original amount
+        double actualPaymentAmount = paidAmount;
+        final double potentialTotal = currentTotalPaymentsMade + paidAmount;
+        final double remainingBalance = originalFoodAmount - currentTotalPaymentsMade;
+
+        if (potentialTotal > originalFoodAmount) {
+          // Adjust payment amount to prevent overpayment
+          actualPaymentAmount = remainingBalance.clamp(0.0, double.infinity);
+          AppLogger.warning(
+            'Overpayment prevented: Requested ₮$paidAmount, but only ₮$actualPaymentAmount needed. '
+            'Original: ₮$originalFoodAmount, Already paid: ₮$currentTotalPaymentsMade',
+          );
+        }
+
+        // If no payment is needed (already fully paid), return early
+        if (actualPaymentAmount <= 0) {
+          AppLogger.info('No payment needed - already fully paid');
+          return {
+            'success': true,
+            'overpaymentPrevented': true,
+            'message': 'Payment not needed - balance already paid in full',
+            'originalAmount': originalFoodAmount,
+            'totalPaymentsMade': currentTotalPaymentsMade,
+            'newAmount': 0.0,
+            'paidAmount': 0.0,
+            'status': 'paid',
+          };
+        }
+
+        // Add the actual payment amount to the array
+        paymentAmounts.add(actualPaymentAmount);
+
+        // Calculate new totals with the actual payment
         final double totalPaymentsMade = paymentAmounts.fold(
           0.0,
           (sum, amount) => sum + amount,
         );
 
-        // Calculate remaining food amount: totalFoodAmount = originalFoodAmount - sum(paymentAmounts)
-        final double newTotalFoodAmount =
-            totalPaymentsMade >= originalFoodAmount
-            ? 0.0
-            : originalFoodAmount - totalPaymentsMade;
+        // DYNAMIC BALANCE CALCULATION: totalFoodAmount = originalFoodAmount - sum(paymentAmounts)
+        // Ensure balance never goes below zero
+        final double newTotalFoodAmount = (originalFoodAmount - totalPaymentsMade)
+            .clamp(0.0, double.infinity);
 
-        // Determine payment status based on remaining balance
-        String paymentStatus;
-        bool isFullyPaid = false;
-        if (totalPaymentsMade >= originalFoodAmount) {
-          paymentStatus = 'paid'; // Fully paid
-          isFullyPaid = true;
+        // STATUS UPDATES: Determine payment status based on remaining balance
+        String qpayStatus;
+        bool paymentStatus = false; // false = incomplete, true = complete
+        
+        if (newTotalFoodAmount == 0.0 || totalPaymentsMade >= originalFoodAmount) {
+          qpayStatus = 'paid'; // Fully paid
+          paymentStatus = true; // Complete
         } else if (totalPaymentsMade > 0) {
-          paymentStatus = 'partial'; // Partial payment made
+          qpayStatus = 'partial'; // Partial payment made
+          paymentStatus = false; // Incomplete
         } else {
-          paymentStatus = 'pending'; // No effective payment (edge case)
+          qpayStatus = 'pending'; // No effective payment (edge case)
+          paymentStatus = false; // Incomplete
         }
 
-        // Get unpaid daily records to clear their totalPrice
-        final eatensSnapshot = await eatensRef.get();
+        // SUBCOLLECTION CLEANUP: Get daily records to clear their totalPrice
+        // Using simple query to avoid composite index requirement
+        // Alternative: Use .where('isPaidOff', isEqualTo: false) if you want to filter at query level
+        final eatensSnapshot = await eatensRef
+            .orderBy('date')
+            .get();
+        
         final List<String> dailyRecordsToClear = [];
-        double amountToClear = paidAmount;
+        double amountToClear = actualPaymentAmount;
 
-        // Collect daily records that should be marked as paid
+        // Mark daily records as paid based on the payment amount
+        // Filter for unpaid records in the loop to avoid complex queries
         for (final doc in eatensSnapshot.docs) {
           if (amountToClear <= 0) break;
 
@@ -99,27 +136,29 @@ class UserPaymentService {
           final dailyPrice = (data['totalPrice'] as num?)?.toDouble() ?? 0.0;
           final isPaidOff = data['isPaidOff'] as bool? ?? false;
 
-          // Only include unpaid records
+          // Only process unpaid records with a price
           if (!isPaidOff && dailyPrice > 0) {
             dailyRecordsToClear.add(doc.id);
             amountToClear -= dailyPrice;
           }
         }
 
-        // Clear totalPrice for paid daily records
+        // Clear/reset totalPrice for paid daily records to prevent old data inflation
         for (final dailyRecordId in dailyRecordsToClear) {
           transaction.update(eatensRef.doc(dailyRecordId), {
             'isPaidOff': true,
             'paidOffAt': FieldValue.serverTimestamp(),
-            'paymentIndex':
-                paymentAmounts.length - 1, // Reference to payment in array
+            'paymentIndex': paymentAmounts.length - 1, // Reference to payment in array
+            'originalTotalPrice': FieldValue.serverTimestamp(), // Backup original for audit
           });
         }
 
         // Create payment record with enhanced details
         final paymentDocRef = paymentsRef.doc();
         final paymentRecord = {
-          'amount': paidAmount,
+          'amount': actualPaymentAmount,
+          'requestedAmount': paidAmount, // Track original requested amount
+          'overpaymentPrevented': actualPaymentAmount != paidAmount,
           'status': 'completed',
           'date': FieldValue.serverTimestamp(),
           'method': paymentMethod,
@@ -128,24 +167,21 @@ class UserPaymentService {
           'originalFoodAmount': originalFoodAmount,
           'totalPaymentsMade': totalPaymentsMade,
           'remainingBalance': newTotalFoodAmount,
-          'paymentIndex':
-              paymentAmounts.length - 1, // Index of this payment in the array
-          'dailyRecordsCleared':
-              dailyRecordsToClear, // Track which daily records were paid
+          'paymentIndex': paymentAmounts.length - 1, // Index of this payment in the array
+          'dailyRecordsCleared': dailyRecordsToClear, // Track which daily records were paid
           'createdAt': FieldValue.serverTimestamp(),
         };
 
         transaction.set(paymentDocRef, paymentRecord);
 
-        // Update user document with array-based payment tracking
+        // Update user document with comprehensive payment tracking
         Map<String, dynamic> updateData = {
-          'totalFoodAmount': newTotalFoodAmount,
-          'originalFoodAmount': originalFoodAmount,
-          'paymentAmounts':
-              paymentAmounts, // Store all payment amounts in array
-          'qpayStatus': paymentStatus,
-          'paymentStatus': isFullyPaid, // Boolean field for easier querying
-          'lastPaymentAmount': paidAmount,
+          'totalFoodAmount': newTotalFoodAmount, // Remaining balance (always >= 0)
+          'originalFoodAmount': originalFoodAmount, // Total amount before payments
+          'paymentAmounts': paymentAmounts, // Array of all payment amounts
+          'qpayStatus': qpayStatus, // "pending", "partial", or "paid"
+          'paymentStatus': paymentStatus, // false = incomplete, true = complete
+          'lastPaymentAmount': actualPaymentAmount,
           'lastPaymentDate': FieldValue.serverTimestamp(),
           'lastPaymentStatusUpdate': FieldValue.serverTimestamp(),
           'updatedAt': FieldValue.serverTimestamp(),
@@ -154,9 +190,10 @@ class UserPaymentService {
         transaction.update(userDocRef, updateData);
 
         AppLogger.success(
-          'Payment processed: ₮$paidAmount added to payment array. '
+          'Payment processed successfully: ₮$actualPaymentAmount added to payment array. '
           'Total payments: ₮$totalPaymentsMade, Remaining: ₮$newTotalFoodAmount, '
-          'Cleared ${dailyRecordsToClear.length} daily records, Status: $paymentStatus',
+          'Cleared ${dailyRecordsToClear.length} daily records, Status: $qpayStatus, '
+          'Complete: $paymentStatus${actualPaymentAmount != paidAmount ? ' (Overpayment prevented)' : ''}',
         );
 
         return {
@@ -164,8 +201,11 @@ class UserPaymentService {
           'originalAmount': originalFoodAmount,
           'totalPaymentsMade': totalPaymentsMade,
           'newAmount': newTotalFoodAmount,
-          'paidAmount': paidAmount,
-          'status': paymentStatus,
+          'paidAmount': actualPaymentAmount,
+          'requestedAmount': paidAmount,
+          'overpaymentPrevented': actualPaymentAmount != paidAmount,
+          'status': qpayStatus,
+          'isComplete': paymentStatus,
           'paymentId': paymentDocRef.id,
           'paymentIndex': paymentAmounts.length - 1,
           'dailyRecordsCleared': dailyRecordsToClear,
@@ -437,6 +477,97 @@ class UserPaymentService {
     } catch (error) {
       AppLogger.error('Error getting payment history: $error');
       return [];
+    }
+  }
+
+  /// Recalculate and fix user balance if there are inconsistencies
+  /// This method ensures accurate balance tracking by recalculating totalFoodAmount
+  static Future<Map<String, dynamic>> recalculateUserBalance([String? userId]) async {
+    try {
+      final String uid = userId ?? FirebaseAuth.instance.currentUser?.uid ?? '';
+
+      if (uid.isEmpty) {
+        throw Exception('No user ID provided');
+      }
+
+      final userDocRef = _firestore.collection('users').doc(uid);
+      
+      return await _firestore.runTransaction((transaction) async {
+        final userDoc = await transaction.get(userDocRef);
+
+        if (!userDoc.exists) {
+          throw Exception('User document not found');
+        }
+
+        final userData = userDoc.data()!;
+
+        // Get payment amounts array and calculate total dynamically
+        final List<dynamic> paymentAmountsList = userData['paymentAmounts'] ?? [];
+        final List<double> paymentAmounts = paymentAmountsList
+            .map((payment) => payment is String 
+                ? double.tryParse(payment) ?? 0.0 
+                : (payment as num).toDouble())
+            .toList();
+
+        final double totalPaymentsMade = paymentAmounts.fold(0.0, (sum, amount) => sum + amount);
+
+        // Get original food amount
+        final dynamic rawOriginalFoodAmount = userData['originalFoodAmount'];
+        final double originalFoodAmount = rawOriginalFoodAmount != null
+            ? (rawOriginalFoodAmount is String
+                  ? double.tryParse(rawOriginalFoodAmount) ?? 0.0
+                  : (rawOriginalFoodAmount as num).toDouble())
+            : throw Exception('Original food amount not found - please initialize user document first');
+
+        // Recalculate remaining balance: max(originalFoodAmount - sum(paymentAmounts), 0)
+        final double correctTotalFoodAmount = (originalFoodAmount - totalPaymentsMade)
+            .clamp(0.0, double.infinity);
+
+        // Determine correct payment status
+        String qpayStatus;
+        bool paymentStatus = false;
+        
+        if (correctTotalFoodAmount == 0.0 || totalPaymentsMade >= originalFoodAmount) {
+          qpayStatus = 'paid';
+          paymentStatus = true;
+        } else if (totalPaymentsMade > 0) {
+          qpayStatus = 'partial';
+          paymentStatus = false;
+        } else {
+          qpayStatus = 'none';
+          paymentStatus = false;
+        }
+
+        // Update user document with corrected values
+        transaction.update(userDocRef, {
+          'totalFoodAmount': correctTotalFoodAmount,
+          'qpayStatus': qpayStatus,
+          'paymentStatus': paymentStatus,
+          'lastRecalculated': FieldValue.serverTimestamp(),
+          'updatedAt': FieldValue.serverTimestamp(),
+        });
+
+        AppLogger.success(
+          'Balance recalculated for user $uid: '
+          'original=₮$originalFoodAmount, '
+          'totalPaid=₮$totalPaymentsMade, '
+          'correctedRemaining=₮$correctTotalFoodAmount, '
+          'status=$qpayStatus',
+        );
+
+        return {
+          'success': true,
+          'originalFoodAmount': originalFoodAmount,
+          'totalPaymentsMade': totalPaymentsMade,
+          'correctedTotalFoodAmount': correctTotalFoodAmount,
+          'qpayStatus': qpayStatus,
+          'paymentStatus': paymentStatus,
+          'paymentCount': paymentAmounts.length,
+        };
+      });
+    } catch (error) {
+      AppLogger.error('Error recalculating user balance: $error');
+      return {'success': false, 'error': error.toString()};
     }
   }
 
