@@ -45,7 +45,10 @@ class RealtimeFoodTotalService {
   }
 
   /// Calculate and update the total food amount based on the eatens collection
-  static Future<void> _updateTotalFoodAmount(String userId, QuerySnapshot snapshot) async {
+  static Future<void> _updateTotalFoodAmount(
+    String userId,
+    QuerySnapshot snapshot,
+  ) async {
     try {
       // Calculate total amount from all documents in the eatens collection
       int totalFoodAmount = 0;
@@ -58,15 +61,15 @@ class RealtimeFoodTotalService {
       }
 
       // Update the totalFoodAmount in the users collection
-      await _firestore
-          .collection('users')
-          .doc(userId)
-          .update({
-            'totalFoodAmount': totalFoodAmount,
-            'lastFoodUpdate': FieldValue.serverTimestamp(),
-          });
+      // Note: totalFoodAmount represents the current amount owed (before payments)
+      await _firestore.collection('users').doc(userId).update({
+        'totalFoodAmount': totalFoodAmount,
+        'lastFoodUpdate': FieldValue.serverTimestamp(),
+      });
 
-      debugPrint('✅ Real-time updated totalFoodAmount: $totalFoodAmount (from ${snapshot.docs.length} eaten records)');
+      debugPrint(
+        '✅ Real-time updated totalFoodAmount: $totalFoodAmount (from ${snapshot.docs.length} eaten records)',
+      );
     } catch (e) {
       debugPrint('❌ Error updating totalFoodAmount in real-time: $e');
     }
@@ -97,13 +100,10 @@ class RealtimeFoodTotalService {
       }
 
       // Update the totalFoodAmount in users collection
-      await _firestore
-          .collection('users')
-          .doc(userId)
-          .update({
-            'totalFoodAmount': totalFoodAmount,
-            'lastFoodUpdate': FieldValue.serverTimestamp(),
-          });
+      await _firestore.collection('users').doc(userId).update({
+        'totalFoodAmount': totalFoodAmount,
+        'lastFoodUpdate': FieldValue.serverTimestamp(),
+      });
 
       debugPrint('✅ Force updated totalFoodAmount: $totalFoodAmount');
     } catch (e) {
@@ -121,10 +121,7 @@ class RealtimeFoodTotalService {
     }
 
     try {
-      final userDoc = await _firestore
-          .collection('users')
-          .doc(userId)
-          .get();
+      final userDoc = await _firestore.collection('users').doc(userId).get();
 
       if (userDoc.exists) {
         final userData = userDoc.data();
