@@ -31,6 +31,22 @@ class DateSelectionCard extends StatelessWidget {
     this.onClearFilter,
   });
 
+  void _navigateMonth(int direction) {
+    int newMonth = selectedMonth + direction;
+    int newYear = selectedYear;
+
+    if (newMonth > 12) {
+      newMonth = 1;
+      newYear++;
+    } else if (newMonth < 1) {
+      newMonth = 12;
+      newYear--;
+    }
+
+    onMonthChanged(newMonth);
+    onYearChanged(newYear);
+  }
+
   @override
   Widget build(BuildContext context) {
     final now = DateTime.now();
@@ -83,115 +99,7 @@ class DateSelectionCard extends StatelessWidget {
                 ),
             ],
           ),
-          // Single row layout for all dropdowns
-          // Row(
-          //   children: [
-          //     Expanded(
-          //       flex: 3,
-          //       child: ModernDropdown<int>(
-          //         value: selectedMonth,
-          //         label: 'Сар',
-          //         items: List.generate(12, (index) {
-          //           return DropdownMenuItem(
-          //             value: index + 1,
-          //             child: Text(monthNames[index]),
-          //           );
-          //         }),
-          //         onChanged: (value) {
-          //           if (value != null) {
-          //             onMonthChanged(value);
-          //           }
-          //         },
-          //       ),
-          //     ),
-          //     const SizedBox(width: 8),
-          //     Expanded(
-          //       flex: 2,
-          //       child: GestureDetector(
-          //         onTap: onShowCalendarDialog,
-          //         child: Container(
-          //           decoration: BoxDecoration(
-          //             color: const Color(0xFFF8FAFC),
-          //             borderRadius: BorderRadius.circular(12),
-          //             border: Border.all(
-          //               color: const Color(0xFFE2E8F0),
-          //             ),
-          //           ),
-          //           child: Padding(
-          //             padding: const EdgeInsets.symmetric(
-          //               horizontal: 16,
-          //               vertical: 12,
-          //             ),
-          //             child: Row(
-          //               mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          //               children: [
-          //                 Expanded(
-          //                   child: Column(
-          //                     crossAxisAlignment: CrossAxisAlignment.start,
-          //                     children: [
-          //                       const Text(
-          //                         'Өдөр',
-          //                         style: TextStyle(
-          //                           color: Color(0xFF64748B),
-          //                           fontWeight: FontWeight.w500,
-          //                           fontSize: 12,
-          //                         ),
-          //                       ),
-          //                       const SizedBox(height: 2),
-          //                       Text(
-          //                         selectedDay == null ? 'Бүгд' : selectedDay.toString(),
-          //                         style: const TextStyle(
-          //                           color: Color(0xFF1E293B),
-          //                           fontWeight: FontWeight.w500,
-          //                           fontSize: 16,
-          //                         ),
-          //                       ),
-          //                     ],
-          //                   ),
-          //                 ),
-          //                 Row(
-          //                   mainAxisSize: MainAxisSize.min,
-          //                   children: [
-          //                     if (selectedDay != null)
-          //                       GestureDetector(
-          //                         onTap: onClearDaySelection,
-          //                         child: const Icon(
-          //                           Icons.clear,
-          //                           color: Color(0xFF64748B),
-          //                           size: 18,
-          //                         ),
-          //                       ),
-          //                   ],
-          //                 ),
-          //               ],
-          //             ),
-          //           ),
-          //         ),
-          //       ),
-          //     ),
-          //     const SizedBox(width: 8),
-          //     Expanded(
-          //       flex: 2,
-          //       child: ModernDropdown<int>(
-          //         value: selectedYear,
-          //         label: 'Жил',
-          //         items: [2024, 2025, 2026].map((year) {
-          //           return DropdownMenuItem(
-          //             value: year,
-          //             child: Text(year.toString()),
-          //           );
-          //         }).toList(),
-          //         onChanged: (value) {
-          //           if (value != null) {
-          //             onYearChanged(value);
-          //           }
-          //         },
-          //       ),
-          //     ),
-          //   ],
-          // ),
-          
-          // Month navigation
+          // Month navigation section
           Container(
             margin: const EdgeInsets.only(top: 16),
             padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 12),
@@ -260,22 +168,5 @@ class DateSelectionCard extends StatelessWidget {
         ],
       ),
     );
-  }
-
-  void _navigateMonth(int direction) {
-    int newMonth = selectedMonth + direction;
-    int newYear = selectedYear;
-
-    if (newMonth > 12) {
-      newMonth = 1;
-      newYear++;
-      onYearChanged(newYear);
-    } else if (newMonth < 1) {
-      newMonth = 12;
-      newYear--;
-      onYearChanged(newYear);
-    }
-
-    onMonthChanged(newMonth);
   }
 }
