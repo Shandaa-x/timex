@@ -7,7 +7,7 @@ import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:get/get_navigation/src/root/get_material_app.dart';
 import 'package:timex/index.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
-import 'package:timex/screens/auth/auth_wrapper.dart';
+import 'package:timex/routes/routes.dart';
 import 'package:timezone/data/latest.dart' as tz;
 import 'package:timezone/timezone.dart' as tz;
 import 'package:permission_handler/permission_handler.dart';
@@ -39,17 +39,17 @@ void main() {
         await Firebase.initializeApp(
           options: DefaultFirebaseOptions.currentPlatform,
         );
-        
+
         // iOS-specific Firebase configuration
         if (Platform.isIOS) {
           print('🍎 iOS Firebase configuration loaded');
         }
-        
+
         log('✅ Firebase initialized successfully');
       } catch (e, stackTrace) {
         log('❌ Firebase initialization failed: $e');
         log('Stack trace: $stackTrace');
-        
+
         // Try to continue anyway for development
         print('⚠️ Continuing without Firebase - some features may not work');
       }
@@ -130,10 +130,9 @@ class MyApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return GetMaterialApp(
-      initialRoute: Routes.authWrapper,
+      initialRoute: Routes.authWrapper, // Back to normal auth flow
       onGenerateRoute: (settings) => Routes().getRoute(settings),
       debugShowCheckedModeBanner: false,
-      home: const AuthWrapper(),
     );
   }
 }

@@ -7,6 +7,7 @@ import 'package:timex/index.dart';
 import 'package:timex/screens/time_track/time_tracking_screen.dart';
 import 'package:timex/screens/qpay/qr_code_screen.dart';
 import 'package:timex/services/realtime_food_total_service.dart';
+import 'package:timex/utils/export_user_data.dart';
 
 class MainScreen extends StatefulWidget {
   const MainScreen({super.key});
@@ -211,6 +212,20 @@ class _MainScreenState extends State<MainScreen> {
             //       child: Icon(Icons.restaurant),
             //     ),
             //   ),
+            // Debug Export User Data Button
+            if (_currentIndex == 0) // Only show on first tab
+              Positioned(
+                top: 220,
+                right: 20,
+                child: FloatingActionButton(
+                  mini: true,
+                  onPressed: () async {
+                    await exportUserData(context, 'IjLl3CSTwaTN4tM42yRNxakxDYx1');
+                  },
+                  backgroundColor: Colors.purple,
+                  child: const Icon(Icons.download),
+                ),
+              ),
           ],
         ),
         bottomNavigationBar: _buildSegmentedTabBar(),

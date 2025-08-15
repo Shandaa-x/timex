@@ -1,6 +1,8 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import '../utils/logger.dart';
+import 'modern_user_account_service.dart';
+import 'transaction_service.dart';
 
 /// Service for handling user payment status and food amount updates in Firestore
 class UserPaymentService {
@@ -127,6 +129,10 @@ class UserPaymentService {
         final List<String> dailyRecordsToClear = [];
         double amountToClear = actualPaymentAmount;
 
+        // Collect food details for payment record
+        List<Map<String, dynamic>> foodDetails = [];
+        double amountForFoodDetails = actualPaymentAmount;
+
         // Mark daily records as paid based on the payment amount
         // Filter for unpaid records in the loop to avoid complex queries
         for (final doc in eatensSnapshot.docs) {
@@ -140,6 +146,26 @@ class UserPaymentService {
           if (!isPaidOff && dailyPrice > 0) {
             dailyRecordsToClear.add(doc.id);
             amountToClear -= dailyPrice;
+
+            // Collect food details for payment record while amount allows
+            if (amountForFoodDetails > 0 && data['foods'] != null) {
+              final foods = List<Map<String, dynamic>>.from(data['foods']);
+              for (final food in foods) {
+                if (amountForFoodDetails <= 0) break;
+                
+                final foodPrice = (food['price'] as num?)?.toDouble() ?? 0.0;
+                if (foodPrice <= amountForFoodDetails) {
+                  // Add food with all its details
+                  foodDetails.add({
+                    'name': food['name'] ?? 'Unknown Food',
+                    'image': food['image'], // Can be null
+                    'price': foodPrice,
+                    'date': doc.id, // Date when this food was eaten
+                  });
+                  amountForFoodDetails -= foodPrice;
+                }
+              }
+            }
           }
         }
 
@@ -153,13 +179,13 @@ class UserPaymentService {
           });
         }
 
-        // Create payment record with enhanced details
+        // Create payment record with enhanced details including food information
         final paymentDocRef = paymentsRef.doc();
         final paymentRecord = {
           'amount': actualPaymentAmount,
           'requestedAmount': paidAmount, // Track original requested amount
           'overpaymentPrevented': actualPaymentAmount != paidAmount,
-          'status': 'completed',
+          'status': qpayStatus, // Use calculated status: 'paid', 'partial', etc.
           'date': FieldValue.serverTimestamp(),
           'method': paymentMethod,
           'invoiceId': invoiceId,
@@ -170,6 +196,10 @@ class UserPaymentService {
           'paymentIndex': paymentAmounts.length - 1, // Index of this payment in the array
           'dailyRecordsCleared': dailyRecordsToClear, // Track which daily records were paid
           'createdAt': FieldValue.serverTimestamp(),
+          // Enhanced food details for payment history display
+          'foodDetails': foodDetails, // List of food items paid for
+          'foodCount': foodDetails.length, // Number of food items
+          'hasFoodDetails': foodDetails.isNotEmpty, // Quick check for UI
         };
 
         transaction.set(paymentDocRef, paymentRecord);
@@ -188,6 +218,11 @@ class UserPaymentService {
         };
 
         transaction.update(userDocRef, updateData);
+
+        // DUAL WRITE: Also write to new structure (non-blocking)
+        _writeToNewStructure(userId, actualPaymentAmount, paymentMethod, invoiceId, orderId).catchError((error) {
+          AppLogger.warning('Failed to write to new structure (non-blocking): $error');
+        });
 
         AppLogger.success(
           'Payment processed successfully: ₮$actualPaymentAmount added to payment array. '
@@ -447,31 +482,45 @@ class UserPaymentService {
     }
   }
 
-  /// Get payment history for a user
+  /// Get payment history for a user with enhanced food details
   static Future<List<Map<String, dynamic>>> getPaymentHistory(
     String userId,
   ) async {
     try {
+      AppLogger.info('🔍 Fetching payment history for user: $userId');
+      
       final paymentsQuery = await _firestore
           .collection('users')
           .doc(userId)
           .collection('payments')
-          .orderBy('date', descending: true)
-          .limit(20)
+          .orderBy('createdAt', descending: true)
+          .limit(50)
           .get();
+
+      AppLogger.info('📊 Found ${paymentsQuery.docs.length} payment documents');
 
       return paymentsQuery.docs.map((doc) {
         final data = doc.data();
         return {
           'id': doc.id,
           'amount': data['amount'] ?? 0.0,
+          'requestedAmount': data['requestedAmount'] ?? data['amount'] ?? 0.0,
           'status': data['status'] ?? 'unknown',
           'date': data['date'],
-          'method': data['method'] ?? 'unknown',
+          'createdAt': data['createdAt'],
+          'method': data['method'] ?? 'qpay',
           'invoiceId': data['invoiceId'],
           'orderId': data['orderId'],
-          'previousBalance': data['previousBalance'] ?? 0.0,
-          'newBalance': data['newBalance'] ?? 0.0,
+          'remainingBalance': data['remainingBalance'] ?? 0.0,
+          'totalPaymentsMade': data['totalPaymentsMade'] ?? 0.0,
+          'originalFoodAmount': data['originalFoodAmount'] ?? 0.0,
+          'overpaymentPrevented': data['overpaymentPrevented'] ?? false,
+          // Enhanced food details for display
+          'foodDetails': data['foodDetails'] ?? [],
+          'foodCount': data['foodCount'] ?? 0,
+          'hasFoodDetails': data['hasFoodDetails'] ?? false,
+          'dailyRecordsCleared': data['dailyRecordsCleared'] ?? [],
+          'paymentIndex': data['paymentIndex'] ?? 0,
         };
       }).toList();
     } catch (error) {
@@ -628,6 +677,90 @@ class UserPaymentService {
       }
     } catch (error) {
       AppLogger.error('Error ensuring user document: $error');
+    }
+  }
+
+  /// Write payment to new structure (dual write strategy)
+  /// This method runs asynchronously and doesn't block the main flow
+  static Future<void> _writeToNewStructure(
+    String userId,
+    double amount,
+    String paymentMethod,
+    String invoiceId,
+    String? orderId,
+  ) async {
+    try {
+      AppLogger.info('Writing payment to new structure: $userId, ₮$amount');
+
+      // Ensure user account exists in new structure
+      await ModernUserAccountService.createUserAccount(userId: userId);
+
+      // Create deposit transaction in new structure
+      final transactionResult = await TransactionService.createDeposit(
+        userId: userId,
+        amount: amount,
+        paymentMethod: paymentMethod,
+        invoiceId: invoiceId,
+        orderId: orderId,
+        metadata: {
+          'legacyMigration': true,
+          'dualWrite': true,
+          'source': 'UserPaymentService',
+        },
+      );
+
+      if (transactionResult['success']) {
+        AppLogger.success('Successfully wrote to new structure: ${transactionResult['transactionId']}');
+      } else {
+        AppLogger.error('Failed to write to new structure: ${transactionResult['error']}');
+      }
+    } catch (error) {
+      AppLogger.error('Error writing to new structure: $error');
+    }
+  }
+
+  /// Get user payment info with fallback to new structure
+  static Future<Map<String, dynamic>> getUserPaymentInfoWithFallback([
+    String? userId,
+  ]) async {
+    try {
+      // Try to get from legacy structure first
+      final legacyResult = await getUserPaymentInfo(userId);
+      
+      if (legacyResult['success']) {
+        return legacyResult;
+      }
+
+      // Fallback to new structure
+      AppLogger.info('Falling back to new structure for user payment info');
+      final uid = userId ?? FirebaseAuth.instance.currentUser?.uid ?? '';
+      
+      final accountInfo = await ModernUserAccountService.getUserAccount(uid);
+      if (accountInfo['success']) {
+        final balance = accountInfo['balance'];
+        final currentBalance = (balance['current'] as num?)?.toDouble() ?? 0.0;
+        final totalDeposited = (balance['totalDeposited'] as num?)?.toDouble() ?? 0.0;
+        
+        return {
+          'success': true,
+          'totalFoodAmount': currentBalance, // Map to legacy field name
+          'originalFoodAmount': totalDeposited, // Map to legacy field name
+          'totalPaymentsMade': totalDeposited,
+          'paymentAmounts': [], // Empty array for compatibility
+          'paymentCount': 0,
+          'qpayStatus': currentBalance > 0 ? 'paid' : 'none',
+          'paymentStatus': currentBalance > 0,
+          'lastPaymentAmount': 0.0,
+          'lastPaymentDate': null,
+          'lastPaymentStatusUpdate': null,
+          'source': 'new_structure',
+        };
+      }
+
+      return legacyResult; // Return original error
+    } catch (error) {
+      AppLogger.error('Error getting user payment info with fallback: $error');
+      return {'success': false, 'error': error.toString()};
     }
   }
 }
