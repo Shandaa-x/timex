@@ -122,6 +122,7 @@ class _FoodReportScreenState extends State<FoodReportScreen>
       _eatenForDayData.clear();
       _paidMeals.clear();
 
+
       // Load all data using services
       final results = await Future.wait([
         FoodDataService.loadEatenForDayData(_selectedMonth),
