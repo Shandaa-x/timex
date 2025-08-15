@@ -8,6 +8,7 @@ import 'package:get/get_navigation/src/root/get_material_app.dart';
 import 'package:timex/index.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:timex/screens/auth/auth_wrapper.dart';
+import 'package:timex/theme/assets.dart';
 import 'package:timezone/data/latest.dart' as tz;
 import 'package:timezone/timezone.dart' as tz;
 import 'package:permission_handler/permission_handler.dart';

@@ -2,7 +2,7 @@ import 'dart:ui';
 import 'package:bot_toast/bot_toast.dart';
 import 'package:flutter/material.dart';
 import 'package:lottie/lottie.dart';
-import 'package:timex/index.dart';
+import 'package:timex/theme/assets.dart';
 
 var toastCancelFunc;
 

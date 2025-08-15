@@ -439,7 +439,6 @@ class _MonthlyStatisticsScreenState extends State<MonthlyStatisticsScreen> {
       child: Scaffold(
         backgroundColor: const Color(0xFFF8FAFC),
         drawer: CustomDrawer(
-          currentScreen: DrawerScreenType.timeReport,
           onNavigateToTab: widget.onNavigateToTab,
         ),
         body: CustomScrollView(

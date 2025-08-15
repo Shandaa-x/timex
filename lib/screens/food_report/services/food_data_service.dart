@@ -1,8 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 
 class FoodDataService {
-  static const String _currentUserId = 'current_user'; // Replace with actual user ID
-
   // Helper function to safely parse food name
   static String getFoodName(Map<String, dynamic> food) {
     try {
@@ -118,7 +116,7 @@ class FoodDataService {
   }
 
   // Load eaten for day data using optimized queries
-  static Future<Map<String, bool>> loadEatenForDayData(DateTime selectedMonth) async {
+  static Future<Map<String, bool>> loadEatenForDayData(DateTime selectedMonth, String userId) async {
     final eatenData = <String, bool>{};
     
     try {
@@ -128,8 +126,10 @@ class FoodDataService {
       final endDocId =
           '${selectedMonth.year}-${selectedMonth.month.toString().padLeft(2, '0')}-${endOfMonth.day.toString().padLeft(2, '0')}';
 
-      // Use range query to get all calendar days for the month
+      // Use range query to get all calendar days for the month from user's subcollection
       final querySnapshot = await FirebaseFirestore.instance
+          .collection('users')
+          .doc(userId)
           .collection('calendarDays')
           .where(FieldPath.documentId, isGreaterThanOrEqualTo: startDocId)
           .where(FieldPath.documentId, isLessThanOrEqualTo: endDocId)
@@ -151,7 +151,7 @@ class FoodDataService {
     } catch (e) {
       print('Error loading eaten for day data: $e');
       // Fallback to individual queries if needed
-      await _loadEatenForDayDataFallback(selectedMonth, eatenData);
+      await _loadEatenForDayDataFallback(selectedMonth, eatenData, userId);
     }
     
     return eatenData;
@@ -161,6 +161,7 @@ class FoodDataService {
   static Future<void> _loadEatenForDayDataFallback(
     DateTime selectedMonth,
     Map<String, bool> eatenData,
+    String userId,
   ) async {
     try {
       final endOfMonth = DateTime(selectedMonth.year, selectedMonth.month + 1, 0);
@@ -169,7 +170,7 @@ class FoodDataService {
       for (int day = 1; day <= endOfMonth.day; day++) {
         final dateKey =
             '${selectedMonth.year}-${selectedMonth.month.toString().padLeft(2, '0')}-${day.toString().padLeft(2, '0')}';
-        futures.add(_loadSingleDayEatenStatus(dateKey, eatenData));
+        futures.add(_loadSingleDayEatenStatus(dateKey, eatenData, userId));
       }
 
       await Future.wait(futures);
@@ -181,9 +182,12 @@ class FoodDataService {
   static Future<void> _loadSingleDayEatenStatus(
     String dateKey,
     Map<String, bool> eatenData,
+    String userId,
   ) async {
     try {
       final calendarDoc = await FirebaseFirestore.instance
+          .collection('users')
+          .doc(userId)
           .collection('calendarDays')
           .doc(dateKey)
           .get();

@@ -261,55 +261,6 @@ class _GoogleLoginScreenState extends State<GoogleLoginScreen> {
                   ),
                 ),
               ),
-              const SizedBox(height: 16),
-              // Firebase Test button for debugging
-              SizedBox(
-                width: double.infinity,
-                child: OutlinedButton.icon(
-                  icon: const Icon(Icons.bug_report),
-                  label: const Text('Test Firebase'),
-                  onPressed: () async {
-                    print('🧪 Running Firebase tests...');
-                    final results = await FirebaseTestService.runAllTests();
-
-                    if (mounted) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(
-                          content: Text(
-                            'Auth: ${results['auth']! ? "✅" : "❌"} | '
-                            'Firestore: ${results['firestore']! ? "✅" : "❌"}',
-                          ),
-                          backgroundColor: results.values.every((v) => v)
-                              ? Colors.green
-                              : Colors.orange,
-                        ),
-                      );
-                    }
-                  },
-                  style: OutlinedButton.styleFrom(
-                    padding: const EdgeInsets.symmetric(vertical: 14),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                  ),
-                ),
-              ),
-              const SizedBox(height: 16),
-              // Logout button for testing
-              SizedBox(
-                width: double.infinity,
-                child: OutlinedButton.icon(
-                  icon: const Icon(Icons.logout),
-                  label: const Text('Гарах'),
-                  onPressed: _signOut,
-                  style: OutlinedButton.styleFrom(
-                    padding: const EdgeInsets.symmetric(vertical: 14),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                  ),
-                ),
-              ),
             ],
           ),
         ),

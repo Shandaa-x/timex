@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:timex/screens/home/widgets/custom_sliver_appbar.dart';
 import 'package:timex/widgets/custom_drawer.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'widgets/quick_actions_grid.dart';
+import 'widgets/statistics_dashboard.dart';
 import 'widgets/news_section_with_tabs.dart';
 import 'widgets/add_news_bottom_sheet.dart';
 
@@ -109,7 +109,6 @@ class _HomeScreenState extends State<HomeScreen> {
     return Scaffold(
       backgroundColor: const Color(0xFFF8FAFC),
       drawer: CustomDrawer(
-        currentScreen: DrawerScreenType.home,
         onNavigateToTab: widget.onNavigateToTab,
       ),
       body: RefreshIndicator(
@@ -168,9 +167,7 @@ class _HomeScreenState extends State<HomeScreen> {
                     )
                   : SliverList(
                       delegate: SliverChildListDelegate([
-                        QuickActionsGrid(
-                          onNavigateToTab: widget.onNavigateToTab,
-                        ),
+                        const StatisticsDashboard(),
                         const SizedBox(height: 20),
                         // News Section with Tabs
                         NewsSectionWithTabs(newsList: _newsList),

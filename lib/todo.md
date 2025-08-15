@@ -27,19 +27,19 @@
 - hoolnii zardliig hadgalah, hoolnii zardliig tootsooloh. tootsoolson bolon hadgalsan 
   2 dvng haritsuulah
 - hoolnii tailan => sariin filteriig awah, bvh medeellee haruulah
-- hool nogoon, tsag tsenher
+- medee CRUD 
+- hool CRUD
+- google login
+- news
+- uuriinhuu news iig harah 
 
 ### 8/12 todo list
 - tulburiin tvvh harah hadgalah ()
 - tabview => tulburiin tvvh (payment statement) 
 
 ### 8/13 todo list
-- google login
 - qpay integration
-- news
 
 ### 
 - tsalingiin tailan tootsooloh
-- medee CRUD 
 - tulburiin tvvh 
-- uuriinhuu news iig harah 

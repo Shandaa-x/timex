@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import 'dart:convert';
 import 'package:timex/screens/home/widgets/custom_sliver_appbar.dart';
+import '../home/widgets/add_news_bottom_sheet.dart';
 import '../../models/news_model.dart';
 import '../../services/news_service.dart';
 import 'news_form_screen.dart';
@@ -109,6 +111,20 @@ class _MyNewsScreenState extends State<MyNewsScreen> {
     );
   }
 
+  void _showAddNewsBottomSheet() {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) => AddNewsBottomSheet(
+        onNewsAdded: () {
+          // Refresh the news list by calling setState
+          setState(() {});
+        },
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -117,95 +133,6 @@ class _MyNewsScreenState extends State<MyNewsScreen> {
           CustomSliverAppBar(
             title: 'Миний мэдээ',
             gradientColors: const [Color(0xFF10B981), Color(0xFF059669)],
-          ),
-          SliverToBoxAdapter(
-            child: Container(
-              padding: const EdgeInsets.all(16.0),
-              child: Column(
-                children: [
-                  // Filter Section
-                  Container(
-                    decoration: BoxDecoration(
-                      color: Colors.grey[100],
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.all(color: Colors.grey[300]!),
-                    ),
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                    child: Row(
-                      children: [
-                        const Icon(Icons.filter_list, color: Color(0xFF10B981)),
-                        const SizedBox(width: 8),
-                        const Text(
-                          'Шүүлтүүр:',
-                          style: TextStyle(fontWeight: FontWeight.bold),
-                        ),
-                        const Spacer(),
-                        // Month filter with arrow icons
-                        Container(
-                          decoration: BoxDecoration(
-                            color: Colors.white,
-                            borderRadius: BorderRadius.circular(8),
-                            border: Border.all(color: Colors.grey[300]!),
-                          ),
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              IconButton(
-                                onPressed: _previousMonth,
-                                icon: const Icon(Icons.arrow_left, color: Color(0xFF10B981)),
-                                constraints: const BoxConstraints(minWidth: 40, minHeight: 40),
-                              ),
-                              Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 12),
-                                child: Text(
-                                  _filterMonth != null
-                                      ? DateFormat('yyyy/MM').format(_selectedMonth)
-                                      : 'Бүгд',
-                                  style: const TextStyle(fontWeight: FontWeight.w500),
-                                ),
-                              ),
-                              IconButton(
-                                onPressed: _nextMonth,
-                                icon: const Icon(Icons.arrow_right, color: Color(0xFF10B981)),
-                                constraints: const BoxConstraints(minWidth: 40, minHeight: 40),
-                              ),
-                            ],
-                          ),
-                        ),
-                        const SizedBox(width: 8),
-                        if (_filterMonth != null)
-                          TextButton(
-                            onPressed: _clearFilter,
-                            child: const Text('Цэвэрлэх', style: TextStyle(color: Color(0xFF10B981))),
-                          ),
-                      ],
-                    ),
-                  ),
-                  // const SizedBox(height: 16),
-                  // // Add News Button
-                  // SizedBox(
-                  //   width: double.infinity,
-                  //   child: ElevatedButton.icon(
-                  //     onPressed: () {
-                  //       Navigator.push(
-                  //         context,
-                  //         MaterialPageRoute(
-                  //           builder: (context) => const NewsFormScreen(),
-                  //         ),
-                  //       );
-                  //     },
-                  //     icon: const Icon(Icons.add),
-                  //     label: const Text('Шинэ мэдээ нэмэх'),
-                  //     style: ElevatedButton.styleFrom(
-                  //       backgroundColor: const Color(0xFF10B981),
-                  //       foregroundColor: Colors.white,
-                  //       padding: const EdgeInsets.symmetric(vertical: 12),
-                  //     ),
-                  //   ),
-                  // ),
-                ],
-              ),
-            ),
           ),
           // News List
           StreamBuilder<List<NewsModel>>(
@@ -266,10 +193,7 @@ class _MyNewsScreenState extends State<MyNewsScreen> {
                           const SizedBox(height: 8),
                           const Text(
                             'Эхний мэдээгээ нэмээрэй!',
-                            style: TextStyle(
-                              fontSize: 14,
-                              color: Colors.grey,
-                            ),
+                            style: TextStyle(fontSize: 14, color: Colors.grey),
                           ),
                         ],
                       ),
@@ -279,159 +203,264 @@ class _MyNewsScreenState extends State<MyNewsScreen> {
               }
 
               return SliverList(
-                delegate: SliverChildBuilderDelegate(
-                  (context, index) {
-                    final news = newsList[index];
-                    return Card(
-                      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                      elevation: 2,
-                      child: ListTile(
-                        contentPadding: const EdgeInsets.all(16),
-                        title: Row(
-                          children: [
-                            Expanded(
-                              child: Text(
-                                news.title,
-                                style: const TextStyle(
-                                  fontWeight: FontWeight.bold,
-                                  fontSize: 16,
+                delegate: SliverChildBuilderDelegate((context, index) {
+                  final news = newsList[index];
+                  return Card(
+                    margin: const EdgeInsets.symmetric(
+                      horizontal: 16,
+                      vertical: 8,
+                    ),
+                    elevation: 2,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        // Image preview (if available)
+                        if (news.imageUrl != null && news.imageUrl!.isNotEmpty)
+                          Container(
+                            width: double.infinity,
+                            height: 200,
+                            decoration: BoxDecoration(
+                              borderRadius: const BorderRadius.only(
+                                topLeft: Radius.circular(8),
+                                topRight: Radius.circular(8),
+                              ),
+                              border: Border.all(color: Colors.grey[300]!),
+                            ),
+                            child: ClipRRect(
+                              borderRadius: const BorderRadius.only(
+                                topLeft: Radius.circular(8),
+                                topRight: Radius.circular(8),
+                              ),
+                              child:
+                                  news.imageUrl!.startsWith('data:image') ||
+                                      news.imageUrl!.startsWith('/9j') ||
+                                      news.imageUrl!.startsWith('iVBOR')
+                                  ? Image.memory(
+                                      base64Decode(
+                                        news.imageUrl!.contains('base64,')
+                                            ? news.imageUrl!.split('base64,')[1]
+                                            : news.imageUrl!,
+                                      ),
+                                      fit: BoxFit.cover,
+                                      errorBuilder:
+                                          (context, error, stackTrace) {
+                                            return Container(
+                                              color: Colors.grey[200],
+                                              child: const Center(
+                                                child: Icon(
+                                                  Icons.broken_image,
+                                                  size: 50,
+                                                  color: Colors.grey,
+                                                ),
+                                              ),
+                                            );
+                                          },
+                                    )
+                                  : Image.network(
+                                      news.imageUrl!,
+                                      fit: BoxFit.cover,
+                                      errorBuilder:
+                                          (context, error, stackTrace) {
+                                            return Container(
+                                              color: Colors.grey[200],
+                                              child: const Center(
+                                                child: Icon(
+                                                  Icons.broken_image,
+                                                  size: 50,
+                                                  color: Colors.grey,
+                                                ),
+                                              ),
+                                            );
+                                          },
+                                    ),
+                            ),
+                          ),
+
+                        // News content
+                        ListTile(
+                          contentPadding: const EdgeInsets.all(16),
+                          title: Row(
+                            children: [
+                              Expanded(
+                                child: Text(
+                                  news.title,
+                                  style: const TextStyle(
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 16,
+                                  ),
                                 ),
                               ),
-                            ),
-                            if (news.category.isNotEmpty)
-                              Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                                decoration: BoxDecoration(
-                                  color: const Color(0xFF10B981).withOpacity(0.1),
-                                  borderRadius: BorderRadius.circular(12),
+                              if (news.category.isNotEmpty)
+                                Container(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 8,
+                                    vertical: 4,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    color: const Color(
+                                      0xFF10B981,
+                                    ).withOpacity(0.1),
+                                    borderRadius: BorderRadius.circular(12),
+                                  ),
+                                  child: Text(
+                                    news.category,
+                                    style: const TextStyle(
+                                      fontSize: 12,
+                                      color: Color(0xFF10B981),
+                                      fontWeight: FontWeight.w500,
+                                    ),
+                                  ),
                                 ),
-                                child: Text(
-                                  news.category,
-                                  style: const TextStyle(
-                                    fontSize: 12,
-                                    color: Color(0xFF10B981),
+                            ],
+                          ),
+                          subtitle: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const SizedBox(height: 8),
+                              if (news.description.isNotEmpty) ...[
+                                Text(
+                                  news.description,
+                                  style: TextStyle(
+                                    color: Colors.grey[600],
                                     fontWeight: FontWeight.w500,
                                   ),
                                 ),
-                              ),
-                          ],
-                        ),
-                        subtitle: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            const SizedBox(height: 8),
-                            if (news.description.isNotEmpty) ...[
+                                const SizedBox(height: 4),
+                              ],
                               Text(
-                                news.description,
-                                style: TextStyle(
-                                  color: Colors.grey[600],
-                                  fontWeight: FontWeight.w500,
-                                ),
+                                news.content,
+                                maxLines: 3,
+                                overflow: TextOverflow.ellipsis,
+                                style: TextStyle(color: Colors.grey[700]),
                               ),
-                              const SizedBox(height: 4),
-                            ],
-                            Text(
-                              news.content,
-                              maxLines: 3,
-                              overflow: TextOverflow.ellipsis,
-                              style: TextStyle(color: Colors.grey[700]),
-                            ),
-                            const SizedBox(height: 8),
-                            Row(
-                              children: [
-                                if (!news.isPublished) ...[
-                                  Container(
-                                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                                    decoration: BoxDecoration(
-                                      color: Colors.orange.withOpacity(0.1),
-                                      borderRadius: BorderRadius.circular(8),
-                                    ),
-                                    child: const Text(
-                                      'Ноорог',
-                                      style: TextStyle(
-                                        fontSize: 10,
-                                        color: Colors.orange,
-                                        fontWeight: FontWeight.w500,
+                              const SizedBox(height: 8),
+                              Row(
+                                children: [
+                                  if (!news.isPublished) ...[
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: 6,
+                                        vertical: 2,
+                                      ),
+                                      decoration: BoxDecoration(
+                                        color: Colors.orange.withOpacity(0.1),
+                                        borderRadius: BorderRadius.circular(8),
+                                      ),
+                                      child: const Text(
+                                        'Ноорог',
+                                        style: TextStyle(
+                                          fontSize: 10,
+                                          color: Colors.orange,
+                                          fontWeight: FontWeight.w500,
+                                        ),
                                       ),
                                     ),
-                                  ),
-                                  const SizedBox(width: 8),
-                                ],
-                                Icon(Icons.access_time, size: 14, color: Colors.grey[500]),
-                                const SizedBox(width: 4),
-                                Text(
-                                  DateFormat('yyyy/MM/dd HH:mm').format(news.createdAt),
-                                  style: TextStyle(
-                                    fontSize: 12,
+                                    const SizedBox(width: 8),
+                                  ],
+                                  Icon(
+                                    Icons.access_time,
+                                    size: 14,
                                     color: Colors.grey[500],
                                   ),
-                                ),
-                                if (news.readingTime.isNotEmpty) ...[
-                                  const SizedBox(width: 12),
-                                  Icon(Icons.schedule, size: 14, color: Colors.grey[500]),
                                   const SizedBox(width: 4),
                                   Text(
-                                    news.readingTime,
+                                    DateFormat(
+                                      'yyyy/MM/dd HH:mm',
+                                    ).format(news.createdAt),
                                     style: TextStyle(
                                       fontSize: 12,
                                       color: Colors.grey[500],
                                     ),
                                   ),
-                                ],
-                                if (news.likes > 0) ...[
-                                  const SizedBox(width: 12),
-                                  Icon(Icons.favorite, size: 14, color: Colors.red[400]),
-                                  const SizedBox(width: 4),
-                                  Text(
-                                    '${news.likes}',
-                                    style: TextStyle(
-                                      fontSize: 12,
+                                  // if (news.readingTime.isNotEmpty) ...[
+                                  //   const SizedBox(width: 12),
+                                  //   Icon(
+                                  //     Icons.schedule,
+                                  //     size: 14,
+                                  //     color: Colors.grey[500],
+                                  //   ),
+                                  //   const SizedBox(width: 4),
+                                  //   Text(
+                                  //     news.readingTime,
+                                  //     style: TextStyle(
+                                  //       fontSize: 12,
+                                  //       color: Colors.grey[500],
+                                  //     ),
+                                  //   ),
+                                  // ],
+                                  if (news.likes > 0) ...[
+                                    const SizedBox(width: 12),
+                                    Icon(
+                                      Icons.favorite,
+                                      size: 14,
+                                      color: Colors.red[400],
+                                    ),
+                                    const SizedBox(width: 4),
+                                    Text(
+                                      '${news.likes}',
+                                      style: TextStyle(
+                                        fontSize: 12,
+                                        color: Colors.grey[500],
+                                      ),
+                                    ),
+                                  ],
+                                  if (news.comments > 0) ...[
+                                    const SizedBox(width: 12),
+                                    Icon(
+                                      Icons.comment,
+                                      size: 14,
                                       color: Colors.grey[500],
                                     ),
-                                  ),
-                                ],
-                                if (news.comments > 0) ...[
-                                  const SizedBox(width: 12),
-                                  Icon(Icons.comment, size: 14, color: Colors.grey[500]),
-                                  const SizedBox(width: 4),
-                                  Text(
-                                    '${news.comments}',
-                                    style: TextStyle(
-                                      fontSize: 12,
+                                    const SizedBox(width: 4),
+                                    Text(
+                                      '${news.comments}',
+                                      style: TextStyle(
+                                        fontSize: 12,
+                                        color: Colors.grey[500],
+                                      ),
+                                    ),
+                                  ],
+                                  if (news.updatedAt != news.createdAt) ...[
+                                    const SizedBox(width: 12),
+                                    Icon(
+                                      Icons.edit,
+                                      size: 14,
                                       color: Colors.grey[500],
                                     ),
-                                  ),
-                                ],
-                                if (news.updatedAt != news.createdAt) ...[
-                                  const SizedBox(width: 12),
-                                  Icon(Icons.edit, size: 14, color: Colors.grey[500]),
-                                  const SizedBox(width: 4),
-                                  Text(
-                                    'Засагдсан',
-                                    style: TextStyle(
-                                      fontSize: 12,
-                                      color: Colors.grey[500],
+                                    const SizedBox(width: 4),
+                                    Text(
+                                      'Засагдсан',
+                                      style: TextStyle(
+                                        fontSize: 12,
+                                        color: Colors.grey[500],
+                                      ),
                                     ),
-                                  ),
+                                  ],
                                 ],
-                              ],
-                            ),
-                          ],
+                              ),
+                            ],
+                          ),
+                          trailing: IconButton(
+                            icon: const Icon(Icons.more_vert),
+                            onPressed: () => _showNewsOptions(news),
+                          ),
+                          onTap: () => _showNewsOptions(news),
                         ),
-                        trailing: IconButton(
-                          icon: const Icon(Icons.more_vert),
-                          onPressed: () => _showNewsOptions(news),
-                        ),
-                        onTap: () => _showNewsOptions(news),
-                      ),
-                    );
-                  },
-                  childCount: newsList.length,
-                ),
+                      ],
+                    ),
+                  );
+                }, childCount: newsList.length),
               );
             },
           ),
         ],
+      ),
+      floatingActionButton: FloatingActionButton.extended(
+        onPressed: _showAddNewsBottomSheet,
+        icon: const Icon(Icons.add),
+        label: const Text('Мэдээ нэмэх'),
+        backgroundColor: const Color(0xFF10B981),
+        foregroundColor: Colors.white,
       ),
     );
   }

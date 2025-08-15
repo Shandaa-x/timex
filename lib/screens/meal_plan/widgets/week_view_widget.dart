@@ -15,6 +15,8 @@ class WeekViewWidget extends StatefulWidget {
   final Function(String date, String mealType, Map<String, dynamic> meal)
       onMealLongPress;
   final Function(Map<String, dynamic> updatedFood)? onFoodUpdated;
+  final Function(Map<String, dynamic> food)? onFoodDelete;
+  final Function(Map<String, dynamic> food)? onFoodEdit;
 
   const WeekViewWidget({
     super.key,
@@ -24,6 +26,8 @@ class WeekViewWidget extends StatefulWidget {
     required this.onAddMeal,
     required this.onMealLongPress,
     this.onFoodUpdated,
+    this.onFoodDelete,
+    this.onFoodEdit,
   });
 
   @override
@@ -308,17 +312,19 @@ class _WeekViewWidgetState extends State<WeekViewWidget> {
     final comments = List<Map<String, dynamic>>.from(food['comments'] ?? []);
     final isLiked = (food['likes'] as List<dynamic>? ?? []).contains(_currentUserId);
     
-    return Container(
-      margin: const EdgeInsets.only(bottom: 16),
-      decoration: BoxDecoration(
-        color: AppTheme.successLight.withOpacity(0.05),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(
-          color: AppTheme.successLight.withOpacity(0.2),
-          width: 1,
+    return GestureDetector(
+      onTap: () => widget.onFoodEdit?.call(food),
+      child: Container(
+        margin: const EdgeInsets.only(bottom: 16),
+        decoration: BoxDecoration(
+          color: AppTheme.successLight.withOpacity(0.05),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(
+            color: AppTheme.successLight.withOpacity(0.2),
+            width: 1,
+          ),
         ),
-      ),
-      child: Column(
+        child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           // Food header with image, name, price
@@ -399,6 +405,47 @@ class _WeekViewWidgetState extends State<WeekViewWidget> {
                       ),
                     ),
                   ),
+
+                // Actions menu
+                PopupMenuButton<String>(
+                  icon: Icon(
+                    Icons.more_vert,
+                    color: colorScheme.onSurface.withOpacity(0.6),
+                    size: 20,
+                  ),
+                  onSelected: (value) {
+                    switch (value) {
+                      case 'edit':
+                        widget.onFoodEdit?.call(food);
+                        break;
+                      case 'delete':
+                        _showDeleteConfirmDialog(context, food);
+                        break;
+                    }
+                  },
+                  itemBuilder: (context) => [
+                    const PopupMenuItem(
+                      value: 'edit',
+                      child: Row(
+                        children: [
+                          Icon(Icons.edit, color: Colors.orange),
+                          SizedBox(width: 8),
+                          Text('Засах'),
+                        ],
+                      ),
+                    ),
+                    const PopupMenuItem(
+                      value: 'delete',
+                      child: Row(
+                        children: [
+                          Icon(Icons.delete, color: Colors.red),
+                          SizedBox(width: 8),
+                          Text('Устгах'),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
               ],
             ),
           ),
@@ -567,10 +614,11 @@ class _WeekViewWidgetState extends State<WeekViewWidget> {
             ],
             
             const SizedBox(height: 12),
-          ],
-        ],
-      ),
-    );
+          ], // Close the if (isExpanded) array
+        ], // Close the main Column children array
+      ), // Close the Column
+    ), // Close the Container
+    ); // Close the GestureDetector
   }
 
   Widget _buildAddFoodButton(BuildContext context, String dateKey) {
@@ -1082,6 +1130,30 @@ class _WeekViewWidgetState extends State<WeekViewWidget> {
       'Dec'
     ];
     return months[month - 1];
+  }
+
+  void _showDeleteConfirmDialog(BuildContext context, Map<String, dynamic> food) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Хоол устгах'),
+        content: Text('Та "${food['name'] ?? 'Unknown Food'}" хоолыг устгахдаа итгэлтэй байна уу?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Болих'),
+          ),
+          TextButton(
+            onPressed: () {
+              Navigator.pop(context);
+              widget.onFoodDelete?.call(food);
+            },
+            style: TextButton.styleFrom(foregroundColor: Colors.red),
+            child: const Text('Устгах'),
+          ),
+        ],
+      ),
+    );
   }
 
 

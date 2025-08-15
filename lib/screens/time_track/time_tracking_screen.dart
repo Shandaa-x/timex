@@ -1017,7 +1017,6 @@ class _TimeTrackingScreenState extends State<TimeTrackScreen>
     return Scaffold(
       backgroundColor: const Color(0xFFF8FAFC),
       drawer: CustomDrawer(
-        currentScreen: DrawerScreenType.timeTracking,
         onNavigateToTab: widget.onNavigateToTab,
       ),
       body: CustomScrollView(

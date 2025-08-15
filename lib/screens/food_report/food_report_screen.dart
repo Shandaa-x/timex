@@ -118,7 +118,7 @@ class _FoodReportScreenState extends State<FoodReportScreen>
 
       // Load all data using services
       final results = await Future.wait([
-        FoodDataService.loadEatenForDayData(_selectedMonth),
+        FoodDataService.loadEatenForDayData(_selectedMonth, _userId),
         PaymentService.loadMealPaymentStatus(_selectedMonth),
         FoodDataService.loadFoodDataForMonth(_selectedMonth),
       ]);
@@ -461,7 +461,6 @@ class _FoodReportScreenState extends State<FoodReportScreen>
     return Scaffold(
       backgroundColor: Colors.white,
       drawer: CustomDrawer(
-        currentScreen: DrawerScreenType.foodReport,
         onNavigateToTab: widget.onNavigateToTab,
       ),
       body: _isLoading 

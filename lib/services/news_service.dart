@@ -59,11 +59,40 @@ class NewsService {
   // Get user's news with optional month filter
   Stream<List<NewsModel>> getUserNews({DateTime? filterMonth}) {
     if (currentUserId == null) {
+      print('❌ User not authenticated');
       return Stream.value([]);
     }
 
-    // Simple query without ordering to avoid index requirement
-    Query query = _newsCollection.where('userId', isEqualTo: currentUserId);
+    print('✅ Loading news for user: $currentUserId');
+    
+    // Query both userId and authorId fields and combine results
+    final userIdStream = _getUserNewsByField('userId', filterMonth);
+    final authorIdStream = _getUserNewsByField('authorId', filterMonth);
+    
+    return userIdStream.asyncMap((userIdResults) async {
+      final authorIdResults = await authorIdStream.first;
+      
+      // Combine results and remove duplicates by document ID
+      final allResults = <String, NewsModel>{};
+      
+      for (final news in userIdResults) {
+        if (news.id != null) allResults[news.id!] = news;
+      }
+      
+      for (final news in authorIdResults) {
+        if (news.id != null) allResults[news.id!] = news;
+      }
+      
+      final combinedList = allResults.values.toList();
+      combinedList.sort((a, b) => b.createdAt.compareTo(a.createdAt));
+      
+      print('📝 Returning ${combinedList.length} combined news items');
+      return combinedList;
+    });
+  }
+
+  Stream<List<NewsModel>> _getUserNewsByField(String field, DateTime? filterMonth) {
+    Query query = _newsCollection.where(field, isEqualTo: currentUserId);
 
     if (filterMonth != null) {
       final startOfMonth = DateTime(filterMonth.year, filterMonth.month, 1);
@@ -75,13 +104,12 @@ class NewsService {
     }
 
     return query.snapshots().map((snapshot) {
+      print('📰 Found ${snapshot.docs.length} news documents for field: $field');
+      
       // Sort in memory to avoid index requirement
       final newsList = snapshot.docs.map((doc) {
         return NewsModel.fromMap(doc.data() as Map<String, dynamic>, doc.id);
       }).toList();
-      
-      // Sort by createdAt descending (newest first)
-      newsList.sort((a, b) => b.createdAt.compareTo(a.createdAt));
       
       return newsList;
     });

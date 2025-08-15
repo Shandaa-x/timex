@@ -298,32 +298,6 @@ class _MainScreenState extends State<MainScreen> {
     );
   }
 
-  void _showAboutDialog() {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('TimeX App-ын тухай'),
-        content: const Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text('Хувилбар: 1.0.0'),
-            SizedBox(height: 8),
-            Text('Цаг хугацаа болон хоолны менежментийн програм'),
-            SizedBox(height: 8),
-            Text('© 2025 TimeX App'),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(),
-            child: const Text('Хаах'),
-          ),
-        ],
-      ),
-    );
-  }
-
   @override
   void dispose() {
     _pageController.dispose();
