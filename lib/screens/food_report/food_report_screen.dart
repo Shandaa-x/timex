@@ -424,7 +424,7 @@ class _FoodReportScreenState extends State<FoodReportScreen>
             final availableHeight = screenHeight * 0.6; // Use 60% of screen height
 
             return SizedBox(
-              height: availableHeight,
+              height: MediaQuery.of(context).size.height,
               child: TabBarView(
                 controller: _tabController,
                 children: [
