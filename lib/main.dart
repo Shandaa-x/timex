@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:developer';
 import 'dart:io' show Platform;
 import 'package:firebase_core/firebase_core.dart';
+import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:get/get_navigation/src/root/get_material_app.dart';
@@ -14,6 +15,14 @@ import 'package:timezone/timezone.dart' as tz;
 import 'package:permission_handler/permission_handler.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'firebase_options.dart';
+import 'services/notification_service.dart';
+
+// Top-level background message handler
+@pragma('vm:entry-point')
+Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
+  await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
+  print('🔔 Background message received: ${message.notification?.title}');
+}
 
 final FlutterLocalNotificationsPlugin flutterLocalNotificationsPlugin =
     FlutterLocalNotificationsPlugin();
@@ -34,8 +43,7 @@ void main() {
 
       Assets.refresh();
 
-      await _initializeNotifications(); // 💡 Notification init here
-
+      // Initialize Firebase first
       try {
         await Firebase.initializeApp(
           options: DefaultFirebaseOptions.currentPlatform,
@@ -55,6 +63,12 @@ void main() {
         print('⚠️ Continuing without Firebase - some features may not work');
       }
 
+      // Initialize notifications after Firebase (non-blocking)
+      _initializeNotifications().catchError((e) {
+        log('❌ Notification initialization failed: $e');
+        print('⚠️ Continuing without notifications - some features may not work');
+      });
+
       runApp(const MyApp());
     },
     (error, stackTrace) {
@@ -64,35 +78,65 @@ void main() {
 }
 
 Future<void> _initializeNotifications() async {
-  // ✅ Timezone initialization (for scheduled notifications)
-  tz.initializeTimeZones();
-  tz.setLocalLocation(tz.getLocation('Asia/Ulaanbaatar')); // or use `local`
+  try {
+    print('🔔 Starting notification initialization...');
+    
+    // ✅ Timezone initialization (for scheduled notifications)
+    tz.initializeTimeZones();
+    tz.setLocalLocation(tz.getLocation('Asia/Ulaanbaatar')); // or use `local`
 
-  const AndroidInitializationSettings androidInitSettings =
-      AndroidInitializationSettings('@mipmap/ic_launcher');
+    const AndroidInitializationSettings androidInitSettings =
+        AndroidInitializationSettings('@mipmap/ic_launcher');
 
-  final DarwinInitializationSettings iosInitSettings =
-      DarwinInitializationSettings(
-        requestSoundPermission: true,
-        requestBadgePermission: true,
-        requestAlertPermission: true,
-      );
+    final DarwinInitializationSettings iosInitSettings =
+        DarwinInitializationSettings(
+          requestSoundPermission: true,
+          requestBadgePermission: true,
+          requestAlertPermission: true,
+        );
 
-  final InitializationSettings initSettings = InitializationSettings(
-    android: androidInitSettings,
-    iOS: iosInitSettings,
-  );
+    final InitializationSettings initSettings = InitializationSettings(
+      android: androidInitSettings,
+      iOS: iosInitSettings,
+    );
 
-  await flutterLocalNotificationsPlugin.initialize(
-    initSettings,
-    onDidReceiveNotificationResponse: (NotificationResponse response) {
-      log("🔔 Notification tapped: ${response.payload}");
-      // Handle navigation or logic here
-    },
-  );
+    await flutterLocalNotificationsPlugin.initialize(
+      initSettings,
+      onDidReceiveNotificationResponse: (NotificationResponse response) {
+        log("🔔 Notification tapped: ${response.payload}");
+        // Handle navigation or logic here
+      },
+    );
 
-  // 🆕 Request notification permission for Android 13+
-  await _requestNotificationPermission();
+    // 🆕 Request notification permission for Android 13+
+    await _requestNotificationPermission();
+    
+    // Set up FCM background message handler
+    try {
+      FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
+      print('🔔 FCM background handler set up');
+    } catch (e) {
+      print('❌ Error setting up FCM background handler: $e');
+    }
+    
+    // Initialize chat notification service with timeout
+    await NotificationService.initialize().timeout(
+      const Duration(seconds: 10),
+      onTimeout: () {
+        print('⚠️ NotificationService initialization timed out');
+        throw TimeoutException('Notification service initialization timeout', Duration(seconds: 10));
+      },
+    );
+    
+    // Initialize notification listener for real-time notifications
+    await NotificationService.initializeNotificationListener();
+    
+    print('✅ Notification initialization completed');
+  } catch (e, stackTrace) {
+    print('❌ Error in notification initialization: $e');
+    print('Stack trace: $stackTrace');
+    rethrow;
+  }
 }
 
 Future<void> _requestNotificationPermission() async {
