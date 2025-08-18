@@ -28,11 +28,12 @@ class _FoodReportScreenState extends State<FoodReportScreen>
   Map<String, List<Map<String, dynamic>>> _monthlyFoodData = {};
   Map<String, int> _foodStats = {};
   Map<String, bool> _eatenForDayData = {}; // Track which days food was eaten
-  Map<String, bool> _paidMeals = {}; // Track which individual meals are paid for
+  Map<String, bool> _paidMeals =
+      {}; // Track which individual meals are paid for
 
-  // User statistics from totalFoodAmount
-  double _paymentBalance = 0.0;
-  double _totalPaymentAmount = 0.0;
+  // Balance and budget tracking
+  int _paymentBalance = 0;
+  int _totalPaymentAmount = 0;
   bool _userStatsLoading = true;
   StreamSubscription<DocumentSnapshot>? _userStatsSubscription;
 
@@ -58,6 +59,7 @@ class _FoodReportScreenState extends State<FoodReportScreen>
     });
     _loadMonthlyFoodData();
     _loadUserSettings();
+    _loadPaymentHistory();
     _loadUserStatistics();
   }
 
@@ -77,23 +79,52 @@ class _FoodReportScreenState extends State<FoodReportScreen>
             if (userDoc.exists && mounted) {
               final userData = userDoc.data();
 
-              // Get totalFoodAmount (total consumed) from the user's document
-              final dynamic rawTotalFoodAmount = userData?['totalFoodAmount'] ?? 0.0;
-              final double totalFoodConsumed = rawTotalFoodAmount is String 
-                  ? double.tryParse(rawTotalFoodAmount) ?? 0.0 
-                  : (rawTotalFoodAmount as num).toDouble();
+              // Get totalFoodAmount directly from Firebase - this is the amount to pay
+              final dynamic rawTotalFoodAmount =
+                  userData?['totalFoodAmount'] ?? 0;
+              int totalAmountToPay = rawTotalFoodAmount is String
+                  ? int.tryParse(rawTotalFoodAmount) ?? 0
+                  : (rawTotalFoodAmount as num).toInt();
 
-              // Get payment status
-              final String qpayStatus = userData?['qpayStatus'] ?? 'none';
+              // Get payment amounts array and calculate total dynamically
+              final List<dynamic> paymentAmountsList =
+                  userData?['paymentAmounts'] ?? [];
+              final List<double> paymentAmounts = paymentAmountsList
+                  .map(
+                    (payment) => payment is String
+                        ? double.tryParse(payment) ?? 0.0
+                        : (payment as num).toDouble(),
+                  )
+                  .toList();
+
+              final double totalPaymentsMade = paymentAmounts.fold(
+                0.0,
+                (sum, amount) => sum + amount,
+              );
+
+              // Get original food amount for balance calculation
+              final dynamic rawOriginalFoodAmount =
+                  userData?['originalFoodAmount'] ?? 0;
+              int originalFoodAmount = rawOriginalFoodAmount is String
+                  ? int.tryParse(rawOriginalFoodAmount) ?? 0
+                  : (rawOriginalFoodAmount as num).toInt();
+
+              // Calculate the payment balance (negative if user owes money)
+              int paymentBalance =
+                  totalPaymentsMade.toInt() - originalFoodAmount;
 
               setState(() {
-                _totalPaymentAmount = totalFoodConsumed; // Show totalFoodAmount as "Amount to Pay"
-                _paymentBalance = totalFoodConsumed; // Show remaining balance
+                // Use totalFoodAmount directly as "Төлөх дүн" (Amount to Pay)
+                _totalPaymentAmount = totalAmountToPay;
+                _paymentBalance =
+                    paymentBalance; // Balance (negative if owing money)
                 _userStatsLoading = false;
               });
 
               debugPrint(
-                '✅ Real-time user statistics: totalFoodAmount=$totalFoodConsumed, status=$qpayStatus',
+                '✅ Real-time user statistics: originalFood=$originalFoodAmount, '
+                'totalPayments=$totalPaymentsMade, amountToPay=$totalAmountToPay, '
+                'balance=$paymentBalance, paymentsCount=${paymentAmounts.length}',
               );
             }
           });
@@ -132,7 +163,7 @@ class _FoodReportScreenState extends State<FoodReportScreen>
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Error loading data: $e'),
+            content: Text('Өгөгдөл ачаалахад алдаа гарлаа: $e'),
             backgroundColor: Colors.red,
             behavior: SnackBarBehavior.floating,
           ),
@@ -144,6 +175,11 @@ class _FoodReportScreenState extends State<FoodReportScreen>
         _isLoading = false;
       });
     }
+  }
+
+  // Load payment history from service - removed as not used
+  Future<void> _loadPaymentHistory() async {
+    // Payment history functionality removed as it's not currently used
   }
 
   // Load user settings (for future use)
@@ -179,7 +215,7 @@ class _FoodReportScreenState extends State<FoodReportScreen>
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(
-              '${FoodDataService.getFoodName(food)} payment completed',
+              '${FoodDataService.getFoodName(food)} төлбөр төлөгдлөө',
             ),
             backgroundColor: Colors.green,
             behavior: SnackBarBehavior.floating,
@@ -190,7 +226,7 @@ class _FoodReportScreenState extends State<FoodReportScreen>
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('An error occurred'),
+            content: Text('Алдаа гарлаа'),
             backgroundColor: Colors.red,
           ),
         );
@@ -204,7 +240,7 @@ class _FoodReportScreenState extends State<FoodReportScreen>
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('No meals to pay for'),
+            content: Text('Төлөх хоол байхгүй байна'),
             backgroundColor: Colors.orange,
           ),
         );
@@ -224,28 +260,30 @@ class _FoodReportScreenState extends State<FoodReportScreen>
       context: context,
       builder: (BuildContext context) {
         return AlertDialog(
-          title: const Text('Pay Monthly Bill'),
+          title: const Text('Сарын төлбөр төлөх'),
           content: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                'Total monthly bill: ${MoneyFormatService.formatWithSymbol(totalAmount)}',
+                'Сарын нийт төлбөр: ${MoneyFormatService.formatWithSymbol(totalAmount)}',
               ),
               const SizedBox(height: 8),
-              Text('Total meals: $totalFoods'),
+              Text('Нийт хоол: $totalFoods'),
               const SizedBox(height: 16),
-              const Text('Do you want to pay for all meals this month?'),
+              const Text(
+                'Та энэ сарын бүх хоолны төлбөрийг төлөхийг хүсэж байна уу?',
+              ),
             ],
           ),
           actions: [
             TextButton(
               onPressed: () => Navigator.of(context).pop(false),
-              child: const Text('No'),
+              child: const Text('Үгүй'),
             ),
             ElevatedButton(
               onPressed: () => Navigator.of(context).pop(true),
-              child: const Text('Yes'),
+              child: const Text('Тийм'),
             ),
           ],
         );
@@ -298,7 +336,7 @@ class _FoodReportScreenState extends State<FoodReportScreen>
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
               content: Text(
-                'Monthly payment successful! ${MoneyFormatService.formatWithSymbol(totalAmount)}',
+                'Сарын төлбөр амжилттай төлөгдлөө! ${MoneyFormatService.formatWithSymbol(totalAmount)}',
               ),
               backgroundColor: Colors.green,
               behavior: SnackBarBehavior.floating,
@@ -311,7 +349,7 @@ class _FoodReportScreenState extends State<FoodReportScreen>
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
-              content: Text('Error processing payment. Please try again.'),
+              content: Text('Төлбөр төлөхөд алдаа гарлаа. Дахин оролдоно уу.'),
               backgroundColor: Colors.red,
             ),
           );
@@ -322,7 +360,7 @@ class _FoodReportScreenState extends State<FoodReportScreen>
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Error occurred: $e'),
+            content: Text('Алдаа гарлаа: $e'),
             backgroundColor: Colors.red,
           ),
         );
@@ -330,7 +368,7 @@ class _FoodReportScreenState extends State<FoodReportScreen>
     }
   }
 
-  // Update food filtering using service
+  // Update food filtering using service - removed as not used
   void _updateFoodFilter() {
     // Food filtering functionality removed as it's not currently used
   }
@@ -369,7 +407,7 @@ class _FoodReportScreenState extends State<FoodReportScreen>
               borderRadius: BorderRadius.circular(6),
               boxShadow: [
                 BoxShadow(
-                  color: Colors.green.withValues(alpha: 0.2),
+                  color: Colors.green.withOpacity(0.2),
                   blurRadius: 4,
                   offset: const Offset(0, 2),
                 ),
@@ -388,7 +426,7 @@ class _FoodReportScreenState extends State<FoodReportScreen>
               fontWeight: FontWeight.w500,
             ),
             splashFactory: NoSplash.splashFactory,
-            overlayColor: WidgetStateProperty.all(Colors.transparent),
+            overlayColor: MaterialStateProperty.all(Colors.transparent),
             tabs: const [
               Tab(
                 child: Row(
@@ -396,7 +434,7 @@ class _FoodReportScreenState extends State<FoodReportScreen>
                   children: [
                     Icon(Icons.restaurant_menu, size: 14),
                     SizedBox(width: 6),
-                    Text('Food List'),
+                    Text('Хоолны жагсаалт'),
                   ],
                 ),
               ),
@@ -406,7 +444,7 @@ class _FoodReportScreenState extends State<FoodReportScreen>
                   children: [
                     Icon(Icons.payment, size: 14),
                     SizedBox(width: 6),
-                    Text('Payment History'),
+                    Text('Төлбөрийн түүх'),
                   ],
                 ),
               ),
@@ -414,33 +452,17 @@ class _FoodReportScreenState extends State<FoodReportScreen>
           ),
         ),
         const SizedBox(height: 16),
-        // Tab content
-        LayoutBuilder(
-          builder: (context, constraints) {
-            // Calculate a reasonable height based on screen size
-            final screenHeight = MediaQuery.of(context).size.height;
-            final availableHeight = screenHeight * 0.6; // Use 60% of screen height
-
-            return SizedBox(
-              height: availableHeight,
-              child: TabBarView(
-                controller: _tabController,
-                children: [
-                  // Tab 1: Daily Breakdown
-                  DailyTabScreen(
-                    unpaidFoodData: _unpaidFoodData,
-                    selectedFoodFilter: _selectedFoodFilter,
-                    onMarkMealAsPaid: _markMealAsPaid,
-                    onPayMonthly: _payMonthly,
-                    hasAnyFoodsInMonth: _hasAnyFoodsInMonth,
-                  ),
-                  // Tab 2: History
-                  const HistoryTabScreen(),
-                ],
-              ),
-            );
-          },
-        ),
+        // Tab content without TabBarView - just show based on selected index
+        if (_tabController.index == 0)
+          DailyTabScreen(
+            unpaidFoodData: _unpaidFoodData,
+            selectedFoodFilter: _selectedFoodFilter,
+            onMarkMealAsPaid: _markMealAsPaid,
+            onPayMonthly: _payMonthly,
+            hasAnyFoodsInMonth: _hasAnyFoodsInMonth,
+          )
+        else
+          const HistoryTabScreen(),
       ],
     );
   }
@@ -448,9 +470,73 @@ class _FoodReportScreenState extends State<FoodReportScreen>
   Future<void> _refreshData() async {
     setState(() => _isLoading = true);
     try {
-      await Future.wait([_loadMonthlyFoodData(), _loadUserStatistics()]);
+      await Future.wait([
+        _loadMonthlyFoodData(),
+        _loadPaymentHistory(),
+        // Don't reload user statistics here as they are real-time
+      ]);
+      // Ensure real-time listener is active
+      if (_userStatsSubscription == null || _userStatsSubscription!.isPaused) {
+        _loadUserStatistics();
+      }
     } finally {
       setState(() => _isLoading = false);
+    }
+  }
+
+  // Force refresh user statistics (for debugging/manual refresh)
+  Future<void> _forceRefreshUserStatistics() async {
+    try {
+      final userDoc = await _firestore.collection('users').doc(_userId).get();
+
+      if (userDoc.exists) {
+        final userData = userDoc.data()!;
+
+        // Get totalFoodAmount directly from Firebase - this is the amount to pay
+        final dynamic rawTotalFoodAmount = userData['totalFoodAmount'] ?? 0;
+        int totalAmountToPay = rawTotalFoodAmount is String
+            ? int.tryParse(rawTotalFoodAmount) ?? 0
+            : (rawTotalFoodAmount as num).toInt();
+
+        // Get payment amounts array and calculate total dynamically
+        final List<dynamic> paymentAmountsList =
+            userData['paymentAmounts'] ?? [];
+        final List<double> paymentAmounts = paymentAmountsList
+            .map(
+              (payment) => payment is String
+                  ? double.tryParse(payment) ?? 0.0
+                  : (payment as num).toDouble(),
+            )
+            .toList();
+
+        final double totalPaymentsMade = paymentAmounts.fold(
+          0.0,
+          (sum, amount) => sum + amount,
+        );
+
+        // Get original food amount for balance calculation
+        final dynamic rawOriginalFoodAmount =
+            userData['originalFoodAmount'] ?? 0;
+        int originalFoodAmount = rawOriginalFoodAmount is String
+            ? int.tryParse(rawOriginalFoodAmount) ?? 0
+            : (rawOriginalFoodAmount as num).toInt();
+
+        int paymentBalance = totalPaymentsMade.toInt() - originalFoodAmount;
+
+        setState(() {
+          // Use totalFoodAmount directly as "Төлөх дүн" (Amount to Pay)
+          _totalPaymentAmount = totalAmountToPay;
+          _paymentBalance = paymentBalance;
+        });
+
+        debugPrint(
+          '🔄 Force refreshed user statistics: originalFood=$originalFoodAmount, '
+          'totalPayments=$totalPaymentsMade, amountToPay=$totalAmountToPay, '
+          'balance=$paymentBalance, paymentsCount=${paymentAmounts.length}',
+        );
+      }
+    } catch (e) {
+      debugPrint('❌ Error force refreshing user statistics: $e');
     }
   }
 
@@ -462,188 +548,191 @@ class _FoodReportScreenState extends State<FoodReportScreen>
         currentScreen: DrawerScreenType.foodReport,
         onNavigateToTab: widget.onNavigateToTab,
       ),
-      body: _isLoading 
-        ? const Center(child: CircularProgressIndicator())
-        : RefreshIndicator(
-            onRefresh: _refreshData,
-            child: CustomScrollView(
-              slivers: [
-                const CustomSliverAppBar(
-                  title: 'Хоолны тайлан',
-                  gradientColors: [Color(0xFF10B981), Color(0xFF059669)],
-                ),
-                SliverPadding(
-                  padding: const EdgeInsets.all(16),
-                  sliver: SliverList(
-                    delegate: SliverChildListDelegate([
-                      // Food Statistics Card
-                      if (_userStatsLoading)
-                        Container(
-                          padding: const EdgeInsets.all(20),
-                          decoration: BoxDecoration(
-                            color: Colors.grey[50],
-                            borderRadius: BorderRadius.circular(16),
-                          ),
-                          child: const Center(
-                            child: CircularProgressIndicator(),
-                          ),
-                        )
-                      else
-                        Container(
-                          width: double.infinity,
-                          padding: const EdgeInsets.all(20),
-                          decoration: BoxDecoration(
-                            gradient: const LinearGradient(
-                              begin: Alignment.topLeft,
-                              end: Alignment.bottomRight,
-                              colors: [Color(0xFF10B981), Color(0xFF059669)],
-                            ),
-                            borderRadius: BorderRadius.circular(16),
-                            boxShadow: [
-                              BoxShadow(
-                                color: Colors.black.withValues(alpha: 0.1),
-                                blurRadius: 10,
-                                offset: const Offset(0, 4),
-                              ),
-                            ],
-                          ),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              const Row(
-                                children: [
-                                  Icon(
-                                    Icons.restaurant_menu,
-                                    color: Colors.white,
-                                    size: 24,
-                                  ),
-                                  SizedBox(width: 8),
-                                  Text(
-                                    'Food Expenses',
-                                    style: TextStyle(
-                                      color: Colors.white,
-                                      fontSize: 18,
-                                      fontWeight: FontWeight.w600,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                              const SizedBox(height: 16),
-                              Row(
-                                children: [
-                                  Expanded(
-                                    child: Column(
-                                      crossAxisAlignment: CrossAxisAlignment.start,
-                                      children: [
-                                        Text(
-                                          'Amount to Pay',
-                                          style: TextStyle(
-                                            color: Colors.white.withValues(alpha: 0.8),
-                                            fontSize: 14,
-                                          ),
-                                        ),
-                                        const SizedBox(height: 4),
-                                        Text(
-                                          MoneyFormatService.formatWithSymbol(
-                                            _totalPaymentAmount.round(),
-                                          ),
-                                          style: const TextStyle(
-                                            color: Colors.white,
-                                            fontSize: 20,
-                                            fontWeight: FontWeight.w700,
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                  Container(
-                                    width: 1,
-                                    height: 40,
-                                    color: Colors.white.withValues(alpha: 0.3),
-                                  ),
-                                  const SizedBox(width: 16),
-                                  Expanded(
-                                    child: Column(
-                                      crossAxisAlignment: CrossAxisAlignment.start,
-                                      children: [
-                                        Text(
-                                          'Balance',
-                                          style: TextStyle(
-                                            color: Colors.white.withValues(alpha: 0.8),
-                                            fontSize: 14,
-                                          ),
-                                        ),
-                                        const SizedBox(height: 4),
-                                        Text(
-                                          MoneyFormatService.formatWithSymbol(
-                                            _paymentBalance.round(),
-                                          ),
-                                          style: TextStyle(
-                                            color: _paymentBalance >= 0
-                                                ? Colors.white
-                                                : Colors.red[200],
-                                            fontSize: 20,
-                                            fontWeight: FontWeight.w700,
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                ],
-                              ),
-                              const SizedBox(height: 16),
-                              // Make Payment Button
-                              SizedBox(
-                                width: double.infinity,
-                                child: ElevatedButton(
-                                  onPressed: _totalPaymentAmount > 0 ? () {
-                                    // Navigate to payment screen with the total amount
-                                    Navigator.push(
-                                      context,
-                                      MaterialPageRoute(
-                                        builder: (context) => Scaffold(
-                                          appBar: AppBar(title: const Text("Payment")), body: const Center(child: Text("Use per-food payment system")),
-                                        ),
-                                      ),
-                                    );
-                                  } : null,
-                                  style: ElevatedButton.styleFrom(
-                                    backgroundColor: Colors.white,
-                                    foregroundColor: const Color(0xFF10B981),
-                                    elevation: 0,
-                                    padding: const EdgeInsets.symmetric(vertical: 16),
-                                    shape: RoundedRectangleBorder(
-                                      borderRadius: BorderRadius.circular(8),
-                                    ),
-                                  ),
-                                  child: const Row(
-                                    mainAxisAlignment: MainAxisAlignment.center,
-                                    children: [
-                                      Icon(Icons.payment, size: 20),
-                                      SizedBox(width: 8),
-                                      Text(
-                                        'Make Payment',
-                                        style: TextStyle(
-                                          fontSize: 16,
-                                          fontWeight: FontWeight.w600,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      const SizedBox(height: 15),
-                      _buildTabbedBreakdownSection(),
-                      const SizedBox(height: 24),
-                    ]),
+      body: _isLoading
+          ? const Center(child: CircularProgressIndicator())
+          : RefreshIndicator(
+              onRefresh: _refreshData,
+              child: CustomScrollView(
+                slivers: [
+                  CustomSliverAppBar(
+                    title: 'Хоолны тайлан',
+                    gradientColors: const [
+                      Color(0xFF10B981),
+                      Color(0xFF059669),
+                    ],
+                    rightIcon: Icons.refresh,
+                    onRightTap: _forceRefreshUserStatistics,
                   ),
-                ),
-              ],
+                  SliverPadding(
+                    padding: const EdgeInsets.all(16),
+                    sliver: SliverList(
+                      delegate: SliverChildListDelegate([
+                        // Food Statistics Card
+                        if (_userStatsLoading)
+                          Container(
+                            padding: const EdgeInsets.all(20),
+                            decoration: BoxDecoration(
+                              color: Colors.grey[50],
+                              borderRadius: BorderRadius.circular(16),
+                            ),
+                            child: const Center(
+                              child: CircularProgressIndicator(),
+                            ),
+                          )
+                        else
+                          Container(
+                            width: double.infinity,
+                            padding: const EdgeInsets.all(20),
+                            decoration: BoxDecoration(
+                              gradient: const LinearGradient(
+                                begin: Alignment.topLeft,
+                                end: Alignment.bottomRight,
+                                colors: [Color(0xFF10B981), Color(0xFF059669)],
+                              ),
+                              borderRadius: BorderRadius.circular(16),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: Colors.black.withOpacity(0.1),
+                                  blurRadius: 10,
+                                  offset: const Offset(0, 4),
+                                ),
+                              ],
+                            ),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                const Row(
+                                  children: [
+                                    Icon(
+                                      Icons.restaurant_menu,
+                                      color: Colors.white,
+                                      size: 24,
+                                    ),
+                                    SizedBox(width: 8),
+                                    Text(
+                                      'Хоолны зардал',
+                                      style: TextStyle(
+                                        color: Colors.white,
+                                        fontSize: 18,
+                                        fontWeight: FontWeight.w600,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                const SizedBox(height: 16),
+                                Row(
+                                  children: [
+                                    Expanded(
+                                      child: Column(
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.start,
+                                        children: [
+                                          Text(
+                                            'Төлөх дүн',
+                                            style: TextStyle(
+                                              color: Colors.white.withOpacity(
+                                                0.8,
+                                              ),
+                                              fontSize: 14,
+                                            ),
+                                          ),
+                                          const SizedBox(height: 4),
+                                          Text(
+                                            MoneyFormatService.formatWithSymbol(
+                                              _totalPaymentAmount,
+                                            ),
+                                            style: const TextStyle(
+                                              color: Colors.white,
+                                              fontSize: 20,
+                                              fontWeight: FontWeight.w700,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                    Container(
+                                      width: 1,
+                                      height: 40,
+                                      color: Colors.white.withOpacity(0.3),
+                                    ),
+                                    const SizedBox(width: 16),
+                                    Expanded(
+                                      child: Column(
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.start,
+                                        children: [
+                                          Text(
+                                            'Үлдэгдэл',
+                                            style: TextStyle(
+                                              color: Colors.white.withOpacity(
+                                                0.8,
+                                              ),
+                                              fontSize: 14,
+                                            ),
+                                          ),
+                                          const SizedBox(height: 4),
+                                          Text(
+                                            MoneyFormatService.formatWithSymbol(
+                                              _paymentBalance,
+                                            ),
+                                            style: TextStyle(
+                                              color: _paymentBalance >= 0
+                                                  ? Colors.white
+                                                  : Colors.red[200],
+                                              fontSize: 20,
+                                              fontWeight: FontWeight.w700,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                const SizedBox(height: 12),
+                                // Old generic payment button removed - now using per-food payment system
+                              ],
+                            ),
+                          ),
+                        // const SizedBox(height: 24),
+
+                        // // Summary cards
+                        // SummarySectionWidget(
+                        //   unpaidCount: _unpaidFoodData.values.fold(
+                        //     0,
+                        //     (total, foods) => total + foods.length,
+                        //   ),
+                        //   paidTotal: _paidTotalAmount,
+                        //   totalCost: _unpaidTotalAmount + _paidTotalAmount,
+                        //   paymentBalance:
+                        //       _paymentHistory.fold<double>(
+                        //         0.0,
+                        //         (total, payment) => total + (payment['amount'] as num).toDouble(),
+                        //       ) -
+                        //       (_unpaidTotalAmount + _paidTotalAmount),
+                        //   selectedFoodFilter: _selectedFoodFilter,
+                        //   onFilterPressed: _showFilterBottomSheet,
+                        // ),
+                        const SizedBox(height: 15),
+                        // Payment history
+                        // if (_paymentHistory.isNotEmpty) ...[
+                        //   PaymentHistorySectionWidget(paymentHistory: _paymentHistory),
+                        //   const SizedBox(height: 24),
+                        // ],
+                        // Food frequency chart
+                        // FoodFrequencySectionWidget(
+                        //   foodStats: _getUnpaidFoodStats(),
+                        //   selectedFoodFilter: _selectedFoodFilter,
+                        // ),
+                        // const SizedBox(height: 24),
+                        // Tabbed breakdown section
+                        _buildTabbedBreakdownSection(),
+                        const SizedBox(height: 24),
+                      ]),
+                    ),
+                  ),
+                ],
+              ),
             ),
-          ),
     );
   }
 

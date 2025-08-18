@@ -65,10 +65,7 @@ class TodayFoodsListWidget extends StatelessWidget {
                   const SizedBox(width: 12),
                   Text(
                     'Өнөөдөр хоол нэмээгүй байна',
-                    style: TextStyle(
-                      color: Colors.grey.shade600,
-                      fontSize: 14,
-                    ),
+                    style: TextStyle(color: Colors.grey.shade600, fontSize: 14),
                   ),
                 ],
               ),
@@ -96,7 +93,8 @@ class TodayFoodsListWidget extends StatelessWidget {
                             color: const Color(0xFFEF4444).withOpacity(0.1),
                             borderRadius: BorderRadius.circular(8),
                           ),
-                          child: food['image'] != null && food['image'].isNotEmpty
+                          child:
+                              food['image'] != null && food['image'].isNotEmpty
                               ? ClipRRect(
                                   borderRadius: BorderRadius.circular(8),
                                   child: Image.memory(
@@ -124,7 +122,8 @@ class TodayFoodsListWidget extends StatelessWidget {
                                   color: Color(0xFF1F2937),
                                 ),
                               ),
-                              if (food['description'] != null && food['description'].isNotEmpty)
+                              if (food['description'] != null &&
+                                  food['description'].isNotEmpty)
                                 Text(
                                   food['description'],
                                   style: const TextStyle(
@@ -136,7 +135,9 @@ class TodayFoodsListWidget extends StatelessWidget {
                                 ),
                               if (food['price'] != null)
                                 Text(
-                                  MoneyFormatService.formatDoubleWithSymbol((food['price'] as num?)?.toDouble() ?? 0.0),
+                                  MoneyFormatService.formatDoubleWithSymbol(
+                                    (food['price'] as num?)?.toDouble() ?? 0.0,
+                                  ),
                                   style: const TextStyle(
                                     fontSize: 14,
                                     color: Color(0xFF059669),

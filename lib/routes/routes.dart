@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:timex/screens/login/google_login_screen.dart';
 import 'package:timex/screens/main/main_screen.dart';
+import 'package:timex/screens/my_news/my_news_screen.dart';
 import 'package:timex/screens/time_track/time_tracking_screen.dart';
 import 'package:timex/screens/auth/auth_wrapper.dart';
 
@@ -13,6 +14,7 @@ class Routes {
   static const timeTrack = 'TimeTracking';
   static const addEmployee = 'AddEmployeeScreen';
   static const authWrapper = 'AuthWrapper';
+  static const myNews = 'MyNewsScreen';
 
   final RouteObserver routeObserver;
 
@@ -50,6 +52,12 @@ class Routes {
       case Routes.timeTrack:
         route = MaterialPageRoute(
           builder: (context) => const TimeTrackScreen(),
+          settings: settings,
+        );
+        break;
+      case Routes.myNews:
+        route = MaterialPageRoute(
+          builder: (context) => const MyNewsScreen(),
           settings: settings,
         );
         break;

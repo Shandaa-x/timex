@@ -9,17 +9,16 @@ import 'food_payment_processor_widget.dart';
 /// Widget that integrates food selection with QPay payment processing
 class FoodPaymentIntegrationWidget extends StatefulWidget {
   final DateTime selectedMonth;
-  
-  const FoodPaymentIntegrationWidget({
-    super.key,
-    required this.selectedMonth,
-  });
+
+  const FoodPaymentIntegrationWidget({super.key, required this.selectedMonth});
 
   @override
-  State<FoodPaymentIntegrationWidget> createState() => _FoodPaymentIntegrationWidgetState();
+  State<FoodPaymentIntegrationWidget> createState() =>
+      _FoodPaymentIntegrationWidgetState();
 }
 
-class _FoodPaymentIntegrationWidgetState extends State<FoodPaymentIntegrationWidget> {
+class _FoodPaymentIntegrationWidgetState
+    extends State<FoodPaymentIntegrationWidget> {
   List<FoodItem> _allFoodItems = [];
   List<String> _selectedFoodIds = [];
   bool _isLoading = false;
@@ -39,8 +38,11 @@ class _FoodPaymentIntegrationWidgetState extends State<FoodPaymentIntegrationWid
 
     try {
       // Load food items using integrated service
-      final foodItems = await IntegratedFoodPaymentService.convertFirebaseFoodsToFoodItems(widget.selectedMonth);
-      
+      final foodItems =
+          await IntegratedFoodPaymentService.convertFirebaseFoodsToFoodItems(
+            widget.selectedMonth,
+          );
+
       if (mounted) {
         setState(() {
           _allFoodItems = foodItems;
@@ -106,10 +108,11 @@ class _FoodPaymentIntegrationWidgetState extends State<FoodPaymentIntegrationWid
       final userData = userDoc.exists ? userDoc.data() : null;
 
       // Create QPay invoice using integrated service
-      final result = await IntegratedFoodPaymentService.createFoodPaymentInvoice(
-        selectedFoods,
-        userData,
-      );
+      final result =
+          await IntegratedFoodPaymentService.createFoodPaymentInvoice(
+            selectedFoods,
+            userData,
+          );
 
       if (result.success) {
         if (mounted) {
@@ -137,7 +140,9 @@ class _FoodPaymentIntegrationWidgetState extends State<FoodPaymentIntegrationWid
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
-              content: Text('Error creating invoice: ${result.error ?? "Unknown error"}'),
+              content: Text(
+                'Error creating invoice: ${result.error ?? "Unknown error"}',
+              ),
               backgroundColor: Colors.red,
             ),
           );
@@ -161,16 +166,19 @@ class _FoodPaymentIntegrationWidgetState extends State<FoodPaymentIntegrationWid
     }
   }
 
-  Future<void> _handlePaymentComplete(Map<String, dynamic> paymentResult) async {
+  Future<void> _handlePaymentComplete(
+    Map<String, dynamic> paymentResult,
+  ) async {
     try {
       // Process payment completion using integrated service
       final invoiceId = paymentResult['invoiceId'] as String?;
-      
+
       if (invoiceId != null) {
-        final success = await IntegratedFoodPaymentService.processPaymentCompletion(
-          invoiceId,
-          paymentResult,
-        );
+        final success =
+            await IntegratedFoodPaymentService.processPaymentCompletion(
+              invoiceId,
+              paymentResult,
+            );
 
         if (success && mounted) {
           // Clear selection and reload food items
@@ -178,9 +186,9 @@ class _FoodPaymentIntegrationWidgetState extends State<FoodPaymentIntegrationWid
             _selectedFoodIds.clear();
             _selectedTotalAmount = 0.0;
           });
-          
+
           await _loadFoodItems();
-          
+
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
               content: Text('Payment completed successfully!'),
@@ -316,7 +324,9 @@ class _FoodPaymentIntegrationWidgetState extends State<FoodPaymentIntegrationWid
                           height: 20,
                           child: CircularProgressIndicator(
                             strokeWidth: 2,
-                            valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                            valueColor: AlwaysStoppedAnimation<Color>(
+                              Colors.white,
+                            ),
                           ),
                         ),
                         SizedBox(width: 12),
@@ -345,7 +355,8 @@ class _FoodPaymentIntegrationWidgetState extends State<FoodPaymentIntegrationWid
       child: Material(
         color: Colors.transparent,
         child: InkWell(
-          onTap: () => _toggleFoodSelection(foodItem.id, foodItem.remainingBalance),
+          onTap: () =>
+              _toggleFoodSelection(foodItem.id, foodItem.remainingBalance),
           borderRadius: BorderRadius.circular(12),
           child: Container(
             padding: const EdgeInsets.all(16),
@@ -374,21 +385,19 @@ class _FoodPaymentIntegrationWidgetState extends State<FoodPaymentIntegrationWid
                     color: isSelected ? Colors.green[600] : Colors.white,
                     borderRadius: BorderRadius.circular(4),
                     border: Border.all(
-                      color: isSelected ? Colors.green[600]! : Colors.grey[400]!,
+                      color: isSelected
+                          ? Colors.green[600]!
+                          : Colors.grey[400]!,
                       width: 2,
                     ),
                   ),
                   child: isSelected
-                      ? const Icon(
-                          Icons.check,
-                          color: Colors.white,
-                          size: 16,
-                        )
+                      ? const Icon(Icons.check, color: Colors.white, size: 16)
                       : null,
                 ),
-                
+
                 const SizedBox(width: 12),
-                
+
                 // Food image placeholder
                 Container(
                   width: 50,
@@ -403,9 +412,9 @@ class _FoodPaymentIntegrationWidgetState extends State<FoodPaymentIntegrationWid
                     size: 24,
                   ),
                 ),
-                
+
                 const SizedBox(width: 12),
-                
+
                 // Food details
                 Expanded(
                   child: Column(
@@ -421,7 +430,10 @@ class _FoodPaymentIntegrationWidgetState extends State<FoodPaymentIntegrationWid
                       const SizedBox(height: 4),
                       Text(
                         'Price: ${MoneyFormatService.formatWithSymbol(foodItem.price.toInt())}',
-                        style: const TextStyle(fontSize: 12, color: Colors.grey),
+                        style: const TextStyle(
+                          fontSize: 12,
+                          color: Colors.grey,
+                        ),
                       ),
                       if (hasPartialPayment) ...[
                         const SizedBox(height: 2),
@@ -437,14 +449,17 @@ class _FoodPaymentIntegrationWidgetState extends State<FoodPaymentIntegrationWid
                     ],
                   ),
                 ),
-                
+
                 // Remaining amount
                 Column(
                   crossAxisAlignment: CrossAxisAlignment.end,
                   children: [
                     if (hasPartialPayment)
                       Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 6,
+                          vertical: 2,
+                        ),
                         decoration: BoxDecoration(
                           color: Colors.orange[100],
                           borderRadius: BorderRadius.circular(10),
@@ -460,7 +475,9 @@ class _FoodPaymentIntegrationWidgetState extends State<FoodPaymentIntegrationWid
                       ),
                     const SizedBox(height: 4),
                     Text(
-                      MoneyFormatService.formatWithSymbol(foodItem.remainingBalance.toInt()),
+                      MoneyFormatService.formatWithSymbol(
+                        foodItem.remainingBalance.toInt(),
+                      ),
                       style: TextStyle(
                         fontSize: 16,
                         fontWeight: FontWeight.bold,
@@ -472,7 +489,9 @@ class _FoodPaymentIntegrationWidgetState extends State<FoodPaymentIntegrationWid
                       hasPartialPayment ? 'Remaining' : 'Amount Due',
                       style: TextStyle(
                         fontSize: 10,
-                        color: isSelected ? Colors.green[600] : Colors.grey[600],
+                        color: isSelected
+                            ? Colors.green[600]
+                            : Colors.grey[600],
                       ),
                     ),
                   ],

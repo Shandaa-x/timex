@@ -99,7 +99,7 @@ class _AddFoodBottomSheetState extends State<AddFoodBottomSheet> {
       // Generate unique food item ID
       final foodId = DateTime.now().millisecondsSinceEpoch.toString();
       final price = double.parse(_priceController.text.trim());
-      
+
       final foodItemData = {
         'id': foodId,
         'name': _nameController.text.trim(),
@@ -111,7 +111,8 @@ class _AddFoodBottomSheetState extends State<AddFoodBottomSheet> {
         'day': selectedDateTime.day,
         'month': selectedDateTime.month,
         'year': selectedDateTime.year,
-        'date': '${selectedDateTime.year}-${selectedDateTime.month.toString().padLeft(2, '0')}-${selectedDateTime.day.toString().padLeft(2, '0')}',
+        'date':
+            '${selectedDateTime.year}-${selectedDateTime.month.toString().padLeft(2, '0')}-${selectedDateTime.day.toString().padLeft(2, '0')}',
         'likes': [],
         'likesCount': 0,
         'comments': [],
@@ -139,17 +140,17 @@ class _AddFoodBottomSheetState extends State<AddFoodBottomSheet> {
             .collection('foods')
             .doc(foodId)
             .set({
-          'id': foodId,
-          'name': _nameController.text.trim(),
-          'price': price,
-          'image': _imageBase64 ?? '',
-          'selectedDate': Timestamp.fromDate(selectedDateTime),
-          'paidAmount': 0.0,
-          'remainingBalance': price,
-          'paymentStatus': 'unpaid',
-          'paymentHistory': [],
-          'createdAt': FieldValue.serverTimestamp(),
-        });
+              'id': foodId,
+              'name': _nameController.text.trim(),
+              'price': price,
+              'image': _imageBase64 ?? '',
+              'selectedDate': Timestamp.fromDate(selectedDateTime),
+              'paidAmount': 0.0,
+              'remainingBalance': price,
+              'paymentStatus': 'unpaid',
+              'paymentHistory': [],
+              'createdAt': FieldValue.serverTimestamp(),
+            });
       }
 
       // Call the callback function with the food data

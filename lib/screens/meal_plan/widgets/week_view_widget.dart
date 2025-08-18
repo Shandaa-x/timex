@@ -10,11 +10,13 @@ class WeekViewWidget extends StatefulWidget {
   final DateTime currentWeek;
   final Map<String, List<Map<String, dynamic>>> weekMeals;
   final Function(String date, String mealType, Map<String, dynamic> meal)
-      onMealTap;
+  onMealTap;
   final Function(String date, String mealType) onAddMeal;
   final Function(String date, String mealType, Map<String, dynamic> meal)
-      onMealLongPress;
+  onMealLongPress;
   final Function(Map<String, dynamic> updatedFood)? onFoodUpdated;
+  final Function(Map<String, dynamic> food)? onFoodDelete;
+  final Function(Map<String, dynamic> food)? onFoodEdit;
 
   const WeekViewWidget({
     super.key,
@@ -24,6 +26,8 @@ class WeekViewWidget extends StatefulWidget {
     required this.onAddMeal,
     required this.onMealLongPress,
     this.onFoodUpdated,
+    this.onFoodDelete,
+    this.onFoodEdit,
   });
 
   @override
@@ -34,12 +38,12 @@ class _WeekViewWidgetState extends State<WeekViewWidget> {
   final Map<String, TextEditingController> _commentControllers = {};
   final Map<String, bool> _expandedFoods = {};
   bool _isLoading = false;
-  
-  String get _currentUserId => FirebaseAuth.instance.currentUser?.uid ?? 'anonymous';
-  
+
+  String get _currentUserId =>
+      FirebaseAuth.instance.currentUser?.uid ?? 'anonymous';
+
   // Payment and eaten status tracking
   Map<String, bool> _eatenForDayData = {}; // Track which days food was eaten
-
 
   @override
   void initState() {
@@ -48,21 +52,23 @@ class _WeekViewWidgetState extends State<WeekViewWidget> {
   }
 
   Future<void> _loadWeekData() async {
-    await Future.wait([
-      _loadEatenForDayData(),
-      _loadMealPaymentStatus(),
-    ]);
+    await Future.wait([_loadEatenForDayData(), _loadMealPaymentStatus()]);
   }
 
   // Load eaten for day data for the current week
   Future<void> _loadEatenForDayData() async {
     try {
-      final weekStart = widget.currentWeek.subtract(Duration(days: widget.currentWeek.weekday - 1));
-      final weekDays = List.generate(7, (index) => weekStart.add(Duration(days: index)));
+      final weekStart = widget.currentWeek.subtract(
+        Duration(days: widget.currentWeek.weekday - 1),
+      );
+      final weekDays = List.generate(
+        7,
+        (index) => weekStart.add(Duration(days: index)),
+      );
 
       for (final day in weekDays) {
         final dateKey = _formatDateKey(day);
-        
+
         final calendarDoc = await FirebaseFirestore.instance
             .collection('calendarDays')
             .doc(dateKey)
@@ -75,7 +81,7 @@ class _WeekViewWidgetState extends State<WeekViewWidget> {
           _eatenForDayData[dateKey] = false;
         }
       }
-      
+
       if (mounted) setState(() {});
     } catch (e) {
       print('Error loading eaten for day data: $e');
@@ -97,7 +103,7 @@ class _WeekViewWidgetState extends State<WeekViewWidget> {
       if (docSnapshot.exists) {
         // Payment status loading removed as feature is not used
       }
-      
+
       if (mounted) setState(() {});
     } catch (e) {
       print('Error loading meal payment status: $e');
@@ -131,11 +137,14 @@ class _WeekViewWidgetState extends State<WeekViewWidget> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
-    
-    final weekStart =
-        widget.currentWeek.subtract(Duration(days: widget.currentWeek.weekday - 1));
-    final weekDays =
-        List.generate(7, (index) => weekStart.add(Duration(days: index)));
+
+    final weekStart = widget.currentWeek.subtract(
+      Duration(days: widget.currentWeek.weekday - 1),
+    );
+    final weekDays = List.generate(
+      7,
+      (index) => weekStart.add(Duration(days: index)),
+    );
 
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8),
@@ -250,7 +259,9 @@ class _WeekViewWidgetState extends State<WeekViewWidget> {
                               if (_isToday(day))
                                 Container(
                                   padding: const EdgeInsets.symmetric(
-                                      horizontal: 8, vertical: 4),
+                                    horizontal: 8,
+                                    vertical: 4,
+                                  ),
                                   decoration: BoxDecoration(
                                     color: AppTheme.primaryLight,
                                     borderRadius: BorderRadius.circular(12),
@@ -275,13 +286,18 @@ class _WeekViewWidgetState extends State<WeekViewWidget> {
                               if (dayFoods.isEmpty)
                                 _buildAddFoodButton(context, dateKey)
                               else
-                                ...dayFoods.map((food) => 
-                                    _buildFoodItemWithComments(context, dateKey, food)),
+                                ...dayFoods.map(
+                                  (food) => _buildFoodItemWithComments(
+                                    context,
+                                    dateKey,
+                                    food,
+                                  ),
+                                ),
                               if (dayFoods.isNotEmpty)
                                 const SizedBox(height: 8),
                               if (dayFoods.isNotEmpty)
                                 _buildAddFoodButton(context, dateKey),
-                              
+
                               // Payment status section
                               // const SizedBox(height: 12),
                               // _buildPaymentStatusSection(context, dateKey, dayFoods),
@@ -300,305 +316,386 @@ class _WeekViewWidgetState extends State<WeekViewWidget> {
     );
   }
 
-  Widget _buildFoodItemWithComments(BuildContext context, String dateKey, Map<String, dynamic> food) {
+  Widget _buildFoodItemWithComments(
+    BuildContext context,
+    String dateKey,
+    Map<String, dynamic> food,
+  ) {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
     final foodId = food['id'] ?? '';
     final isExpanded = _expandedFoods[foodId] ?? false;
     final comments = List<Map<String, dynamic>>.from(food['comments'] ?? []);
-    final isLiked = (food['likes'] as List<dynamic>? ?? []).contains(_currentUserId);
-    
-    return Container(
-      margin: const EdgeInsets.only(bottom: 16),
-      decoration: BoxDecoration(
-        color: AppTheme.successLight.withOpacity(0.05),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(
-          color: AppTheme.successLight.withOpacity(0.2),
-          width: 1,
+    final isLiked = (food['likes'] as List<dynamic>? ?? []).contains(
+      _currentUserId,
+    );
+
+    return GestureDetector(
+      onTap: () => widget.onFoodEdit?.call(food),
+      child: Container(
+        margin: const EdgeInsets.only(bottom: 16),
+        decoration: BoxDecoration(
+          color: AppTheme.successLight.withOpacity(0.05),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(
+            color: AppTheme.successLight.withOpacity(0.2),
+            width: 1,
+          ),
         ),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // Food header with image, name, price
-          Padding(
-            padding: const EdgeInsets.all(12),
-            child: Row(
-              children: [
-                // Food image
-                if (food['image'] != null && food['image'].isNotEmpty)
-                  ClipRRect(
-                    borderRadius: BorderRadius.circular(8),
-                    child: Image.memory(
-                      base64Decode(food['image']),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Food header with image, name, price
+            Padding(
+              padding: const EdgeInsets.all(12),
+              child: Row(
+                children: [
+                  // Food image
+                  if (food['image'] != null && food['image'].isNotEmpty)
+                    ClipRRect(
+                      borderRadius: BorderRadius.circular(8),
+                      child: Image.memory(
+                        base64Decode(food['image']),
+                        width: 56,
+                        height: 56,
+                        fit: BoxFit.cover,
+                      ),
+                    )
+                  else
+                    Container(
                       width: 56,
                       height: 56,
-                      fit: BoxFit.cover,
-                    ),
-                  )
-                else
-                  Container(
-                    width: 56,
-                    height: 56,
-                    decoration: BoxDecoration(
-                      color: AppTheme.successLight.withOpacity(0.2),
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: Center(
-                      child: Icon(
-                        Icons.restaurant,
-                        color: AppTheme.successLight,
-                        size: 24,
+                      decoration: BoxDecoration(
+                        color: AppTheme.successLight.withOpacity(0.2),
+                        borderRadius: BorderRadius.circular(8),
                       ),
-                    ),
-                  ),
-                const SizedBox(width: 12),
-
-                // Food details
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        food['name'] as String? ?? 'Unknown Food',
-                        style: theme.textTheme.titleMedium?.copyWith(
-                          fontWeight: FontWeight.w600,
-                          color: colorScheme.onSurface,
+                      child: Center(
+                        child: Icon(
+                          Icons.restaurant,
+                          color: AppTheme.successLight,
+                          size: 24,
                         ),
                       ),
-                      if (food['description'] != null && food['description'].isNotEmpty)
-                        Padding(
-                          padding: const EdgeInsets.only(top: 4),
-                          child: Text(
-                            food['description'],
-                            style: theme.textTheme.bodySmall?.copyWith(
-                              color: colorScheme.onSurface.withOpacity(0.6),
-                            ),
-                            maxLines: 2,
-                            overflow: TextOverflow.ellipsis,
+                    ),
+                  const SizedBox(width: 12),
+
+                  // Food details
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          food['name'] as String? ?? 'Unknown Food',
+                          style: theme.textTheme.titleMedium?.copyWith(
+                            fontWeight: FontWeight.w600,
+                            color: colorScheme.onSurface,
                           ),
                         ),
+                        if (food['description'] != null &&
+                            food['description'].isNotEmpty)
+                          Padding(
+                            padding: const EdgeInsets.only(top: 4),
+                            child: Text(
+                              food['description'],
+                              style: theme.textTheme.bodySmall?.copyWith(
+                                color: colorScheme.onSurface.withOpacity(0.6),
+                              ),
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                      ],
+                    ),
+                  ),
+
+                  // Price
+                  if (food['price'] != null)
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 8,
+                        vertical: 4,
+                      ),
+                      decoration: BoxDecoration(
+                        color: AppTheme.successLight.withOpacity(0.1),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Text(
+                        MoneyFormatService.formatDoubleWithSymbol(
+                          food['price'] is num
+                              ? (food['price'] as num).toDouble()
+                              : 0.0,
+                        ),
+                        style: theme.textTheme.titleSmall?.copyWith(
+                          fontWeight: FontWeight.w600,
+                          color: AppTheme.successLight,
+                        ),
+                      ),
+                    ),
+
+                  // Actions menu
+                  PopupMenuButton<String>(
+                    icon: Icon(
+                      Icons.more_vert,
+                      color: colorScheme.onSurface.withOpacity(0.6),
+                      size: 20,
+                    ),
+                    onSelected: (value) {
+                      switch (value) {
+                        case 'edit':
+                          widget.onFoodEdit?.call(food);
+                          break;
+                        case 'delete':
+                          _showDeleteConfirmDialog(context, food);
+                          break;
+                      }
+                    },
+                    itemBuilder: (context) => [
+                      const PopupMenuItem(
+                        value: 'edit',
+                        child: Row(
+                          children: [
+                            Icon(Icons.edit, color: Colors.orange),
+                            SizedBox(width: 8),
+                            Text('Засах'),
+                          ],
+                        ),
+                      ),
+                      const PopupMenuItem(
+                        value: 'delete',
+                        child: Row(
+                          children: [
+                            Icon(Icons.delete, color: Colors.red),
+                            SizedBox(width: 8),
+                            Text('Устгах'),
+                          ],
+                        ),
+                      ),
                     ],
                   ),
-                ),
-
-                // Price
-                if (food['price'] != null)
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                    decoration: BoxDecoration(
-                      color: AppTheme.successLight.withOpacity(0.1),
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: Text(
-                      MoneyFormatService.formatDoubleWithSymbol(
-                        food['price'] is num 
-                          ? (food['price'] as num).toDouble() 
-                          : 0.0
-                      ),
-                      style: theme.textTheme.titleSmall?.copyWith(
-                        fontWeight: FontWeight.w600,
-                        color: AppTheme.successLight,
-                      ),
-                    ),
-                  ),
-              ],
+                ],
+              ),
             ),
-          ),
 
-          // Like and comment buttons
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 12),
-            child: Row(
-              children: [
-                // Like button
-                GestureDetector(
-                  onTap: () => _toggleLike(dateKey, food),
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                    decoration: BoxDecoration(
-                      color: isLiked ? Colors.red.withOpacity(0.1) : Colors.grey[100],
-                      borderRadius: BorderRadius.circular(20),
-                      border: Border.all(
-                        color: isLiked ? Colors.red.withOpacity(0.3) : Colors.grey[300]!,
-                      ),
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(
-                          isLiked ? Icons.favorite : Icons.favorite_border,
-                          color: isLiked ? Colors.red : Colors.grey[600],
-                          size: 16,
-                        ),
-                        const SizedBox(width: 4),
-                        Text(
-                          '${food['likesCount'] ?? 0}',
-                          style: theme.textTheme.labelSmall?.copyWith(
-                            color: isLiked ? Colors.red : Colors.grey[600],
-                            fontWeight: FontWeight.w500,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-                
-                const SizedBox(width: 8),
-                
-                // Comment toggle button
-                GestureDetector(
-                  onTap: () => _toggleComments(foodId),
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                    decoration: BoxDecoration(
-                      color: isExpanded ? AppTheme.primaryLight.withOpacity(0.1) : Colors.grey[100],
-                      borderRadius: BorderRadius.circular(20),
-                      border: Border.all(
-                        color: isExpanded ? AppTheme.primaryLight.withOpacity(0.3) : Colors.grey[300]!,
-                      ),
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(
-                          Icons.chat_bubble_outline,
-                          color: isExpanded ? AppTheme.primaryLight : Colors.grey[600],
-                          size: 16,
-                        ),
-                        const SizedBox(width: 4),
-                        Text(
-                          '${food['commentsCount'] ?? 0}',
-                          style: theme.textTheme.labelSmall?.copyWith(
-                            color: isExpanded ? AppTheme.primaryLight : Colors.grey[600],
-                            fontWeight: FontWeight.w500,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-
-          // Comments section (expanded)
-          if (isExpanded) ...[
-            const SizedBox(height: 12),
-            
-            // Add comment section
+            // Like and comment buttons
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 12),
               child: Row(
                 children: [
-                  CircleAvatar(
-                    radius: 16,
-                    backgroundColor: AppTheme.primaryLight,
-                    child: const Text(
-                      'Y',
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontWeight: FontWeight.w600,
-                        fontSize: 12,
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: TextField(
-                      controller: _getCommentController(foodId),
-                      decoration: InputDecoration(
-                        hintText: 'Write a comment...',
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(20),
-                          borderSide: BorderSide(color: Colors.grey[300]!),
-                        ),
-                        enabledBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(20),
-                          borderSide: BorderSide(color: Colors.grey[300]!),
-                        ),
-                        focusedBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(20),
-                          borderSide: BorderSide(color: AppTheme.primaryLight),
-                        ),
-                        contentPadding: const EdgeInsets.symmetric(
-                          horizontal: 12,
-                          vertical: 8,
-                        ),
-                        filled: true,
-                        fillColor: Colors.white,
-                      ),
-                      style: theme.textTheme.bodySmall,
-                      maxLines: null,
-                      textInputAction: TextInputAction.send,
-                      onSubmitted: (_) => _addComment(dateKey, food),
-                    ),
-                  ),
-                  const SizedBox(width: 8),
+                  // Like button
                   GestureDetector(
-                    onTap: () => _addComment(dateKey, food),
+                    onTap: () => _toggleLike(dateKey, food),
                     child: Container(
-                      padding: const EdgeInsets.all(8),
-                      decoration: BoxDecoration(
-                        color: AppTheme.primaryLight,
-                        shape: BoxShape.circle,
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 12,
+                        vertical: 8,
                       ),
-                      child: _isLoading
-                          ? SizedBox(
-                              width: 16,
-                              height: 16,
-                              child: CircularProgressIndicator(
-                                strokeWidth: 2,
-                                color: Colors.white,
-                              ),
-                            )
-                          : const Icon(
-                              Icons.send,
-                              color: Colors.white,
-                              size: 16,
+                      decoration: BoxDecoration(
+                        color: isLiked
+                            ? Colors.red.withOpacity(0.1)
+                            : Colors.grey[100],
+                        borderRadius: BorderRadius.circular(20),
+                        border: Border.all(
+                          color: isLiked
+                              ? Colors.red.withOpacity(0.3)
+                              : Colors.grey[300]!,
+                        ),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            isLiked ? Icons.favorite : Icons.favorite_border,
+                            color: isLiked ? Colors.red : Colors.grey[600],
+                            size: 16,
+                          ),
+                          const SizedBox(width: 4),
+                          Text(
+                            '${food['likesCount'] ?? 0}',
+                            style: theme.textTheme.labelSmall?.copyWith(
+                              color: isLiked ? Colors.red : Colors.grey[600],
+                              fontWeight: FontWeight.w500,
                             ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+
+                  const SizedBox(width: 8),
+
+                  // Comment toggle button
+                  GestureDetector(
+                    onTap: () => _toggleComments(foodId),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 12,
+                        vertical: 8,
+                      ),
+                      decoration: BoxDecoration(
+                        color: isExpanded
+                            ? AppTheme.primaryLight.withOpacity(0.1)
+                            : Colors.grey[100],
+                        borderRadius: BorderRadius.circular(20),
+                        border: Border.all(
+                          color: isExpanded
+                              ? AppTheme.primaryLight.withOpacity(0.3)
+                              : Colors.grey[300]!,
+                        ),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            Icons.chat_bubble_outline,
+                            color: isExpanded
+                                ? AppTheme.primaryLight
+                                : Colors.grey[600],
+                            size: 16,
+                          ),
+                          const SizedBox(width: 4),
+                          Text(
+                            '${food['commentsCount'] ?? 0}',
+                            style: theme.textTheme.labelSmall?.copyWith(
+                              color: isExpanded
+                                  ? AppTheme.primaryLight
+                                  : Colors.grey[600],
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
                   ),
                 ],
               ),
             ),
-            
-            // Comments list
-            if (comments.isNotEmpty) ...[
-              const SizedBox(height: 8),
-              ...comments.map((comment) => _buildCommentItem(context, dateKey, food, comment)),
-            ],
-            
-            const SizedBox(height: 12),
-          ],
-        ],
-      ),
-    );
+
+            // Comments section (expanded)
+            if (isExpanded) ...[
+              const SizedBox(height: 12),
+
+              // Add comment section
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 12),
+                child: Row(
+                  children: [
+                    CircleAvatar(
+                      radius: 16,
+                      backgroundColor: AppTheme.primaryLight,
+                      child: const Text(
+                        'Y',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontWeight: FontWeight.w600,
+                          fontSize: 12,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: TextField(
+                        controller: _getCommentController(foodId),
+                        decoration: InputDecoration(
+                          hintText: 'Write a comment...',
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(20),
+                            borderSide: BorderSide(color: Colors.grey[300]!),
+                          ),
+                          enabledBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(20),
+                            borderSide: BorderSide(color: Colors.grey[300]!),
+                          ),
+                          focusedBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(20),
+                            borderSide: BorderSide(
+                              color: AppTheme.primaryLight,
+                            ),
+                          ),
+                          contentPadding: const EdgeInsets.symmetric(
+                            horizontal: 12,
+                            vertical: 8,
+                          ),
+                          filled: true,
+                          fillColor: Colors.white,
+                        ),
+                        style: theme.textTheme.bodySmall,
+                        maxLines: null,
+                        textInputAction: TextInputAction.send,
+                        onSubmitted: (_) => _addComment(dateKey, food),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    GestureDetector(
+                      onTap: () => _addComment(dateKey, food),
+                      child: Container(
+                        padding: const EdgeInsets.all(8),
+                        decoration: BoxDecoration(
+                          color: AppTheme.primaryLight,
+                          shape: BoxShape.circle,
+                        ),
+                        child: _isLoading
+                            ? SizedBox(
+                                width: 16,
+                                height: 16,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  color: Colors.white,
+                                ),
+                              )
+                            : const Icon(
+                                Icons.send,
+                                color: Colors.white,
+                                size: 16,
+                              ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+
+              // Comments list
+              if (comments.isNotEmpty) ...[
+                const SizedBox(height: 8),
+                ...comments.map(
+                  (comment) =>
+                      _buildCommentItem(context, dateKey, food, comment),
+                ),
+              ],
+
+              const SizedBox(height: 12),
+            ], // Close the if (isExpanded) array
+          ], // Close the main Column children array
+        ), // Close the Column
+      ), // Close the Container
+    ); // Close the GestureDetector
   }
 
   Widget _buildAddFoodButton(BuildContext context, String dateKey) {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
-    
+
     // Check if the date is in the past
     final selectedDate = DateTime.parse(dateKey);
     final today = DateTime.now();
     final todayDate = DateTime(today.year, today.month, today.day);
-    final selectedDateOnly = DateTime(selectedDate.year, selectedDate.month, selectedDate.day);
+    final selectedDateOnly = DateTime(
+      selectedDate.year,
+      selectedDate.month,
+      selectedDate.day,
+    );
     final isPastDate = selectedDateOnly.isBefore(todayDate);
-    
+
     return GestureDetector(
-      onTap: isPastDate ? null : () => widget.onAddMeal(dateKey, ''), // Disable tap for past dates
+      onTap: isPastDate
+          ? null
+          : () => widget.onAddMeal(dateKey, ''), // Disable tap for past dates
       child: Container(
         height: 48,
         decoration: BoxDecoration(
-          color: isPastDate 
-              ? Colors.white
-              : Colors.white.withOpacity(0.8),
+          color: isPastDate ? Colors.white : Colors.white.withOpacity(0.8),
           borderRadius: BorderRadius.circular(8),
           border: Border.all(
-            color: isPastDate 
+            color: isPastDate
                 ? colorScheme.outline.withOpacity(0.1)
                 : colorScheme.outline.withOpacity(0.2),
             width: 1,
@@ -609,7 +706,7 @@ class _WeekViewWidgetState extends State<WeekViewWidget> {
           children: [
             Icon(
               Icons.add,
-              color: isPastDate 
+              color: isPastDate
                   ? AppTheme.primaryLight.withOpacity(0.3)
                   : AppTheme.primaryLight,
               size: 20,
@@ -618,7 +715,7 @@ class _WeekViewWidgetState extends State<WeekViewWidget> {
             Text(
               isPastDate ? 'Past Date' : 'Add Food',
               style: theme.textTheme.bodyMedium?.copyWith(
-                color: isPastDate 
+                color: isPastDate
                     ? AppTheme.primaryLight.withOpacity(0.3)
                     : AppTheme.primaryLight,
                 fontWeight: FontWeight.w500,
@@ -650,15 +747,17 @@ class _WeekViewWidgetState extends State<WeekViewWidget> {
 
     // Add haptic feedback
     HapticFeedback.lightImpact();
-    
+
     setState(() {
       _isLoading = true;
     });
 
     try {
       final documentId = '${dateKey}-foods';
-      final docRef = FirebaseFirestore.instance.collection('foods').doc(documentId);
-      
+      final docRef = FirebaseFirestore.instance
+          .collection('foods')
+          .doc(documentId);
+
       // Get current document
       final docSnapshot = await docRef.get();
       if (!docSnapshot.exists) {
@@ -667,17 +766,19 @@ class _WeekViewWidgetState extends State<WeekViewWidget> {
 
       final data = docSnapshot.data()!;
       final foods = List<Map<String, dynamic>>.from(data['foods'] ?? []);
-      
+
       // Find the food item by ID - handle various ID scenarios
       final foodId = food['id']?.toString();
       if (foodId == null || foodId.isEmpty) {
         throw Exception('Food ID is missing or empty');
       }
-      
+
       final foodIndex = foods.indexWhere((f) => f['id']?.toString() == foodId);
       if (foodIndex == -1) {
         // Debug: Print available food IDs for troubleshooting
-        final availableIds = foods.map((f) => f['id']?.toString() ?? 'null').toList();
+        final availableIds = foods
+            .map((f) => f['id']?.toString() ?? 'null')
+            .toList();
         print('❌ Food item not found in _toggleLike. Looking for ID: $foodId');
         print('📋 Available food IDs: $availableIds');
         throw Exception('Food item not found. Expected ID: $foodId');
@@ -685,7 +786,7 @@ class _WeekViewWidgetState extends State<WeekViewWidget> {
 
       final currentFood = Map<String, dynamic>.from(foods[foodIndex]);
       final likes = List<String>.from(currentFood['likes'] ?? []);
-      
+
       if (likes.contains(currentUser.uid)) {
         // Remove like
         likes.remove(currentUser.uid);
@@ -693,28 +794,30 @@ class _WeekViewWidgetState extends State<WeekViewWidget> {
         // Add like
         likes.add(currentUser.uid);
       }
-      
+
       // Update the food item
       currentFood['likes'] = likes;
       currentFood['likesCount'] = likes.length;
       foods[foodIndex] = currentFood;
-      
+
       // Update Firestore
       await docRef.update({
         'foods': foods,
         'lastUpdated': FieldValue.serverTimestamp(),
       });
-      
+
       // Update local state
       setState(() {
-        widget.weekMeals[dateKey]?[widget.weekMeals[dateKey]!.indexWhere((f) => f['id'] == food['id'])] = currentFood;
+        widget.weekMeals[dateKey]?[widget.weekMeals[dateKey]!.indexWhere(
+              (f) => f['id'] == food['id'],
+            )] =
+            currentFood;
       });
-      
+
       // Notify parent if callback provided
       if (widget.onFoodUpdated != null) {
         widget.onFoodUpdated!(currentFood);
       }
-      
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -755,14 +858,18 @@ class _WeekViewWidgetState extends State<WeekViewWidget> {
           .collection('users')
           .doc(currentUser.uid)
           .get();
-      
+
       final userData = userDoc.data();
-      final authorName = userData?['name'] ?? currentUser.displayName ?? 'Anonymous User';
-      final authorPhotoUrl = userData?['photoUrl'] ?? currentUser.photoURL ?? '';
+      final authorName =
+          userData?['name'] ?? currentUser.displayName ?? 'Anonymous User';
+      final authorPhotoUrl =
+          userData?['photoUrl'] ?? currentUser.photoURL ?? '';
 
       final documentId = '${dateKey}-foods';
-      final docRef = FirebaseFirestore.instance.collection('foods').doc(documentId);
-      
+      final docRef = FirebaseFirestore.instance
+          .collection('foods')
+          .doc(documentId);
+
       // Get current document
       final docSnapshot = await docRef.get();
       if (!docSnapshot.exists) {
@@ -771,53 +878,61 @@ class _WeekViewWidgetState extends State<WeekViewWidget> {
 
       final data = docSnapshot.data()!;
       final foods = List<Map<String, dynamic>>.from(data['foods'] ?? []);
-      
+
       // Find the food item by ID - handle various ID scenarios
       if (foodId.isEmpty) {
         throw Exception('Food ID is missing or empty');
       }
-      
+
       final foodIndex = foods.indexWhere((f) => f['id']?.toString() == foodId);
       if (foodIndex == -1) {
         // Debug: Print available food IDs for troubleshooting
-        final availableIds = foods.map((f) => f['id']?.toString() ?? 'null').toList();
+        final availableIds = foods
+            .map((f) => f['id']?.toString() ?? 'null')
+            .toList();
         print('❌ Food item not found in _addComment. Looking for ID: $foodId');
         print('📋 Available food IDs: $availableIds');
         throw Exception('Food item not found. Expected ID: $foodId');
       }
 
       final currentFood = Map<String, dynamic>.from(foods[foodIndex]);
-      final comments = List<Map<String, dynamic>>.from(currentFood['comments'] ?? []);
-      
+      final comments = List<Map<String, dynamic>>.from(
+        currentFood['comments'] ?? [],
+      );
+
       // Create new comment with proper user information
       final newComment = {
         'id': DateTime.now().millisecondsSinceEpoch.toString(),
         'userId': currentUser.uid,
         'userName': authorName, // Keep for backward compatibility
-        'authorName': authorName, // Use consistent naming with food detail dialog
+        'authorName':
+            authorName, // Use consistent naming with food detail dialog
         'authorPhotoUrl': authorPhotoUrl,
         'text': commentText,
         'createdAt': DateTime.now().millisecondsSinceEpoch,
         'likes': <String>[],
         'likesCount': 0,
       };
-      
+
       comments.add(newComment);
-      
+
       // Update the food item
       currentFood['comments'] = comments;
       currentFood['commentsCount'] = comments.length;
       foods[foodIndex] = currentFood;
-      
+
       // Update Firestore
       await docRef.update({
         'foods': foods,
         'lastUpdated': FieldValue.serverTimestamp(),
       });
-      
+
       // Update local state
       setState(() {
-        widget.weekMeals[dateKey]?[widget.weekMeals[dateKey]!.indexWhere((f) => f['id'] == food['id'])] = currentFood;
+        widget.weekMeals[dateKey]?[widget.weekMeals[dateKey]!.indexWhere(
+              (f) => f['id'] == food['id'],
+            )] =
+            currentFood;
         _getCommentController(foodId).clear();
       });
 
@@ -827,12 +942,11 @@ class _WeekViewWidgetState extends State<WeekViewWidget> {
           backgroundColor: Colors.green,
         ),
       );
-      
+
       // Notify parent if callback provided
       if (widget.onFoodUpdated != null) {
         widget.onFoodUpdated!(currentFood);
       }
-      
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -847,18 +961,24 @@ class _WeekViewWidgetState extends State<WeekViewWidget> {
     }
   }
 
-  Future<void> _toggleCommentLike(String dateKey, Map<String, dynamic> food, String commentId) async {
+  Future<void> _toggleCommentLike(
+    String dateKey,
+    Map<String, dynamic> food,
+    String commentId,
+  ) async {
     // Add haptic feedback
     HapticFeedback.selectionClick();
-    
+
     setState(() {
       _isLoading = true;
     });
 
     try {
       final documentId = '${dateKey}-foods';
-      final docRef = FirebaseFirestore.instance.collection('foods').doc(documentId);
-      
+      final docRef = FirebaseFirestore.instance
+          .collection('foods')
+          .doc(documentId);
+
       // Get current document
       final docSnapshot = await docRef.get();
       if (!docSnapshot.exists) {
@@ -867,25 +987,31 @@ class _WeekViewWidgetState extends State<WeekViewWidget> {
 
       final data = docSnapshot.data()!;
       final foods = List<Map<String, dynamic>>.from(data['foods'] ?? []);
-      
+
       // Find the food item by ID - handle various ID scenarios
       final foodId = food['id']?.toString();
       if (foodId == null || foodId.isEmpty) {
         throw Exception('Food ID is missing or empty');
       }
-      
+
       final foodIndex = foods.indexWhere((f) => f['id']?.toString() == foodId);
       if (foodIndex == -1) {
         // Debug: Print available food IDs for troubleshooting
-        final availableIds = foods.map((f) => f['id']?.toString() ?? 'null').toList();
-        print('❌ Food item not found in _toggleCommentLike. Looking for ID: $foodId');
+        final availableIds = foods
+            .map((f) => f['id']?.toString() ?? 'null')
+            .toList();
+        print(
+          '❌ Food item not found in _toggleCommentLike. Looking for ID: $foodId',
+        );
         print('📋 Available food IDs: $availableIds');
         throw Exception('Food item not found. Expected ID: $foodId');
       }
 
       final currentFood = Map<String, dynamic>.from(foods[foodIndex]);
-      final comments = List<Map<String, dynamic>>.from(currentFood['comments'] ?? []);
-      
+      final comments = List<Map<String, dynamic>>.from(
+        currentFood['comments'] ?? [],
+      );
+
       // Find the comment by ID
       final commentIndex = comments.indexWhere((c) => c['id'] == commentId);
       if (commentIndex == -1) {
@@ -894,7 +1020,7 @@ class _WeekViewWidgetState extends State<WeekViewWidget> {
 
       final currentComment = Map<String, dynamic>.from(comments[commentIndex]);
       final likes = List<String>.from(currentComment['likes'] ?? []);
-      
+
       if (likes.contains(_currentUserId)) {
         // Remove like
         likes.remove(_currentUserId);
@@ -902,32 +1028,34 @@ class _WeekViewWidgetState extends State<WeekViewWidget> {
         // Add like
         likes.add(_currentUserId);
       }
-      
+
       // Update the comment
       currentComment['likes'] = likes;
       currentComment['likesCount'] = likes.length;
       comments[commentIndex] = currentComment;
-      
+
       // Update the food item
       currentFood['comments'] = comments;
       foods[foodIndex] = currentFood;
-      
+
       // Update Firestore
       await docRef.update({
         'foods': foods,
         'lastUpdated': FieldValue.serverTimestamp(),
       });
-      
+
       // Update local state
       setState(() {
-        widget.weekMeals[dateKey]?[widget.weekMeals[dateKey]!.indexWhere((f) => f['id'] == food['id'])] = currentFood;
+        widget.weekMeals[dateKey]?[widget.weekMeals[dateKey]!.indexWhere(
+              (f) => f['id'] == food['id'],
+            )] =
+            currentFood;
       });
-      
+
       // Notify parent if callback provided
       if (widget.onFoodUpdated != null) {
         widget.onFoodUpdated!(currentFood);
       }
-      
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -942,11 +1070,18 @@ class _WeekViewWidgetState extends State<WeekViewWidget> {
     }
   }
 
-  Widget _buildCommentItem(BuildContext context, String dateKey, Map<String, dynamic> food, Map<String, dynamic> comment) {
+  Widget _buildCommentItem(
+    BuildContext context,
+    String dateKey,
+    Map<String, dynamic> food,
+    Map<String, dynamic> comment,
+  ) {
     final theme = Theme.of(context);
-    final isCommentLiked = (comment['likes'] as List<dynamic>? ?? []).contains(_currentUserId);
+    final isCommentLiked = (comment['likes'] as List<dynamic>? ?? []).contains(
+      _currentUserId,
+    );
     final commentLikes = comment['likesCount'] ?? 0;
-    
+
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
       padding: const EdgeInsets.all(12),
@@ -963,12 +1098,17 @@ class _WeekViewWidgetState extends State<WeekViewWidget> {
               CircleAvatar(
                 radius: 14,
                 backgroundColor: AppTheme.primaryLight,
-                backgroundImage: (comment['authorPhotoUrl'] as String?)?.isNotEmpty == true
+                backgroundImage:
+                    (comment['authorPhotoUrl'] as String?)?.isNotEmpty == true
                     ? NetworkImage(comment['authorPhotoUrl'])
                     : null,
-                child: (comment['authorPhotoUrl'] as String?)?.isNotEmpty != true
+                child:
+                    (comment['authorPhotoUrl'] as String?)?.isNotEmpty != true
                     ? Text(
-                        (comment['authorName'] as String? ?? comment['userName'] as String? ?? 'U')[0].toUpperCase(),
+                        (comment['authorName'] as String? ??
+                                comment['userName'] as String? ??
+                                'U')[0]
+                            .toUpperCase(),
                         style: const TextStyle(
                           color: Colors.white,
                           fontWeight: FontWeight.w600,
@@ -983,7 +1123,9 @@ class _WeekViewWidgetState extends State<WeekViewWidget> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      comment['authorName'] ?? comment['userName'] ?? 'Unknown User',
+                      comment['authorName'] ??
+                          comment['userName'] ??
+                          'Unknown User',
                       style: theme.textTheme.labelMedium?.copyWith(
                         fontWeight: FontWeight.w600,
                       ),
@@ -1000,10 +1142,7 @@ class _WeekViewWidgetState extends State<WeekViewWidget> {
             ],
           ),
           const SizedBox(height: 8),
-          Text(
-            comment['text'] ?? '',
-            style: theme.textTheme.bodySmall,
-          ),
+          Text(comment['text'] ?? '', style: theme.textTheme.bodySmall),
           const SizedBox(height: 8),
           Row(
             children: [
@@ -1038,11 +1177,11 @@ class _WeekViewWidgetState extends State<WeekViewWidget> {
 
   String _formatCommentTime(dynamic timestamp) {
     if (timestamp == null) return 'Just now';
-    
+
     final DateTime commentTime = DateTime.fromMillisecondsSinceEpoch(timestamp);
     final DateTime now = DateTime.now();
     final Duration difference = now.difference(commentTime);
-    
+
     if (difference.inMinutes < 1) {
       return 'Just now';
     } else if (difference.inHours < 1) {
@@ -1083,10 +1222,37 @@ class _WeekViewWidgetState extends State<WeekViewWidget> {
       'Sep',
       'Oct',
       'Nov',
-      'Dec'
+      'Dec',
     ];
     return months[month - 1];
   }
 
-
+  void _showDeleteConfirmDialog(
+    BuildContext context,
+    Map<String, dynamic> food,
+  ) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Хоол устгах'),
+        content: Text(
+          'Та "${food['name'] ?? 'Unknown Food'}" хоолыг устгахдаа итгэлтэй байна уу?',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Болих'),
+          ),
+          TextButton(
+            onPressed: () {
+              Navigator.pop(context);
+              widget.onFoodDelete?.call(food);
+            },
+            style: TextButton.styleFrom(foregroundColor: Colors.red),
+            child: const Text('Устгах'),
+          ),
+        ],
+      ),
+    );
+  }
 }

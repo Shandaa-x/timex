@@ -4,8 +4,10 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:timex/screens/home/widgets/custom_sliver_appbar.dart';
 import '../../theme/app_theme.dart';
 import '../../widgets/custom_drawer.dart';
+import '../food_report/services/food_data_service.dart';
 import './widgets/calendar_header_widget.dart';
 import './widgets/add_food_bottom_sheet.dart';
+import './widgets/edit_food_bottom_sheet.dart';
 import './widgets/food_detail_dialog.dart';
 import './widgets/month_view_widget.dart';
 import './widgets/week_view_widget.dart';
@@ -43,6 +45,9 @@ class _MealPlanCalendarState extends State<MealPlanCalendar>
   // Food data - map of date string to list of foods
   final Map<String, List<Map<String, dynamic>>> _foodData = {};
   Map<String, List<Map<String, dynamic>>> _filteredFoodData = {};
+
+  // Eaten data - map of date string to boolean indicating if food was eaten
+  Map<String, bool> _eatenForDayData = {};
 
   // Helper to get current user ID
   String get _userId =>
@@ -85,18 +90,22 @@ class _MealPlanCalendarState extends State<MealPlanCalendar>
     });
 
     try {
-      final now = DateTime.now();
-      final endOfMonth = DateTime(now.year, now.month + 1, 0);
+      final selectedMonth = _currentDate;
+      final endOfMonth = DateTime(
+        selectedMonth.year,
+        selectedMonth.month + 1,
+        0,
+      );
 
       setState(() {
         _foodData.clear();
       });
 
-      // Create document ID range for the current month
+      // Create document ID range for the selected month
       final startDocId =
-          '${now.year}-${now.month.toString().padLeft(2, '0')}-01-foods';
+          '${selectedMonth.year}-${selectedMonth.month.toString().padLeft(2, '0')}-01-foods';
       final endDocId =
-          '${now.year}-${now.month.toString().padLeft(2, '0')}-${endOfMonth.day.toString().padLeft(2, '0')}-foods';
+          '${selectedMonth.year}-${selectedMonth.month.toString().padLeft(2, '0')}-${endOfMonth.day.toString().padLeft(2, '0')}-foods';
 
       try {
         // Use a range query to get all food documents for the current month
@@ -151,7 +160,19 @@ class _MealPlanCalendarState extends State<MealPlanCalendar>
       } catch (e) {
         print('❌ Error loading food data with range query: $e');
         // Fallback to individual queries if range query fails
-        await _loadFoodDataFallback(now);
+        await _loadFoodDataFallback(selectedMonth);
+      }
+
+      // Load eaten for day data
+      try {
+        final eatenData = await FoodDataService.loadEatenForDayData(
+          DateTime(selectedMonth.year, selectedMonth.month),
+          _userId,
+        );
+        _eatenForDayData = eatenData;
+        print('✅ Loaded eaten for day data for ${eatenData.length} days');
+      } catch (e) {
+        print('❌ Error loading eaten for day data: $e');
       }
 
       setState(() {
@@ -173,16 +194,20 @@ class _MealPlanCalendarState extends State<MealPlanCalendar>
   }
 
   // Fallback method for individual document queries
-  Future<void> _loadFoodDataFallback(DateTime now) async {
+  Future<void> _loadFoodDataFallback(DateTime selectedMonth) async {
     print('🔄 Using fallback method with individual queries...');
-    final daysInMonth = DateTime(now.year, now.month + 1, 0).day;
+    final daysInMonth = DateTime(
+      selectedMonth.year,
+      selectedMonth.month + 1,
+      0,
+    ).day;
 
     // Use batch processing to reduce loading time
     final futures = <Future<void>>[];
 
     for (int day = 1; day <= daysInMonth; day++) {
       final documentId =
-          '${now.year}-${now.month.toString().padLeft(2, '0')}-${day.toString().padLeft(2, '0')}-foods';
+          '${selectedMonth.year}-${selectedMonth.month.toString().padLeft(2, '0')}-${day.toString().padLeft(2, '0')}-foods';
 
       futures.add(_loadSingleDayFood(documentId));
     }
@@ -220,7 +245,8 @@ class _MealPlanCalendarState extends State<MealPlanCalendar>
               'description': food['description'] ?? '',
               'price': (food['price'] as num?)?.toDouble() ?? 0.0,
               'image': food['image'] ?? '',
-              'createdAt': food['createdAt'] ?? DateTime.now().millisecondsSinceEpoch,
+              'createdAt':
+                  food['createdAt'] ?? DateTime.now().millisecondsSinceEpoch,
               'likes': food['likes'] ?? <String>[],
               'likesCount': food['likesCount'] ?? 0,
               'comments': food['comments'] ?? <Map<String, dynamic>>[],
@@ -361,7 +387,126 @@ class _MealPlanCalendarState extends State<MealPlanCalendar>
           _foodData[date]![foodIndex] = updatedFood;
         }
       }
+
+      // Update filtered data if in filter mode
+      if (_isFilterMode) {
+        _applyFilter();
+      } else {
+        _filteredFoodData = Map.from(_foodData);
+      }
     });
+  }
+
+  Future<void> _deleteFoodFromCalendar(Map<String, dynamic> food) async {
+    try {
+      setState(() {
+        _isLoading = true;
+      });
+
+      // Find which date this food belongs to
+      String? targetDate;
+      for (final dateKey in _foodData.keys) {
+        final foods = _foodData[dateKey] ?? [];
+        if (foods.any((f) => f['id'] == food['id'])) {
+          targetDate = dateKey;
+          break;
+        }
+      }
+
+      if (targetDate == null) {
+        throw Exception('Food not found in calendar data');
+      }
+
+      // Delete from Firestore
+      final documentId = '$targetDate-foods';
+      final docRef = FirebaseFirestore.instance
+          .collection('foods')
+          .doc(documentId);
+
+      final docSnapshot = await docRef.get();
+      if (!docSnapshot.exists) {
+        throw Exception('Document not found');
+      }
+
+      final data = docSnapshot.data()!;
+      final foods = List<Map<String, dynamic>>.from(data['foods'] ?? []);
+
+      // Remove the food item by ID
+      foods.removeWhere((f) => f['id'] == food['id']);
+
+      // Update Firestore document
+      await docRef.update({'foods': foods});
+
+      // Update local state
+      setState(() {
+        _foodData[targetDate!] = foods;
+
+        // Update filtered data if in filter mode
+        if (_isFilterMode) {
+          _applyFilter();
+        } else {
+          _filteredFoodData = Map.from(_foodData);
+        }
+      });
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('${food['name']} амжилттай устгагдлаа'),
+            backgroundColor: Colors.green,
+          ),
+        );
+      }
+    } catch (e) {
+      print('❌ Error deleting food: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Хоол устгахад алдаа гарлаа: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    } finally {
+      setState(() {
+        _isLoading = false;
+      });
+    }
+  }
+
+  void _editFood(Map<String, dynamic> food) {
+    // Find which date this food belongs to
+    String? targetDate;
+    for (final dateKey in _foodData.keys) {
+      final foods = _foodData[dateKey] ?? [];
+      if (foods.any((f) => f['id'] == food['id'])) {
+        targetDate = dateKey;
+        break;
+      }
+    }
+
+    if (targetDate == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Хоолны мэдээлэл олдсонгүй'),
+          backgroundColor: Colors.red,
+        ),
+      );
+      return;
+    }
+
+    // Open the edit food bottom sheet
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) => EditFoodBottomSheet(
+        food: food,
+        dateKey: targetDate!,
+        onFoodUpdated: (updatedFood) =>
+            _updateFoodInCalendar(targetDate!, updatedFood),
+      ),
+    );
   }
 
   void _onAddFood(String date, String mealType) {
@@ -435,14 +580,11 @@ class _MealPlanCalendarState extends State<MealPlanCalendar>
 
     return Scaffold(
       backgroundColor: Colors.white,
-      drawer: CustomDrawer(
-        currentScreen: DrawerScreenType.mealPlan,
-        onNavigateToTab: widget.onNavigateToTab,
-      ),
+      drawer: CustomDrawer(onNavigateToTab: widget.onNavigateToTab),
       body: CustomScrollView(
         slivers: [
           CustomSliverAppBar(title: 'Хоолны хуваарь'),
-          
+
           // Offline indicator
           if (_isOffline)
             SliverToBoxAdapter(
@@ -466,7 +608,7 @@ class _MealPlanCalendarState extends State<MealPlanCalendar>
                 ),
               ),
             ),
-          
+
           // Calendar header
           SliverToBoxAdapter(
             child: CalendarHeaderWidget(
@@ -480,7 +622,7 @@ class _MealPlanCalendarState extends State<MealPlanCalendar>
               selectedFilter: _selectedFilter,
             ),
           ),
-          
+
           // Loading state
           if (_isLoading)
             SliverFillRemaining(
@@ -488,9 +630,7 @@ class _MealPlanCalendarState extends State<MealPlanCalendar>
                 child: Column(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    CircularProgressIndicator(
-                      color: colorScheme.primary,
-                    ),
+                    CircularProgressIndicator(color: colorScheme.primary),
                     const SizedBox(height: 16),
                     Text(
                       'Loading food data...',
@@ -502,12 +642,14 @@ class _MealPlanCalendarState extends State<MealPlanCalendar>
                 ),
               ),
             ),
-          
+
           // Calendar content using original widgets
           if (!_isLoading)
             SliverToBoxAdapter(
               child: Container(
-                height: MediaQuery.of(context).size.height - 200, // Set a proper height
+                height:
+                    MediaQuery.of(context).size.height -
+                    200, // Set a proper height
                 child: RefreshIndicator(
                   onRefresh: _refreshFoodData,
                   color: colorScheme.primary,
@@ -537,14 +679,20 @@ class _MealPlanCalendarState extends State<MealPlanCalendar>
                               }
                             }
                           },
+                          onFoodDelete: _deleteFoodFromCalendar,
+                          onFoodEdit: _editFood,
                         )
                       : MonthViewWidget(
                           currentMonth: _currentDate,
                           monthMeals: _isFilterMode
                               ? _filteredFoodData
                               : _foodData,
+                          eatenForDayData: _eatenForDayData,
                           onDateTap: _onDateTap,
                           onAddMeal: _onAddFood,
+                          onFoodTap: _onFoodTap,
+                          onFoodDelete: _deleteFoodFromCalendar,
+                          onFoodEdit: _editFood,
                         ),
                 ),
               ),

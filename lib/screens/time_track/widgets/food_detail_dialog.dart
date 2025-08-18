@@ -5,10 +5,7 @@ import '../../../services/money_format.dart';
 class FoodDetailDialog extends StatelessWidget {
   final Map<String, dynamic> food;
 
-  const FoodDetailDialog({
-    super.key,
-    required this.food,
-  });
+  const FoodDetailDialog({super.key, required this.food});
 
   String _formatTimeFromMillis(int milliseconds) {
     final dateTime = DateTime.fromMillisecondsSinceEpoch(milliseconds);
@@ -52,7 +49,7 @@ class FoodDetailDialog extends StatelessWidget {
                 ],
               ),
             ),
-            
+
             // Content
             Flexible(
               child: SingleChildScrollView(
@@ -85,7 +82,7 @@ class FoodDetailDialog extends StatelessWidget {
                       ),
                       const SizedBox(height: 20),
                     ],
-                    
+
                     // Food name
                     Text(
                       food['name'] ?? 'Нэргүй хоол',
@@ -96,17 +93,22 @@ class FoodDetailDialog extends StatelessWidget {
                       ),
                     ),
                     const SizedBox(height: 12),
-                    
+
                     // Price
                     if (food['price'] != null)
                       Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 6,
+                        ),
                         decoration: BoxDecoration(
                           color: const Color(0xFF059669).withOpacity(0.1),
                           borderRadius: BorderRadius.circular(8),
                         ),
                         child: Text(
-                          MoneyFormatService.formatDoubleWithSymbol((food['price'] as num?)?.toDouble() ?? 0.0),
+                          MoneyFormatService.formatDoubleWithSymbol(
+                            (food['price'] as num?)?.toDouble() ?? 0.0,
+                          ),
                           style: const TextStyle(
                             fontSize: 18,
                             color: Color(0xFF059669),
@@ -114,11 +116,12 @@ class FoodDetailDialog extends StatelessWidget {
                           ),
                         ),
                       ),
-                    
+
                     const SizedBox(height: 16),
-                    
+
                     // Description
-                    if (food['description'] != null && food['description'].isNotEmpty) ...[
+                    if (food['description'] != null &&
+                        food['description'].isNotEmpty) ...[
                       const Text(
                         'Тайлбар:',
                         style: TextStyle(
@@ -138,7 +141,7 @@ class FoodDetailDialog extends StatelessWidget {
                       ),
                       const SizedBox(height: 16),
                     ],
-                    
+
                     // Added time
                     if (food['createdAt'] != null) ...[
                       const Text(

@@ -27,8 +27,9 @@ class _FoodDetailDialogState extends State<FoodDetailDialog> {
   late Map<String, dynamic> _foodData;
   bool _isLoading = false;
   bool _isLiked = false;
-  
-  String get _currentUserId => FirebaseAuth.instance.currentUser?.uid ?? 'anonymous';
+
+  String get _currentUserId =>
+      FirebaseAuth.instance.currentUser?.uid ?? 'anonymous';
 
   @override
   void initState() {
@@ -72,15 +73,17 @@ class _FoodDetailDialogState extends State<FoodDetailDialog> {
 
     // Add haptic feedback
     HapticFeedback.lightImpact();
-    
+
     setState(() {
       _isLoading = true;
     });
 
     try {
       final documentId = '${widget.dateKey}-foods';
-      final docRef = FirebaseFirestore.instance.collection('foods').doc(documentId);
-      
+      final docRef = FirebaseFirestore.instance
+          .collection('foods')
+          .doc(documentId);
+
       // Get current document
       final docSnapshot = await docRef.get();
       if (!docSnapshot.exists) {
@@ -89,7 +92,7 @@ class _FoodDetailDialogState extends State<FoodDetailDialog> {
 
       final data = docSnapshot.data()!;
       final foods = List<Map<String, dynamic>>.from(data['foods'] ?? []);
-      
+
       // Find the food item by ID
       final foodIndex = foods.indexWhere((f) => f['id'] == _foodData['id']);
       if (foodIndex == -1) {
@@ -98,7 +101,7 @@ class _FoodDetailDialogState extends State<FoodDetailDialog> {
 
       final currentFood = Map<String, dynamic>.from(foods[foodIndex]);
       final likes = List<String>.from(currentFood['likes'] ?? []);
-      
+
       if (_isLiked) {
         // Remove like
         likes.remove(currentUser.uid);
@@ -108,25 +111,24 @@ class _FoodDetailDialogState extends State<FoodDetailDialog> {
           likes.add(currentUser.uid);
         }
       }
-      
+
       // Update the food item
       currentFood['likes'] = likes;
       currentFood['likesCount'] = likes.length;
       foods[foodIndex] = currentFood;
-      
+
       // Update Firestore
       await docRef.update({
         'foods': foods,
         'lastUpdated': FieldValue.serverTimestamp(),
       });
-      
+
       setState(() {
         _foodData = currentFood;
         _isLiked = !_isLiked;
       });
-      
+
       widget.onFoodUpdated(_foodData);
-      
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -166,14 +168,18 @@ class _FoodDetailDialogState extends State<FoodDetailDialog> {
           .collection('users')
           .doc(currentUser.uid)
           .get();
-      
+
       final userData = userDoc.data();
-      final authorName = userData?['name'] ?? currentUser.displayName ?? 'Anonymous User';
-      final authorPhotoUrl = userData?['photoUrl'] ?? currentUser.photoURL ?? '';
+      final authorName =
+          userData?['name'] ?? currentUser.displayName ?? 'Anonymous User';
+      final authorPhotoUrl =
+          userData?['photoUrl'] ?? currentUser.photoURL ?? '';
 
       final documentId = '${widget.dateKey}-foods';
-      final docRef = FirebaseFirestore.instance.collection('foods').doc(documentId);
-      
+      final docRef = FirebaseFirestore.instance
+          .collection('foods')
+          .doc(documentId);
+
       // Get current document
       final docSnapshot = await docRef.get();
       if (!docSnapshot.exists) {
@@ -182,7 +188,7 @@ class _FoodDetailDialogState extends State<FoodDetailDialog> {
 
       final data = docSnapshot.data()!;
       final foods = List<Map<String, dynamic>>.from(data['foods'] ?? []);
-      
+
       // Find the food item by ID
       final foodIndex = foods.indexWhere((f) => f['id'] == _foodData['id']);
       if (foodIndex == -1) {
@@ -190,8 +196,10 @@ class _FoodDetailDialogState extends State<FoodDetailDialog> {
       }
 
       final currentFood = Map<String, dynamic>.from(foods[foodIndex]);
-      final comments = List<Map<String, dynamic>>.from(currentFood['comments'] ?? []);
-      
+      final comments = List<Map<String, dynamic>>.from(
+        currentFood['comments'] ?? [],
+      );
+
       // Create new comment
       final newComment = {
         'id': DateTime.now().millisecondsSinceEpoch.toString(),
@@ -203,34 +211,33 @@ class _FoodDetailDialogState extends State<FoodDetailDialog> {
         'likes': <String>[],
         'likesCount': 0,
       };
-      
+
       comments.add(newComment);
-      
+
       // Update the food item
       currentFood['comments'] = comments;
       currentFood['commentsCount'] = comments.length;
       foods[foodIndex] = currentFood;
-      
+
       // Update Firestore
       await docRef.update({
         'foods': foods,
         'lastUpdated': FieldValue.serverTimestamp(),
       });
-      
+
       setState(() {
         _foodData = currentFood;
         _commentController.clear();
       });
-      
+
       widget.onFoodUpdated(_foodData);
-      
+
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('Comment added successfully! ✅'),
           backgroundColor: Colors.green,
         ),
       );
-      
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -248,15 +255,17 @@ class _FoodDetailDialogState extends State<FoodDetailDialog> {
   Future<void> _toggleCommentLike(String commentId) async {
     // Add haptic feedback
     HapticFeedback.selectionClick();
-    
+
     setState(() {
       _isLoading = true;
     });
 
     try {
       final documentId = '${widget.dateKey}-foods';
-      final docRef = FirebaseFirestore.instance.collection('foods').doc(documentId);
-      
+      final docRef = FirebaseFirestore.instance
+          .collection('foods')
+          .doc(documentId);
+
       // Get current document
       final docSnapshot = await docRef.get();
       if (!docSnapshot.exists) {
@@ -265,7 +274,7 @@ class _FoodDetailDialogState extends State<FoodDetailDialog> {
 
       final data = docSnapshot.data()!;
       final foods = List<Map<String, dynamic>>.from(data['foods'] ?? []);
-      
+
       // Find the food item by ID
       final foodIndex = foods.indexWhere((f) => f['id'] == _foodData['id']);
       if (foodIndex == -1) {
@@ -273,8 +282,10 @@ class _FoodDetailDialogState extends State<FoodDetailDialog> {
       }
 
       final currentFood = Map<String, dynamic>.from(foods[foodIndex]);
-      final comments = List<Map<String, dynamic>>.from(currentFood['comments'] ?? []);
-      
+      final comments = List<Map<String, dynamic>>.from(
+        currentFood['comments'] ?? [],
+      );
+
       // Find the comment by ID
       final commentIndex = comments.indexWhere((c) => c['id'] == commentId);
       if (commentIndex == -1) {
@@ -283,7 +294,7 @@ class _FoodDetailDialogState extends State<FoodDetailDialog> {
 
       final currentComment = Map<String, dynamic>.from(comments[commentIndex]);
       final likes = List<String>.from(currentComment['likes'] ?? []);
-      
+
       if (likes.contains(_currentUserId)) {
         // Remove like
         likes.remove(_currentUserId);
@@ -291,28 +302,27 @@ class _FoodDetailDialogState extends State<FoodDetailDialog> {
         // Add like
         likes.add(_currentUserId);
       }
-      
+
       // Update the comment
       currentComment['likes'] = likes;
       currentComment['likesCount'] = likes.length;
       comments[commentIndex] = currentComment;
-      
+
       // Update the food item
       currentFood['comments'] = comments;
       foods[foodIndex] = currentFood;
-      
+
       // Update Firestore
       await docRef.update({
         'foods': foods,
         'lastUpdated': FieldValue.serverTimestamp(),
       });
-      
+
       setState(() {
         _foodData = currentFood;
       });
-      
+
       widget.onFoodUpdated(_foodData);
-      
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -330,7 +340,9 @@ class _FoodDetailDialogState extends State<FoodDetailDialog> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final comments = List<Map<String, dynamic>>.from(_foodData['comments'] ?? []);
+    final comments = List<Map<String, dynamic>>.from(
+      _foodData['comments'] ?? [],
+    );
     final likesCount = _foodData['likesCount'] ?? 0;
 
     return Dialog(
@@ -374,8 +386,9 @@ class _FoodDetailDialogState extends State<FoodDetailDialog> {
                       ),
                     ],
                   ),
-                  
-                  if (_foodData['image'] != null && _foodData['image'].isNotEmpty)
+
+                  if (_foodData['image'] != null &&
+                      _foodData['image'].isNotEmpty)
                     Container(
                       height: 200,
                       width: double.infinity,
@@ -388,8 +401,9 @@ class _FoodDetailDialogState extends State<FoodDetailDialog> {
                         ),
                       ),
                     ),
-                  
-                  if (_foodData['description'] != null && _foodData['description'].isNotEmpty)
+
+                  if (_foodData['description'] != null &&
+                      _foodData['description'].isNotEmpty)
                     Padding(
                       padding: const EdgeInsets.only(bottom: 8),
                       child: Text(
@@ -397,7 +411,7 @@ class _FoodDetailDialogState extends State<FoodDetailDialog> {
                         style: theme.textTheme.bodyMedium,
                       ),
                     ),
-                  
+
                   // Stats row
                   Container(
                     padding: const EdgeInsets.symmetric(vertical: 12),
@@ -412,7 +426,10 @@ class _FoodDetailDialogState extends State<FoodDetailDialog> {
                           child: Column(
                             children: [
                               Text(
-                                MoneyFormatService.formatDoubleWithSymbol((_foodData['price'] as num?)?.toDouble() ?? 0.0),
+                                MoneyFormatService.formatDoubleWithSymbol(
+                                  (_foodData['price'] as num?)?.toDouble() ??
+                                      0.0,
+                                ),
                                 style: theme.textTheme.titleLarge?.copyWith(
                                   fontWeight: FontWeight.w700,
                                   color: AppTheme.successLight,
@@ -493,12 +510,12 @@ class _FoodDetailDialogState extends State<FoodDetailDialog> {
                       child: Container(
                         padding: const EdgeInsets.symmetric(vertical: 12),
                         decoration: BoxDecoration(
-                          color: _isLiked 
+                          color: _isLiked
                               ? const Color(0xFFEF4444).withOpacity(0.1)
                               : Colors.grey[100],
                           borderRadius: BorderRadius.circular(12),
                           border: Border.all(
-                            color: _isLiked 
+                            color: _isLiked
                                 ? const Color(0xFFEF4444).withOpacity(0.3)
                                 : Colors.grey[300]!,
                           ),
@@ -512,21 +529,27 @@ class _FoodDetailDialogState extends State<FoodDetailDialog> {
                                     height: 20,
                                     child: CircularProgressIndicator(
                                       strokeWidth: 2,
-                                      color: _isLiked 
+                                      color: _isLiked
                                           ? const Color(0xFFEF4444)
                                           : Colors.grey[600],
                                     ),
                                   )
                                 : Icon(
-                                    _isLiked ? Icons.favorite : Icons.favorite_border,
-                                    color: _isLiked ? const Color(0xFFEF4444) : Colors.grey[600],
+                                    _isLiked
+                                        ? Icons.favorite
+                                        : Icons.favorite_border,
+                                    color: _isLiked
+                                        ? const Color(0xFFEF4444)
+                                        : Colors.grey[600],
                                     size: 20,
                                   ),
                             const SizedBox(width: 8),
                             Text(
                               _isLiked ? 'Liked' : 'Like',
                               style: TextStyle(
-                                color: _isLiked ? const Color(0xFFEF4444) : Colors.grey[700],
+                                color: _isLiked
+                                    ? const Color(0xFFEF4444)
+                                    : Colors.grey[700],
                                 fontWeight: FontWeight.w600,
                                 fontSize: 14,
                               ),
@@ -593,10 +616,11 @@ class _FoodDetailDialogState extends State<FoodDetailDialog> {
                           itemCount: comments.length,
                           itemBuilder: (context, index) {
                             final comment = comments[index];
-                            final isCommentLiked = (comment['likes'] as List<dynamic>? ?? [])
-                                .contains(_currentUserId);
+                            final isCommentLiked =
+                                (comment['likes'] as List<dynamic>? ?? [])
+                                    .contains(_currentUserId);
                             final commentLikes = comment['likesCount'] ?? 0;
-                            
+
                             return Container(
                               margin: const EdgeInsets.only(bottom: 12),
                               padding: const EdgeInsets.all(12),
@@ -613,12 +637,27 @@ class _FoodDetailDialogState extends State<FoodDetailDialog> {
                                       CircleAvatar(
                                         radius: 18,
                                         backgroundColor: Colors.grey[300],
-                                        backgroundImage: (comment['authorPhotoUrl'] != null && comment['authorPhotoUrl'].isNotEmpty)
-                                            ? NetworkImage(comment['authorPhotoUrl'])
+                                        backgroundImage:
+                                            (comment['authorPhotoUrl'] !=
+                                                    null &&
+                                                comment['authorPhotoUrl']
+                                                    .isNotEmpty)
+                                            ? NetworkImage(
+                                                comment['authorPhotoUrl'],
+                                              )
                                             : null,
-                                        child: (comment['authorPhotoUrl'] == null || comment['authorPhotoUrl'].isEmpty)
+                                        child:
+                                            (comment['authorPhotoUrl'] ==
+                                                    null ||
+                                                comment['authorPhotoUrl']
+                                                    .isEmpty)
                                             ? Text(
-                                                (comment['authorName'] as String? ?? comment['userName'] as String? ?? 'U')[0].toUpperCase(),
+                                                (comment['authorName']
+                                                            as String? ??
+                                                        comment['userName']
+                                                            as String? ??
+                                                        'U')[0]
+                                                    .toUpperCase(),
                                                 style: const TextStyle(
                                                   color: Colors.white,
                                                   fontWeight: FontWeight.w600,
@@ -630,20 +669,29 @@ class _FoodDetailDialogState extends State<FoodDetailDialog> {
                                       const SizedBox(width: 12),
                                       Expanded(
                                         child: Column(
-                                          crossAxisAlignment: CrossAxisAlignment.start,
+                                          crossAxisAlignment:
+                                              CrossAxisAlignment.start,
                                           children: [
                                             Text(
-                                              comment['authorName'] ?? comment['userName'] ?? 'Unknown User',
-                                              style: theme.textTheme.titleSmall?.copyWith(
-                                                fontWeight: FontWeight.w600,
-                                                color: const Color(0xFF1F2937),
-                                              ),
+                                              comment['authorName'] ??
+                                                  comment['userName'] ??
+                                                  'Unknown User',
+                                              style: theme.textTheme.titleSmall
+                                                  ?.copyWith(
+                                                    fontWeight: FontWeight.w600,
+                                                    color: const Color(
+                                                      0xFF1F2937,
+                                                    ),
+                                                  ),
                                             ),
                                             Text(
-                                              _formatCommentTime(comment['createdAt']),
-                                              style: theme.textTheme.bodySmall?.copyWith(
-                                                color: Colors.grey[600],
+                                              _formatCommentTime(
+                                                comment['createdAt'],
                                               ),
+                                              style: theme.textTheme.bodySmall
+                                                  ?.copyWith(
+                                                    color: Colors.grey[600],
+                                                  ),
                                             ),
                                           ],
                                         ),
@@ -657,36 +705,47 @@ class _FoodDetailDialogState extends State<FoodDetailDialog> {
                                     decoration: BoxDecoration(
                                       color: Colors.white,
                                       borderRadius: BorderRadius.circular(8),
-                                      border: Border.all(color: Colors.grey[100]!),
+                                      border: Border.all(
+                                        color: Colors.grey[100]!,
+                                      ),
                                     ),
                                     child: Text(
                                       comment['text'] ?? '',
-                                      style: theme.textTheme.bodyMedium?.copyWith(
-                                        height: 1.4,
-                                        color: const Color(0xFF374151),
-                                      ),
+                                      style: theme.textTheme.bodyMedium
+                                          ?.copyWith(
+                                            height: 1.4,
+                                            color: const Color(0xFF374151),
+                                          ),
                                     ),
                                   ),
                                   const SizedBox(height: 8),
                                   Row(
                                     children: [
                                       GestureDetector(
-                                        onTap: () => _toggleCommentLike(comment['id']),
+                                        onTap: () =>
+                                            _toggleCommentLike(comment['id']),
                                         child: Row(
                                           mainAxisSize: MainAxisSize.min,
                                           children: [
                                             Icon(
-                                              isCommentLiked ? Icons.favorite : Icons.favorite_border,
-                                              color: isCommentLiked ? Colors.red : Colors.grey,
+                                              isCommentLiked
+                                                  ? Icons.favorite
+                                                  : Icons.favorite_border,
+                                              color: isCommentLiked
+                                                  ? Colors.red
+                                                  : Colors.grey,
                                               size: 16,
                                             ),
                                             if (commentLikes > 0) ...[
                                               const SizedBox(width: 4),
                                               Text(
                                                 '$commentLikes',
-                                                style: theme.textTheme.labelSmall?.copyWith(
-                                                  color: Colors.grey[600],
-                                                ),
+                                                style: theme
+                                                    .textTheme
+                                                    .labelSmall
+                                                    ?.copyWith(
+                                                      color: Colors.grey[600],
+                                                    ),
                                               ),
                                             ],
                                           ],
@@ -720,14 +779,26 @@ class _FoodDetailDialogState extends State<FoodDetailDialog> {
                   CircleAvatar(
                     radius: 18,
                     backgroundColor: Colors.grey[300],
-                    backgroundImage: (FirebaseAuth.instance.currentUser?.photoURL != null)
-                        ? NetworkImage(FirebaseAuth.instance.currentUser!.photoURL!)
+                    backgroundImage:
+                        (FirebaseAuth.instance.currentUser?.photoURL != null)
+                        ? NetworkImage(
+                            FirebaseAuth.instance.currentUser!.photoURL!,
+                          )
                         : null,
                     child: (FirebaseAuth.instance.currentUser?.photoURL == null)
                         ? Text(
-                            (FirebaseAuth.instance.currentUser?.displayName?.isNotEmpty == true
-                                ? FirebaseAuth.instance.currentUser!.displayName![0]
-                                : 'A').toUpperCase(),
+                            (FirebaseAuth
+                                            .instance
+                                            .currentUser
+                                            ?.displayName
+                                            ?.isNotEmpty ==
+                                        true
+                                    ? FirebaseAuth
+                                          .instance
+                                          .currentUser!
+                                          .displayName![0]
+                                    : 'A')
+                                .toUpperCase(),
                             style: const TextStyle(
                               color: Colors.white,
                               fontWeight: FontWeight.w600,
@@ -801,11 +872,11 @@ class _FoodDetailDialogState extends State<FoodDetailDialog> {
 
   String _formatCommentTime(dynamic timestamp) {
     if (timestamp == null) return 'Just now';
-    
+
     final DateTime commentTime = DateTime.fromMillisecondsSinceEpoch(timestamp);
     final DateTime now = DateTime.now();
     final Duration difference = now.difference(commentTime);
-    
+
     if (difference.inMinutes < 1) {
       return 'Just now';
     } else if (difference.inMinutes < 60) {
