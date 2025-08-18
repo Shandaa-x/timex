@@ -131,11 +131,19 @@ class ChatService {
     return _firestore
         .collection('chatRooms')
         .where('participants', arrayContains: currentUserId)
-        .orderBy('lastMessageTime', descending: true)
+        // Removed .orderBy('lastMessageTime', descending: true) temporarily to avoid index requirement
         .snapshots()
-        .map((snapshot) => snapshot.docs
-            .map((doc) => ChatRoom.fromMap(doc.data(), doc.id))
-            .toList());
+        .map((snapshot) {
+          final chatRooms = snapshot.docs
+              .map((doc) => ChatRoom.fromMap(doc.data(), doc.id))
+              .toList();
+          
+          // Sort in memory instead of in query
+          chatRooms.sort((a, b) => (b.lastMessageTime ?? DateTime.now())
+              .compareTo(a.lastMessageTime ?? DateTime.now()));
+          
+          return chatRooms;
+        });
   }
 
   // Get only group chat rooms for the current user

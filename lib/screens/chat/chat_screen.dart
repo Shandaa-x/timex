@@ -22,7 +22,7 @@ class _ChatScreenState extends State<ChatScreen>
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 2, vsync: this);
+    _tabController = TabController(length: 3, vsync: this); // Changed from 2 to 3
     _tabController.addListener(() {
       setState(() {}); // Rebuild to show/hide FAB based on current tab
     });
@@ -52,44 +52,54 @@ class _ChatScreenState extends State<ChatScreen>
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFF8FAFC),
+      backgroundColor: Colors.white,
       appBar: AppBar(
         title: const Text(
-          'Чат',
+          'Flutter Demo Home Page',
           style: TextStyle(
-            fontWeight: FontWeight.bold,
+            fontWeight: FontWeight.w400,
             color: Colors.white,
+            fontSize: 20,
           ),
         ),
-        backgroundColor: const Color(0xFF8B5CF6),
+        backgroundColor: const Color(0xFF9C27B0), // Purple color from the image
         foregroundColor: Colors.white,
         elevation: 0,
+        centerTitle: true,
+        leading: IconButton(
+          icon: const Icon(Icons.menu, color: Colors.white),
+          onPressed: () {
+            // TODO: Open drawer
+          },
+        ),
         actions: [
           // Test notification button
           IconButton(
             icon: const Icon(Icons.notification_add),
             onPressed: () async {
               print('🔔 Testing notifications and debugging...');
-              
+
               // Debug current user's FCM token
               await NotificationService.debugCheckFCMToken();
-              
+
               // Debug all users with FCM tokens
               await NotificationService.debugListAllFCMTokens();
-              
+
               // Try to send a test notification to mungunshand_6
               print('🔔 Testing direct notification to mungunshand_6...');
               await NotificationService.debugSendNotificationToUser(
-                'mungunshand_6', 
-                'This is a test notification from debug'
+                'mungunshand_6',
+                'This is a test notification from debug',
               );
-              
+
               // Send test local notification on current device
               await NotificationService.sendTestNotification();
-              
+
               ScaffoldMessenger.of(context).showSnackBar(
                 const SnackBar(
-                  content: Text('Debug complete! Check console for FCM status.'),
+                  content: Text(
+                    'Debug complete! Check console for FCM status.',
+                  ),
                   duration: Duration(seconds: 3),
                 ),
               );
@@ -98,74 +108,64 @@ class _ChatScreenState extends State<ChatScreen>
           ),
         ],
         bottom: PreferredSize(
-          preferredSize: const Size.fromHeight(100),
-          child: Column(
-            children: [
-              // Search Bar
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                child: TextField(
-                  controller: _searchController,
-                  onChanged: (value) {
-                    setState(() {
-                      _searchQuery = value.toLowerCase();
-                    });
-                  },
-                  decoration: InputDecoration(
-                    hintText: 'Чат хайх...',
-                    prefixIcon: const Icon(Icons.search, color: Color(0xFF64748B)),
-                    suffixIcon: _searchQuery.isNotEmpty
-                        ? IconButton(
-                            icon: const Icon(Icons.clear, color: Color(0xFF64748B)),
-                            onPressed: () {
-                              _searchController.clear();
-                              setState(() {
-                                _searchQuery = '';
-                              });
-                            },
-                          )
-                        : null,
-                    filled: true,
-                    fillColor: Colors.white,
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      borderSide: BorderSide.none,
-                    ),
-                    contentPadding: const EdgeInsets.symmetric(
-                      horizontal: 16,
-                      vertical: 12,
-                    ),
+          preferredSize: const Size.fromHeight(60),
+          child: Container(
+            color: const Color(0xFFF3E5F5), // Light purple background
+            height: 60,
+            child: Row(
+              children: [
+                Expanded(
+                  child: GestureDetector(
+                    onTap: () => _tabController.animateTo(0),
+                    child: _buildTopTab('Chats', Icons.chat_bubble_outline),
                   ),
                 ),
-              ),
-              // Tabs
-              TabBar(
-                controller: _tabController,
-                indicatorColor: Colors.white,
-                indicatorWeight: 3,
-                labelColor: Colors.white,
-                unselectedLabelColor: Colors.white70,
-                labelStyle: const TextStyle(
-                  fontWeight: FontWeight.w600,
-                  fontSize: 16,
+                Expanded(
+                  child: GestureDetector(
+                    onTap: () => _tabController.animateTo(1),
+                    child: _buildTopTab('Messages', Icons.message),
+                  ),
                 ),
-                tabs: const [
-                  Tab(text: 'Бүгд'),
-                  Tab(text: 'Бүлэг'),
-                ],
-              ),
-            ],
+                Expanded(
+                  child: GestureDetector(
+                    onTap: () => _tabController.animateTo(2),
+                    child: _buildTopTab('Groups', Icons.group),
+                  ),
+                ),
+              ],
+            ),
           ),
         ),
       ),
       body: TabBarView(
         controller: _tabController,
         children: [
-          _buildUserList(), // Show all users in "Бүгд" tab
-          _buildGroupChatList(), // Show group chats in "Бүлэг" tab
+          _buildAllChatsList(), // Tab 0: "Chats" - Show ALL chats (users + groups)
+          _buildUserChatsList(), // Tab 1: "Messages" - Show only user-to-user chats  
+          _buildGroupChatList(), // Tab 2: "Groups" - Show group chats only
         ],
       ),
-      floatingActionButton: _tabController.index == 1 // Show FAB only on Group tab
+      bottomNavigationBar: Container(
+        height: 80,
+        decoration: const BoxDecoration(
+          color: Colors.white,
+          border: Border(top: BorderSide(color: Color(0xFFE5E7EB), width: 0.5)),
+        ),
+        child: SafeArea(
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceAround,
+            children: [
+              _buildBottomNavItem('Home', Icons.home, false),
+              _buildBottomNavItem('Search', Icons.search, false),
+              _buildBottomNavItem('Chat', Icons.chat, true), // Active tab
+              _buildBottomNavItem('Dates', Icons.calendar_today, false),
+            ],
+          ),
+        ),
+      ),
+      floatingActionButton:
+          _tabController.index ==
+              2 // Show FAB only on Groups tab (index 2)
           ? FloatingActionButton(
               onPressed: () {
                 Navigator.of(context).push(
@@ -181,9 +181,9 @@ class _ChatScreenState extends State<ChatScreen>
     );
   }
 
-  Widget _buildUserList() {
-    return StreamBuilder<List<UserProfile>>(
-      stream: ChatService.getAllUsers(),
+  Widget _buildAllChatsList() {
+    return StreamBuilder<List<ChatRoom>>(
+      stream: ChatService.getUserChatRooms(),
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
           return const Center(
@@ -212,59 +212,31 @@ class _ChatScreenState extends State<ChatScreen>
                     color: Colors.grey.shade600,
                   ),
                 ),
-                const SizedBox(height: 8),
-                Text(
-                  snapshot.error.toString(),
-                  style: TextStyle(
-                    color: Colors.grey.shade500,
-                  ),
-                  textAlign: TextAlign.center,
-                ),
               ],
             ),
           );
         }
 
-        List<UserProfile> users = snapshot.data ?? [];
+        List<ChatRoom> allChats = snapshot.data ?? [];
 
-        // Filter by search query
-        if (_searchQuery.isNotEmpty) {
-          users = users.where((user) =>
-              user.displayName.toLowerCase().contains(_searchQuery) ||
-              (user.email?.toLowerCase().contains(_searchQuery) ?? false)
-          ).toList();
-        }
-
-        if (users.isEmpty) {
+        if (allChats.isEmpty) {
           return Center(
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
                 Icon(
-                  Icons.people_outline,
+                  Icons.chat_bubble_outline,
                   size: 64,
                   color: Colors.grey.shade400,
                 ),
                 const SizedBox(height: 16),
                 Text(
-                  _searchQuery.isNotEmpty
-                      ? 'Хэрэглэгч олдсонгүй'
-                      : 'Хэрэглэгч байхгүй байна',
+                  'Чат байхгүй байна',
                   style: TextStyle(
                     fontSize: 18,
                     fontWeight: FontWeight.w600,
                     color: Colors.grey.shade600,
                   ),
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  _searchQuery.isNotEmpty
-                      ? 'Өөр түлхүүр үг оруулж хайж үзээрэй'
-                      : 'Одоогоор хэрэглэгч байхгүй байна',
-                  style: TextStyle(
-                    color: Colors.grey.shade500,
-                  ),
-                  textAlign: TextAlign.center,
                 ),
               ],
             ),
@@ -273,11 +245,101 @@ class _ChatScreenState extends State<ChatScreen>
 
         return ListView.builder(
           padding: const EdgeInsets.symmetric(vertical: 8),
-          itemCount: users.length,
+          itemCount: allChats.length,
           itemBuilder: (context, index) {
-            final user = users[index];
-            return _buildUserTile(user);
+            final chatRoom = allChats[index];
+            return _buildChatRoomTile(chatRoom);
           },
+        );
+      },
+    );
+  }
+
+  Widget _buildUserChatsList() {
+    return StreamBuilder<List<ChatRoom>>(
+      stream: ChatService.getUserChatRooms(),
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const Center(
+            child: CircularProgressIndicator(
+              valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF8B5CF6)),
+            ),
+          );
+        }
+
+        if (snapshot.hasError) {
+          return Center(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(
+                  Icons.error_outline,
+                  size: 64,
+                  color: Colors.grey.shade400,
+                ),
+                const SizedBox(height: 16),
+                Text(
+                  'Алдаа гарлаа',
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.w600,
+                    color: Colors.grey.shade600,
+                  ),
+                ),
+              ],
+            ),
+          );
+        }
+
+        // Filter only direct/user-to-user chats (not group chats)
+        List<ChatRoom> userChats = (snapshot.data ?? [])
+            .where((chat) => chat.type != 'group')
+            .toList();
+
+        if (userChats.isEmpty) {
+          return Center(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(
+                  Icons.person_outline,
+                  size: 64,
+                  color: Colors.grey.shade400,
+                ),
+                const SizedBox(height: 16),
+                Text(
+                  'Хувийн чат байхгүй байна',
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.w600,
+                    color: Colors.grey.shade600,
+                  ),
+                ),
+              ],
+            ),
+          );
+        }
+
+        return ListView.builder(
+          padding: const EdgeInsets.symmetric(vertical: 8),
+          itemCount: userChats.length,
+          itemBuilder: (context, index) {
+            final chatRoom = userChats[index];
+            return _buildChatRoomTile(chatRoom);
+          },
+        );
+      },
+    );
+  }
+
+  Widget _buildChatRoomTile(ChatRoom chatRoom) {
+    return ChatRoomTile(
+      chatRoom: chatRoom,
+      onTap: () {
+        Navigator.of(context).push(
+          MaterialPageRoute(
+            builder: (context) => ChatRoomScreen(chatRoom: chatRoom),
+          ),
         );
       },
     );
@@ -317,9 +379,7 @@ class _ChatScreenState extends State<ChatScreen>
                 const SizedBox(height: 8),
                 Text(
                   snapshot.error.toString(),
-                  style: TextStyle(
-                    color: Colors.grey.shade500,
-                  ),
+                  style: TextStyle(color: Colors.grey.shade500),
                   textAlign: TextAlign.center,
                 ),
               ],
@@ -331,10 +391,14 @@ class _ChatScreenState extends State<ChatScreen>
 
         // Filter by search query
         if (_searchQuery.isNotEmpty) {
-          chatRooms = chatRooms.where((room) =>
-              room.name.toLowerCase().contains(_searchQuery) ||
-              (room.lastMessage?.toLowerCase().contains(_searchQuery) ?? false)
-          ).toList();
+          chatRooms = chatRooms
+              .where(
+                (room) =>
+                    room.name.toLowerCase().contains(_searchQuery) ||
+                    (room.lastMessage?.toLowerCase().contains(_searchQuery) ??
+                        false),
+              )
+              .toList();
         }
 
         if (chatRooms.isEmpty) {
@@ -342,11 +406,7 @@ class _ChatScreenState extends State<ChatScreen>
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                Icon(
-                  Icons.group,
-                  size: 64,
-                  color: Colors.grey.shade400,
-                ),
+                Icon(Icons.group, size: 64, color: Colors.grey.shade400),
                 const SizedBox(height: 16),
                 Text(
                   _searchQuery.isNotEmpty
@@ -363,9 +423,7 @@ class _ChatScreenState extends State<ChatScreen>
                   _searchQuery.isNotEmpty
                       ? 'Өөр түлхүүр үг оруулж хайж үзээрэй'
                       : 'Шинэ бүлгийн чат үүсгэхийн тулд + товчийг дарна уу',
-                  style: TextStyle(
-                    color: Colors.grey.shade500,
-                  ),
+                  style: TextStyle(color: Colors.grey.shade500),
                   textAlign: TextAlign.center,
                 ),
                 const SizedBox(height: 16),
@@ -395,204 +453,65 @@ class _ChatScreenState extends State<ChatScreen>
           itemCount: chatRooms.length,
           itemBuilder: (context, index) {
             final chatRoom = chatRooms[index];
-            return ChatRoomTile(
-              chatRoom: chatRoom,
-              onTap: () {
-                Navigator.of(context).push(
-                  MaterialPageRoute(
-                    builder: (context) => ChatRoomScreen(
-                      chatRoom: chatRoom,
-                    ),
-                  ),
-                );
-              },
-            );
+            return _buildChatRoomTile(chatRoom);
           },
         );
       },
     );
   }
 
-  Widget _buildUserTile(UserProfile user) {
-    return StreamBuilder<ChatRoom?>(
-      stream: _getDirectChatStream(user.id),
-      builder: (context, chatSnapshot) {
-        final chatRoom = chatSnapshot.data;
-        final hasConversation = chatRoom != null;
-        final lastMessage = chatRoom?.lastMessage;
-        final lastMessageSender = chatRoom?.lastMessageSender;
-        
-        String displayMessage = '';
-        if (hasConversation && lastMessage != null && lastMessage.isNotEmpty) {
-          if (lastMessageSender == ChatService.currentUserId) {
-            displayMessage = 'You: $lastMessage';
-          } else {
-            displayMessage = '${user.displayName}: $lastMessage';
-          }
-        } else if (hasConversation) {
-          displayMessage = 'Чат эхлүүлэх';
-        } else {
-          displayMessage = 'Чат эхлүүлэх';
-        }
-        
-        return Container(
-          margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(12),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withOpacity(0.05),
-                blurRadius: 4,
-                offset: const Offset(0, 2),
-              ),
-            ],
+  Widget _buildTopTab(String text, IconData icon) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(20),
+        color: Colors.transparent,
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 16, color: Colors.white),
+          const SizedBox(width: 8),
+          Text(
+            text,
+            style: const TextStyle(
+              color: Colors.white,
+              fontWeight: FontWeight.w500,
+            ),
           ),
-          child: ListTile(
-            contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-            leading: Stack(
-              children: [
-                CircleAvatar(
-                  radius: 28,
-                  backgroundImage: user.photoURL != null && user.photoURL!.isNotEmpty
-                      ? NetworkImage(user.photoURL!)
-                      : null,
-                  backgroundColor: const Color(0xFF8B5CF6),
-                  child: user.photoURL == null || user.photoURL!.isEmpty
-                      ? Text(
-                          user.displayName.isNotEmpty 
-                              ? user.displayName.substring(0, 1).toUpperCase()
-                              : '?',
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 18,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        )
-                      : null,
-                ),
-                if (user.isOnline)
-                  Positioned(
-                    right: 0,
-                    bottom: 0,
-                    child: Container(
-                      width: 16,
-                      height: 16,
-                      decoration: BoxDecoration(
-                        color: const Color(0xFF10B981),
-                        shape: BoxShape.circle,
-                        border: Border.all(
-                          color: Colors.white,
-                          width: 2,
-                        ),
-                      ),
-                    ),
-                  ),
-              ],
-            ),
-            title: Text(
-              user.displayName,
-              style: const TextStyle(
-                fontWeight: FontWeight.w600,
-                fontSize: 16,
-                color: Color(0xFF1E293B),
-              ),
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-            ),
-            subtitle: Text(
-              displayMessage,
-              style: TextStyle(
-                color: hasConversation 
-                    ? Colors.grey.shade600 
-                    : Colors.grey.shade500,
-                fontSize: 14,
-                fontStyle: !hasConversation ? FontStyle.italic : FontStyle.normal,
-                fontWeight: lastMessageSender == ChatService.currentUserId && hasConversation
-                    ? FontWeight.w500
-                    : FontWeight.normal,
-              ),
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-            ),
-            trailing: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                if (chatRoom?.lastMessageTime != null)
-                  Text(
-                    _formatMessageTime(chatRoom!.lastMessageTime!),
-                    style: TextStyle(
-                      color: Colors.grey.shade400,
-                      fontSize: 12,
-                    ),
-                  ),
-                const SizedBox(width: 8),
-                Icon(
-                  hasConversation ? Icons.chat : Icons.chat_bubble_outline,
-                  color: hasConversation 
-                      ? const Color(0xFF8B5CF6) 
-                      : Colors.grey.shade400,
-                  size: 20,
-                ),
-              ],
-            ),
-            onTap: () => _startChatWithUser(user),
-          ),
-        );
-      },
+        ],
+      ),
     );
   }
 
-  Stream<ChatRoom?> _getDirectChatStream(String userId) {
-    return ChatService.getDirectChatStream(userId);
-  }
-
-  String _formatMessageTime(DateTime time) {
-    final now = DateTime.now();
-    final today = DateTime(now.year, now.month, now.day);
-    final messageDate = DateTime(time.year, time.month, time.day);
-    
-    if (messageDate == today) {
-      // Today: show time
-      return '${time.hour.toString().padLeft(2, '0')}:${time.minute.toString().padLeft(2, '0')}';
-    } else if (messageDate == today.subtract(const Duration(days: 1))) {
-      // Yesterday
-      return 'Өчигдөр';
-    } else if (now.difference(messageDate).inDays < 7) {
-      // This week: show day name
-      const days = ['Даваа', 'Мягмар', 'Лхагва', 'Пүрэв', 'Баасан', 'Бямба', 'Ням'];
-      return days[time.weekday - 1];
-    } else {
-      // Older: show date
-      return '${time.day}/${time.month}';
-    }
-  }
-
-  void _startChatWithUser(UserProfile user) async {
-    try {
-      // Check if a direct chat already exists
-      final existingChatRoom = await ChatService.getOrCreateDirectChat(user.id);
-      
-      if (existingChatRoom != null) {
-        // Navigate to existing chat
-        Navigator.of(context).push(
-          MaterialPageRoute(
-            builder: (context) => ChatRoomScreen(
-              chatRoom: existingChatRoom,
+  Widget _buildBottomNavItem(String label, IconData icon, bool isActive) {
+    return GestureDetector(
+      onTap: () {
+        // Handle navigation
+        print('Tapped $label');
+      },
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 8),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              icon,
+              size: 24,
+              color: isActive ? const Color(0xFF9C27B0) : Colors.grey,
             ),
-          ),
-        );
-      }
-    } catch (e) {
-      // Show error message
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Чат эхлүүлэхэд алдаа гарлаа: $e'),
-            backgroundColor: Colors.red,
-          ),
-        );
-      }
-    }
+            const SizedBox(height: 4),
+            Text(
+              label,
+              style: TextStyle(
+                fontSize: 12,
+                color: isActive ? const Color(0xFF9C27B0) : Colors.grey,
+                fontWeight: isActive ? FontWeight.w600 : FontWeight.normal,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 }
