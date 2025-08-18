@@ -13,7 +13,7 @@ class ChatRoomScreen extends StatefulWidget {
   State<ChatRoomScreen> createState() => _ChatRoomScreenState();
 }
 
-class _ChatRoomScreenState extends State<ChatRoomScreen> 
+class _ChatRoomScreenState extends State<ChatRoomScreen>
     with SingleTickerProviderStateMixin {
   final TextEditingController _messageController = TextEditingController();
   final ScrollController _scrollController = ScrollController();
@@ -111,27 +111,27 @@ class _ChatRoomScreenState extends State<ChatRoomScreen>
     });
   }
 
-  Widget _buildTopTab(String text, IconData icon) {
+  Widget _buildTopTab(String text, IconData icon, bool isActive) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(20),
         color: Colors.transparent,
       ),
-      child: Row(
+      child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
           Icon(
             icon,
             size: 16,
-            color: Colors.white,
+            color: isActive ? const Color(0xFF9C27B0) : Colors.black,
           ),
           const SizedBox(width: 8),
           Text(
             text,
-            style: const TextStyle(
-              color: Colors.white,
-              fontWeight: FontWeight.w500,
+            style: TextStyle(
+              color: isActive ? const Color(0xFF9C27B0) : Colors.black,
+              fontWeight: isActive ? FontWeight.w600 : FontWeight.w500,
             ),
           ),
         ],
@@ -139,116 +139,19 @@ class _ChatRoomScreenState extends State<ChatRoomScreen>
     );
   }
 
-  Widget _buildBottomNavItem(String label, IconData icon, bool isActive) {
-    return GestureDetector(
-      onTap: () {
-        // Handle navigation
-        if (label == 'Home' || label == 'Search' || label == 'Dates') {
-          // Navigate to other screens
-          print('Tapped $label');
-        }
-        // Chat is already active, so no action needed
-      },
-      child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 8),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(
-              icon,
-              size: 24,
-              color: isActive ? const Color(0xFF9C27B0) : Colors.grey,
-            ),
-            const SizedBox(height: 4),
-            Text(
-              label,
-              style: TextStyle(
-                fontSize: 12,
-                color: isActive ? const Color(0xFF9C27B0) : Colors.grey,
-                fontWeight: isActive ? FontWeight.w600 : FontWeight.normal,
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: Colors.white,
-      appBar: AppBar(
-        title: const Text('Flutter Demo Home Page'),
-        backgroundColor: const Color(0xFF9C27B0),
-        foregroundColor: Colors.white,
-        elevation: 0,
-        leading: IconButton(
-          icon: const Icon(Icons.menu, color: Colors.white),
-          onPressed: () {
-            // Handle menu action
-          },
-        ),
-        bottom: PreferredSize(
-          preferredSize: const Size.fromHeight(60),
-          child: Container(
-            color: const Color(0xFFF3E5F5), // Light purple background
-            height: 60,
-            child: Row(
-              children: [
-                Expanded(
-                  child: GestureDetector(
-                    onTap: () => Navigator.pop(context),
-                    child: _buildTopTab('Chats', Icons.chat_bubble_outline),
-                  ),
-                ),
-                Expanded(
-                  child: Container(
-                    decoration: const BoxDecoration(
-                      border: Border(
-                        bottom: BorderSide(
-                          color: Color(0xFF9C27B0),
-                          width: 2,
-                        ),
-                      ),
-                    ),
-                    child: _buildTopTab('Messages', Icons.message),
-                  ),
-                ),
-                Expanded(
-                  child: GestureDetector(
-                    onTap: () => Navigator.pop(context),
-                    child: _buildTopTab('Groups', Icons.group),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
-      ),
-      body: Column(
-        children: [
-          // Chat Room Header (User info section)
-          Container(
-            width: double.infinity,
-            padding: const EdgeInsets.all(16),
-            decoration: const BoxDecoration(
-              color: Color(0xFF9C27B0),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black12,
-                  offset: Offset(0, 2),
-                  blurRadius: 4,
-                ),
-              ],
-            ),
-            child: Row(
+  Widget _buildAppBarTitle() {
+    if (widget.chatRoom.type == 'group') {
+      return FutureBuilder<List<UserProfile>>(
+        future: ChatService.getParticipantProfiles(widget.chatRoom.participants),
+        builder: (context, snapshot) {
+          if (snapshot.connectionState == ConnectionState.waiting) {
+            return Row(
               children: [
                 CircleAvatar(
-                  radius: 20,
-                  backgroundColor: const Color(0xFF7B1FA2),
-                  child: Icon(
-                    widget.chatRoom.type == 'group' ? Icons.group : Icons.person,
+                  radius: 18,
+                  backgroundColor: const Color(0xFF8B5CF6),
+                  child: const Icon(
+                    Icons.group,
                     color: Colors.white,
                     size: 20,
                   ),
@@ -261,31 +164,307 @@ class _ChatRoomScreenState extends State<ChatRoomScreen>
                       Text(
                         widget.chatRoom.name,
                         style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 18,
                           fontWeight: FontWeight.w600,
+                          fontSize: 18,
+                          color: Colors.white,
                         ),
                       ),
-                      const SizedBox(height: 2),
                       Text(
-                        widget.chatRoom.type == 'group' ? 'Group Chat' : 'Online',
+                        'Group Chat',
                         style: const TextStyle(
+                          fontSize: 13,
                           color: Colors.white70,
-                          fontSize: 14,
+                          fontWeight: FontWeight.w400,
                         ),
                       ),
                     ],
                   ),
                 ),
-                IconButton(
-                  icon: const Icon(Icons.info_outline, color: Colors.white),
-                  onPressed: () {
-                    // Show info
-                  },
+              ],
+            );
+          }
+          
+          final participants = snapshot.data ?? [];
+          final otherParticipants = participants
+              .where((p) => p.id != ChatService.currentUserId)
+              .take(2)
+              .toList();
+          
+          Widget groupAvatar;
+          if (otherParticipants.length >= 2) {
+            // Show first 2 users' images overlapping
+            groupAvatar = SizedBox(
+              width: 36,
+              height: 36,
+              child: Stack(
+                children: [
+                  Positioned(
+                    left: 0,
+                    top: 0,
+                    child: Container(
+                      width: 24,
+                      height: 24,
+                      decoration: BoxDecoration(
+                        border: Border.all(color: Colors.white, width: 1.5),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: CircleAvatar(
+                        radius: 10,
+                        backgroundImage: otherParticipants[0].photoURL != null && 
+                                         otherParticipants[0].photoURL!.isNotEmpty
+                            ? NetworkImage(otherParticipants[0].photoURL!)
+                            : null,
+                        backgroundColor: const Color(0xFF8B5CF6),
+                        child: otherParticipants[0].photoURL == null || 
+                               otherParticipants[0].photoURL!.isEmpty
+                            ? Text(
+                                otherParticipants[0].displayName.isNotEmpty
+                                    ? otherParticipants[0].displayName.substring(0, 1).toUpperCase()
+                                    : 'U',
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 8,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              )
+                            : null,
+                      ),
+                    ),
+                  ),
+                  Positioned(
+                    right: 0,
+                    bottom: 0,
+                    child: Container(
+                      width: 24,
+                      height: 24,
+                      decoration: BoxDecoration(
+                        border: Border.all(color: Colors.white, width: 1.5),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: CircleAvatar(
+                        radius: 10,
+                        backgroundImage: otherParticipants[1].photoURL != null && 
+                                         otherParticipants[1].photoURL!.isNotEmpty
+                            ? NetworkImage(otherParticipants[1].photoURL!)
+                            : null,
+                        backgroundColor: const Color(0xFF8B5CF6),
+                        child: otherParticipants[1].photoURL == null || 
+                               otherParticipants[1].photoURL!.isEmpty
+                            ? Text(
+                                otherParticipants[1].displayName.isNotEmpty
+                                    ? otherParticipants[1].displayName.substring(0, 1).toUpperCase()
+                                    : 'U',
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 8,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              )
+                            : null,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            );
+          } else {
+            // Fallback to group icon
+            groupAvatar = CircleAvatar(
+              radius: 18,
+              backgroundColor: const Color(0xFF8B5CF6),
+              child: const Icon(
+                Icons.group,
+                color: Colors.white,
+                size: 20,
+              ),
+            );
+          }
+          
+          return Row(
+            children: [
+              groupAvatar,
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      widget.chatRoom.name,
+                      style: const TextStyle(
+                        fontWeight: FontWeight.w600,
+                        fontSize: 18,
+                        color: Colors.white,
+                      ),
+                    ),
+                    Text(
+                      '${widget.chatRoom.participants.length} members',
+                      style: const TextStyle(
+                        fontSize: 13,
+                        color: Colors.white70,
+                        fontWeight: FontWeight.w400,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          );
+        },
+      );
+    } else {
+      // For direct chats, show the other user's avatar
+      final otherParticipant = _participants.firstWhere(
+        (p) => p.id != ChatService.currentUserId,
+        orElse: () => UserProfile(
+          id: '',
+          displayName: widget.chatRoom.name,
+          email: '',
+          isOnline: false,
+        ),
+      );
+      
+      return Row(
+        children: [
+          Container(
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              border: Border.all(
+                color: otherParticipant.isOnline ? const Color(0xFF10B981) : Colors.white24, 
+                width: 2
+              ),
+            ),
+            child: CircleAvatar(
+              radius: 18,
+              backgroundImage: otherParticipant.photoURL != null && 
+                               otherParticipant.photoURL!.isNotEmpty
+                  ? NetworkImage(otherParticipant.photoURL!)
+                  : null,
+              backgroundColor: const Color(0xFF8B5CF6),
+              child: otherParticipant.photoURL == null || 
+                     otherParticipant.photoURL!.isEmpty
+                  ? Text(
+                      otherParticipant.displayName.isNotEmpty
+                          ? otherParticipant.displayName.substring(0, 1).toUpperCase()
+                          : 'U',
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 16,
+                      ),
+                    )
+                  : null,
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  otherParticipant.displayName.isNotEmpty 
+                      ? otherParticipant.displayName 
+                      : widget.chatRoom.name,
+                  style: const TextStyle(
+                    fontWeight: FontWeight.w600,
+                    fontSize: 18,
+                    color: Colors.white,
+                  ),
+                ),
+                Row(
+                  children: [
+                    if (otherParticipant.isOnline)
+                      Container(
+                        width: 8,
+                        height: 8,
+                        decoration: const BoxDecoration(
+                          color: Color(0xFF10B981),
+                          shape: BoxShape.circle,
+                        ),
+                      ),
+                    if (otherParticipant.isOnline) const SizedBox(width: 6),
+                    Text(
+                      otherParticipant.isOnline ? 'Online' : 'Offline',
+                      style: const TextStyle(
+                        fontSize: 13,
+                        color: Colors.white70,
+                        fontWeight: FontWeight.w400,
+                      ),
+                    ),
+                  ],
                 ),
               ],
             ),
           ),
+        ],
+      );
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: const Color(0xFFF8FAFC),
+      appBar: AppBar(
+        title: _buildAppBarTitle(),
+        backgroundColor: const Color(
+          0xFF9C27B0,
+        ), // Purple color like in the image
+        foregroundColor: Colors.white,
+        elevation: 0,
+        actions: [
+          if (widget.chatRoom.type == 'group')
+            IconButton(
+              icon: const Icon(Icons.info_outline),
+              onPressed: () {
+                // TODO: Show group info
+              },
+            ),
+        ],
+        bottom: PreferredSize(
+          preferredSize: const Size.fromHeight(60),
+          child: Container(
+            color: Colors.white,
+            height: 60,
+            child: Row(
+              children: [
+                Expanded(
+                  child: GestureDetector(
+                    onTap: () {
+                      Navigator.of(context).pop(); // Go back to chats tab
+                      _tabController.animateTo(0);
+                    },
+                    child: _buildTopTab(
+                      'Chats',
+                      Icons.chat_bubble_outline,
+                      true,
+                    ), // Active since we're in chat
+                  ),
+                ),
+                Expanded(
+                  child: GestureDetector(
+                    onTap: () {
+                      Navigator.of(context).pop(); // Go back to messages tab
+                      _tabController.animateTo(1);
+                    },
+                    child: _buildTopTab('Messages', Icons.message, false),
+                  ),
+                ),
+                Expanded(
+                  child: GestureDetector(
+                    onTap: () {
+                      Navigator.of(context).pop(); // Go back to groups tab
+                      _tabController.animateTo(2);
+                    },
+                    child: _buildTopTab('Groups', Icons.group, false),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+      body: Column(
+        children: [
           // Messages List
           Expanded(
             child: StreamBuilder<List<Message>>(
@@ -519,24 +698,6 @@ class _ChatRoomScreenState extends State<ChatRoomScreen>
           ),
         ],
       ),
-      bottomNavigationBar: Container(
-        height: 80,
-        decoration: const BoxDecoration(
-          color: Colors.white,
-          border: Border(top: BorderSide(color: Color(0xFFE5E7EB), width: 0.5)),
-        ),
-        child: SafeArea(
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceAround,
-            children: [
-              _buildBottomNavItem('Home', Icons.home, false),
-              _buildBottomNavItem('Search', Icons.search, false),
-              _buildBottomNavItem('Chat', Icons.chat, true), // Active tab
-              _buildBottomNavItem('Dates', Icons.calendar_today, false),
-            ],
-          ),
-        ),
-      ),
     );
   }
 
@@ -592,50 +753,38 @@ class _ChatRoomScreenState extends State<ChatRoomScreen>
                     maxWidth: MediaQuery.of(context).size.width * 0.7,
                   ),
                   padding: const EdgeInsets.symmetric(
-                    horizontal: 16,
-                    vertical: 12,
+                    horizontal: 12,
+                    vertical: 8,
                   ),
                   decoration: BoxDecoration(
                     color: isMe
                         ? const Color(0xFF8B5CF6)
                         : const Color(0xFFF3F4F6),
-                    borderRadius: BorderRadius.only(
-                      topLeft: const Radius.circular(20),
-                      topRight: const Radius.circular(20),
-                      bottomLeft: isMe
-                          ? const Radius.circular(20)
-                          : const Radius.circular(4),
-                      bottomRight: isMe
-                          ? const Radius.circular(4)
-                          : const Radius.circular(20),
-                    ),
+                    borderRadius: BorderRadius.circular(15),
                   ),
-                  child: Text(
-                    message.content,
-                    style: TextStyle(
-                      color: isMe ? Colors.white : const Color(0xFF1F2937),
-                      fontSize: 16,
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Padding(
-                  padding: EdgeInsets.only(
-                    left: isMe ? 0 : 8,
-                    right: isMe ? 8 : 0,
-                  ),
-                  child: Text(
-                    _formatMessageTime(message.timestamp),
-                    style: const TextStyle(
-                      fontSize: 12,
-                      color: Color(0xFF9CA3AF),
-                    ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        message.content,
+                        style: TextStyle(
+                          color: isMe ? Colors.white : const Color(0xFF1F2937),
+                          fontSize: 15,
+                        ),
+                      ),
+                      Text(
+                        _formatMessageTime(message.timestamp),
+                        style: TextStyle(
+                          fontSize: 11,
+                          color: isMe ? Colors.white : Color(0xFF9CA3AF),
+                        ),
+                      ),
+                    ],
                   ),
                 ),
               ],
             ),
           ),
-          if (isMe) const SizedBox(width: 40),
         ],
       ),
     );

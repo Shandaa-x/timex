@@ -55,7 +55,7 @@ class _ChatScreenState extends State<ChatScreen>
       backgroundColor: Colors.white,
       appBar: AppBar(
         title: const Text(
-          'Flutter Demo Home Page',
+          'Чат',
           style: TextStyle(
             fontWeight: FontWeight.w400,
             color: Colors.white,
@@ -110,29 +110,28 @@ class _ChatScreenState extends State<ChatScreen>
         bottom: PreferredSize(
           preferredSize: const Size.fromHeight(60),
           child: Container(
-            color: const Color(0xFFF3E5F5), // Light purple background
-            height: 60,
-            child: Row(
-              children: [
-                Expanded(
-                  child: GestureDetector(
-                    onTap: () => _tabController.animateTo(0),
-                    child: _buildTopTab('Chats', Icons.chat_bubble_outline),
+            color: const Color.fromARGB(255, 255, 255, 255), // Light purple background
+            height: 60,              child: Row(
+                children: [
+                  Expanded(
+                    child: GestureDetector(
+                      onTap: () => _tabController.animateTo(0),
+                      child: _buildTopTab('Chats', Icons.chat_bubble_outline, _tabController.index == 0),
+                    ),
                   ),
-                ),
-                Expanded(
-                  child: GestureDetector(
-                    onTap: () => _tabController.animateTo(1),
-                    child: _buildTopTab('Messages', Icons.message),
+                  Expanded(
+                    child: GestureDetector(
+                      onTap: () => _tabController.animateTo(1),
+                      child: _buildTopTab('Messages', Icons.message, _tabController.index == 1),
+                    ),
                   ),
-                ),
-                Expanded(
-                  child: GestureDetector(
-                    onTap: () => _tabController.animateTo(2),
-                    child: _buildTopTab('Groups', Icons.group),
+                  Expanded(
+                    child: GestureDetector(
+                      onTap: () => _tabController.animateTo(2),
+                      child: _buildTopTab('Groups', Icons.group, _tabController.index == 2),
+                    ),
                   ),
-                ),
-              ],
+                ],
             ),
           ),
         ),
@@ -146,7 +145,7 @@ class _ChatScreenState extends State<ChatScreen>
         ],
       ),
       bottomNavigationBar: Container(
-        height: 80,
+        height: 90,
         decoration: const BoxDecoration(
           color: Colors.white,
           border: Border(top: BorderSide(color: Color(0xFFE5E7EB), width: 0.5)),
@@ -182,73 +181,94 @@ class _ChatScreenState extends State<ChatScreen>
   }
 
   Widget _buildAllChatsList() {
-    return StreamBuilder<List<ChatRoom>>(
-      stream: ChatService.getUserChatRooms(),
-      builder: (context, snapshot) {
-        if (snapshot.connectionState == ConnectionState.waiting) {
-          return const Center(
-            child: CircularProgressIndicator(
-              valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF8B5CF6)),
-            ),
-          );
-        }
-
-        if (snapshot.hasError) {
-          return Center(
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Icon(
-                  Icons.error_outline,
-                  size: 64,
-                  color: Colors.grey.shade400,
+    return StreamBuilder<List<UserProfile>>(
+      stream: ChatService.getAllUsers(),
+      builder: (context, userSnapshot) {
+        return StreamBuilder<List<ChatRoom>>(
+          stream: ChatService.getUserChatRooms(),
+          builder: (context, chatSnapshot) {
+            if (userSnapshot.connectionState == ConnectionState.waiting ||
+                chatSnapshot.connectionState == ConnectionState.waiting) {
+              return const Center(
+                child: CircularProgressIndicator(
+                  valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF8B5CF6)),
                 ),
-                const SizedBox(height: 16),
-                Text(
-                  'Алдаа гарлаа',
-                  style: TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.w600,
-                    color: Colors.grey.shade600,
-                  ),
-                ),
-              ],
-            ),
-          );
-        }
+              );
+            }
 
-        List<ChatRoom> allChats = snapshot.data ?? [];
-
-        if (allChats.isEmpty) {
-          return Center(
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Icon(
-                  Icons.chat_bubble_outline,
-                  size: 64,
-                  color: Colors.grey.shade400,
+            if (userSnapshot.hasError || chatSnapshot.hasError) {
+              return Center(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(
+                      Icons.error_outline,
+                      size: 64,
+                      color: Colors.grey.shade400,
+                    ),
+                    const SizedBox(height: 16),
+                    Text(
+                      'Алдаа гарлаа',
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.w600,
+                        color: Colors.grey.shade600,
+                      ),
+                    ),
+                  ],
                 ),
-                const SizedBox(height: 16),
-                Text(
-                  'Чат байхгүй байна',
-                  style: TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.w600,
-                    color: Colors.grey.shade600,
-                  ),
-                ),
-              ],
-            ),
-          );
-        }
+              );
+            }
 
-        return ListView.builder(
-          padding: const EdgeInsets.symmetric(vertical: 8),
-          itemCount: allChats.length,
-          itemBuilder: (context, index) {
-            final chatRoom = allChats[index];
-            return _buildChatRoomTile(chatRoom);
+            final List<UserProfile> allUsers = userSnapshot.data ?? [];
+            final List<ChatRoom> groupChats = (chatSnapshot.data ?? [])
+                .where((chat) => chat.type == 'group')
+                .toList();
+
+            // Filter out current user
+            final otherUsers = allUsers
+                .where((user) => user.id != ChatService.currentUserId)
+                .toList();
+
+            if (otherUsers.isEmpty && groupChats.isEmpty) {
+              return Center(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(
+                      Icons.chat_bubble_outline,
+                      size: 64,
+                      color: Colors.grey.shade400,
+                    ),
+                    const SizedBox(height: 16),
+                    Text(
+                      'Чат байхгүй байна',
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.w600,
+                        color: Colors.grey.shade600,
+                      ),
+                    ),
+                  ],
+                ),
+              );
+            }
+
+            return ListView.builder(
+              padding: const EdgeInsets.symmetric(vertical: 8),
+              itemCount: otherUsers.length + groupChats.length,
+              itemBuilder: (context, index) {
+                if (index < otherUsers.length) {
+                  // Show user
+                  final user = otherUsers[index];
+                  return _buildUserTile(user);
+                } else {
+                  // Show group chat
+                  final groupChat = groupChats[index - otherUsers.length];
+                  return _buildChatRoomTile(groupChat);
+                }
+              },
+            );
           },
         );
       },
@@ -256,8 +276,8 @@ class _ChatScreenState extends State<ChatScreen>
   }
 
   Widget _buildUserChatsList() {
-    return StreamBuilder<List<ChatRoom>>(
-      stream: ChatService.getUserChatRooms(),
+    return StreamBuilder<List<UserProfile>>(
+      stream: ChatService.getAllUsers(),
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
           return const Center(
@@ -291,12 +311,14 @@ class _ChatScreenState extends State<ChatScreen>
           );
         }
 
-        // Filter only direct/user-to-user chats (not group chats)
-        List<ChatRoom> userChats = (snapshot.data ?? [])
-            .where((chat) => chat.type != 'group')
+        final List<UserProfile> allUsers = snapshot.data ?? [];
+        
+        // Filter out current user
+        final otherUsers = allUsers
+            .where((user) => user.id != ChatService.currentUserId)
             .toList();
 
-        if (userChats.isEmpty) {
+        if (otherUsers.isEmpty) {
           return Center(
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
@@ -308,7 +330,7 @@ class _ChatScreenState extends State<ChatScreen>
                 ),
                 const SizedBox(height: 16),
                 Text(
-                  'Хувийн чат байхгүй байна',
+                  'Хэрэглэгч байхгүй байна',
                   style: TextStyle(
                     fontSize: 18,
                     fontWeight: FontWeight.w600,
@@ -322,10 +344,10 @@ class _ChatScreenState extends State<ChatScreen>
 
         return ListView.builder(
           padding: const EdgeInsets.symmetric(vertical: 8),
-          itemCount: userChats.length,
+          itemCount: otherUsers.length,
           itemBuilder: (context, index) {
-            final chatRoom = userChats[index];
-            return _buildChatRoomTile(chatRoom);
+            final user = otherUsers[index];
+            return _buildUserTile(user);
           },
         );
       },
@@ -460,23 +482,27 @@ class _ChatScreenState extends State<ChatScreen>
     );
   }
 
-  Widget _buildTopTab(String text, IconData icon) {
+  Widget _buildTopTab(String text, IconData icon, bool isActive) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(20),
         color: Colors.transparent,
       ),
-      child: Row(
+      child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(icon, size: 16, color: Colors.white),
+          Icon(
+            icon, 
+            size: 16, 
+            color: isActive ? const Color(0xFF9C27B0) : Colors.black
+          ),
           const SizedBox(width: 8),
           Text(
             text,
-            style: const TextStyle(
-              color: Colors.white,
-              fontWeight: FontWeight.w500,
+            style: TextStyle(
+              color: isActive ? const Color(0xFF9C27B0) : Colors.black,
+              fontWeight: isActive ? FontWeight.w600 : FontWeight.w500,
             ),
           ),
         ],
@@ -513,5 +539,153 @@ class _ChatScreenState extends State<ChatScreen>
         ),
       ),
     );
+  }
+
+  Widget _buildUserTile(UserProfile user) {
+    return StreamBuilder<ChatRoom?>(
+      stream: ChatService.getOrCreateDirectChat(user.id).asStream(),
+      builder: (context, chatSnapshot) {
+        final chatRoom = chatSnapshot.data;
+        
+        return ListTile(
+          contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+          leading: Stack(
+            children: [
+              CircleAvatar(
+                radius: 28,
+                backgroundImage: user.photoURL != null && user.photoURL!.isNotEmpty
+                    ? NetworkImage(user.photoURL!)
+                    : null,
+                backgroundColor: const Color(0xFF8B5CF6),
+                child: user.photoURL == null || user.photoURL!.isEmpty
+                    ? Text(
+                        user.displayName.isNotEmpty
+                            ? user.displayName.substring(0, 1).toUpperCase()
+                            : 'U',
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontWeight: FontWeight.bold,
+                          fontSize: 18,
+                        ),
+                      )
+                    : null,
+              ),
+              // Online indicator
+              if (user.isOnline)
+                Positioned(
+                  bottom: 2,
+                  right: 2,
+                  child: Container(
+                    width: 12,
+                    height: 12,
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF10B981),
+                      shape: BoxShape.circle,
+                      border: Border.all(
+                        color: Colors.white,
+                        width: 2,
+                      ),
+                    ),
+                  ),
+                ),
+            ],
+          ),
+          title: Text(
+            user.displayName,
+            style: const TextStyle(
+              fontWeight: FontWeight.w600,
+              fontSize: 16,
+              color: Color(0xFF1F2937),
+            ),
+          ),
+          subtitle: chatRoom?.lastMessage != null
+              ? Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const SizedBox(height: 4),
+                    Row(
+                      children: [
+                        if (chatRoom!.lastMessageSender == ChatService.currentUserId)
+                          const Text(
+                            'You: ',
+                            style: TextStyle(
+                              fontWeight: FontWeight.w500,
+                              color: Color(0xFF6B7280),
+                              fontSize: 14,
+                            ),
+                          ),
+                        Expanded(
+                          child: Text(
+                            chatRoom.lastMessage ?? '',
+                            style: const TextStyle(
+                              color: Color(0xFF6B7280),
+                              fontSize: 14,
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                )
+              : Text(
+                  user.isOnline ? 'Online' : 'Offline',
+                  style: TextStyle(
+                    color: user.isOnline ? const Color(0xFF10B981) : const Color(0xFF6B7280),
+                    fontSize: 14,
+                  ),
+                ),
+          trailing: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              if (chatRoom?.lastMessageTime != null)
+                Text(
+                  _formatTime(chatRoom!.lastMessageTime!),
+                  style: const TextStyle(
+                    color: Color(0xFF6B7280),
+                    fontSize: 12,
+                  ),
+                ),
+              const SizedBox(height: 4),
+              // TODO: Add unread count when available in ChatRoom model
+            ],
+          ),
+          onTap: () async {
+            // Get or create direct chat
+            final directChatRoom = await ChatService.getOrCreateDirectChat(user.id);
+            if (directChatRoom != null) {
+              Navigator.of(context).push(
+                MaterialPageRoute(
+                  builder: (context) => ChatRoomScreen(chatRoom: directChatRoom),
+                ),
+              );
+            }
+          },
+        );
+      },
+    );
+  }
+
+  String _formatTime(DateTime timestamp) {
+    final now = DateTime.now();
+    final difference = now.difference(timestamp);
+    
+    if (difference.inDays > 0) {
+      if (difference.inDays == 1) {
+        return 'Yesterday';
+      } else if (difference.inDays < 7) {
+        return '${difference.inDays}d ago';
+      } else {
+        return '${timestamp.day}/${timestamp.month}';
+      }
+    } else if (difference.inHours > 0) {
+      return '${difference.inHours}h ago';
+    } else if (difference.inMinutes > 0) {
+      return '${difference.inMinutes}m ago';
+    } else {
+      return 'Just now';
+    }
   }
 }
