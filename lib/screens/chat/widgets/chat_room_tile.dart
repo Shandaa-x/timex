@@ -49,178 +49,44 @@ class ChatRoomTile extends StatelessWidget {
 
   Widget _buildAvatar() {
     if (chatRoom.type == 'group') {
-      return FutureBuilder<List<UserProfile>>(
-        future: ChatService.getParticipantProfiles(chatRoom.participants),
-        builder: (context, snapshot) {
-          if (snapshot.connectionState == ConnectionState.waiting) {
-            return Container(
-              width: 50,
-              height: 50,
-              decoration: BoxDecoration(
-                color: const Color(0xFF8B5CF6),
-                borderRadius: BorderRadius.circular(25),
-              ),
-              child: const Icon(
-                Icons.group,
-                color: Colors.white,
-                size: 24,
-              ),
-            );
-          }
-          
-          final participants = snapshot.data ?? [];
-          final otherParticipants = participants
-              .where((p) => p.id != ChatService.currentUserId)
-              .take(2)
-              .toList();
-          
-          if (otherParticipants.length >= 2) {
-            // Show first 2 users' images overlapping
-            return SizedBox(
-              width: 50,
-              height: 50,
-              child: Stack(
-                children: [
-                  Positioned(
-                    left: 0,
-                    top: 0,
-                    child: Container(
-                      width: 32,
-                      height: 32,
-                      decoration: BoxDecoration(
-                        border: Border.all(color: Colors.white, width: 2),
-                        borderRadius: BorderRadius.circular(16),
-                      ),
-                      child: CircleAvatar(
-                        radius: 14,
-                        backgroundImage: otherParticipants[0].photoURL != null && 
-                                         otherParticipants[0].photoURL!.isNotEmpty
-                            ? NetworkImage(otherParticipants[0].photoURL!)
-                            : null,
-                        backgroundColor: const Color(0xFF8B5CF6),
-                        child: otherParticipants[0].photoURL == null || 
-                               otherParticipants[0].photoURL!.isEmpty
-                            ? Text(
-                                otherParticipants[0].displayName.isNotEmpty
-                                    ? otherParticipants[0].displayName.substring(0, 1).toUpperCase()
-                                    : 'U',
-                                style: const TextStyle(
-                                  color: Colors.white,
-                                  fontSize: 10,
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              )
-                            : null,
-                      ),
-                    ),
-                  ),
-                  Positioned(
-                    right: 0,
-                    bottom: 0,
-                    child: Container(
-                      width: 32,
-                      height: 32,
-                      decoration: BoxDecoration(
-                        border: Border.all(color: Colors.white, width: 2),
-                        borderRadius: BorderRadius.circular(16),
-                      ),
-                      child: CircleAvatar(
-                        radius: 14,
-                        backgroundImage: otherParticipants[1].photoURL != null && 
-                                         otherParticipants[1].photoURL!.isNotEmpty
-                            ? NetworkImage(otherParticipants[1].photoURL!)
-                            : null,
-                        backgroundColor: const Color(0xFF8B5CF6),
-                        child: otherParticipants[1].photoURL == null || 
-                               otherParticipants[1].photoURL!.isEmpty
-                            ? Text(
-                                otherParticipants[1].displayName.isNotEmpty
-                                    ? otherParticipants[1].displayName.substring(0, 1).toUpperCase()
-                                    : 'U',
-                                style: const TextStyle(
-                                  color: Colors.white,
-                                  fontSize: 10,
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              )
-                            : null,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            );
-          } else {
-            // Fallback to group icon if less than 2 other participants
-            return Container(
-              width: 50,
-              height: 50,
-              decoration: BoxDecoration(
-                color: const Color(0xFF8B5CF6),
-                borderRadius: BorderRadius.circular(25),
-              ),
-              child: const Icon(
-                Icons.group,
-                color: Colors.white,
-                size: 24,
-              ),
-            );
-          }
-        },
+      return Container(
+        width: 50,
+        height: 50,
+        decoration: BoxDecoration(
+          gradient: const LinearGradient(
+            colors: [Color(0xFF3B82F6), Color(0xFF1D4ED8)],
+          ),
+          borderRadius: BorderRadius.circular(25),
+        ),
+        child: const Icon(
+          Icons.group,
+          color: Colors.white,
+          size: 24,
+        ),
       );
     } else {
-      // For direct chats, show the other user's avatar
-      return FutureBuilder<List<UserProfile>>(
-        future: ChatService.getParticipantProfiles(chatRoom.participants),
-        builder: (context, snapshot) {
-          if (snapshot.connectionState == ConnectionState.waiting) {
-            return Container(
-              width: 50,
-              height: 50,
-              decoration: BoxDecoration(
-                color: const Color(0xFF8B5CF6),
-                borderRadius: BorderRadius.circular(25),
-              ),
-              child: const Icon(
-                Icons.person,
-                color: Colors.white,
-                size: 24,
-              ),
-            );
-          }
-          
-          final participants = snapshot.data ?? [];
-          final otherParticipant = participants.firstWhere(
-            (p) => p.id != ChatService.currentUserId,
-            orElse: () => UserProfile(
-              id: '',
-              displayName: chatRoom.name,
-              email: '',
+      return Container(
+        width: 50,
+        height: 50,
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            colors: [
+              Colors.blue.shade400,
+              Colors.blue.shade600,
+            ],
+          ),
+          borderRadius: BorderRadius.circular(25),
+        ),
+        child: Center(
+          child: Text(
+            chatRoom.name.isNotEmpty ? chatRoom.name[0].toUpperCase() : '?',
+            style: const TextStyle(
+              color: Colors.white,
+              fontSize: 20,
+              fontWeight: FontWeight.bold,
             ),
-          );
-          
-          return CircleAvatar(
-            radius: 25,
-            backgroundImage: otherParticipant.photoURL != null && 
-                             otherParticipant.photoURL!.isNotEmpty
-                ? NetworkImage(otherParticipant.photoURL!)
-                : null,
-            backgroundColor: const Color(0xFF8B5CF6),
-            child: otherParticipant.photoURL == null || 
-                   otherParticipant.photoURL!.isEmpty
-                ? Text(
-                    otherParticipant.displayName.isNotEmpty
-                        ? otherParticipant.displayName.substring(0, 1).toUpperCase()
-                        : 'U',
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  )
-                : null,
-          );
-        },
+          ),
+        ),
       );
     }
   }

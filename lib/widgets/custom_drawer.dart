@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 
 import '../index.dart';
-import '../services/notification_service.dart';
 
 class CustomDrawer extends StatelessWidget {
   final Function(int)? onNavigateToTab;
@@ -74,9 +73,9 @@ class CustomDrawer extends StatelessWidget {
             child: ListView(
               padding: const EdgeInsets.symmetric(vertical: 8),
               children: [
-                _buildDrawerItemWithBadge(
+                _buildDrawerItem(
                   context,
-                  icon: Icons.chat,
+                  icon: Icons.article,
                   title: 'Миний чат',
                   onTap: () {
                     Navigator.pop(context);
@@ -174,73 +173,6 @@ class CustomDrawer extends StatelessWidget {
           borderRadius: BorderRadius.circular(8),
         ),
       ),
-    );
-  }
-
-  Widget _buildDrawerItemWithBadge(
-    BuildContext context, {
-    required IconData icon,
-    required String title,
-    required VoidCallback onTap,
-    Color? textColor,
-  }) {
-    return StreamBuilder<int>(
-      stream: NotificationService.getUnreadMessageCount(),
-      builder: (context, snapshot) {
-        final unreadCount = snapshot.data ?? 0;
-        
-        return Container(
-          margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(8),
-          ),
-          child: ListTile(
-            leading: Icon(
-              icon,
-              color: textColor ?? const Color(0xFF374151),
-              size: 24,
-            ),
-            title: Row(
-              children: [
-                Expanded(
-                  child: Text(
-                    title,
-                    style: TextStyle(
-                      color: textColor ?? const Color(0xFF374151),
-                      fontSize: 16,
-                      fontWeight: FontWeight.w500,
-                    ),
-                  ),
-                ),
-                if (unreadCount > 0)
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 8,
-                      vertical: 2,
-                    ),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFFE74C3C),
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: Text(
-                      unreadCount > 99 ? '99+' : unreadCount.toString(),
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 12,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ),
-              ],
-            ),
-            onTap: onTap,
-            contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(8),
-            ),
-          ),
-        );
-      },
     );
   }
 

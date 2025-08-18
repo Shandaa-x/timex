@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../../models/chat_models.dart';
 import '../../services/chat_service.dart';
-import '../../services/notification_service.dart';
+import 'widgets/message_bubble.dart';
 
 class ChatRoomScreen extends StatefulWidget {
   final ChatRoom chatRoom;
@@ -13,19 +13,16 @@ class ChatRoomScreen extends StatefulWidget {
   State<ChatRoomScreen> createState() => _ChatRoomScreenState();
 }
 
-class _ChatRoomScreenState extends State<ChatRoomScreen>
-    with SingleTickerProviderStateMixin {
+class _ChatRoomScreenState extends State<ChatRoomScreen> {
   final TextEditingController _messageController = TextEditingController();
   final ScrollController _scrollController = ScrollController();
   bool _isLoading = false;
   List<UserProfile> _participants = [];
   Message? _replyToMessage;
-  late TabController _tabController;
 
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 3, vsync: this);
     _loadParticipants();
     _markAsRead();
   }
@@ -34,14 +31,11 @@ class _ChatRoomScreenState extends State<ChatRoomScreen>
   void dispose() {
     _messageController.dispose();
     _scrollController.dispose();
-    _tabController.dispose();
     super.dispose();
   }
 
   Future<void> _loadParticipants() async {
-    final participants = await ChatService.getParticipantProfiles(
-      widget.chatRoom.participants,
-    );
+    final participants = await ChatService.getParticipantProfiles(widget.chatRoom.participants);
     setState(() {
       _participants = participants;
     });
@@ -49,8 +43,6 @@ class _ChatRoomScreenState extends State<ChatRoomScreen>
 
   void _markAsRead() {
     ChatService.markMessagesAsRead(widget.chatRoom.id);
-    // Clear notifications for this chat
-    NotificationService.clearChatNotifications(widget.chatRoom.id);
   }
 
   Future<void> _sendMessage() async {
@@ -62,8 +54,6 @@ class _ChatRoomScreenState extends State<ChatRoomScreen>
     });
 
     try {
-      print('📤 Sending message: $content');
-
       final success = await ChatService.sendMessage(
         chatRoomId: widget.chatRoom.id,
         content: content,
@@ -78,7 +68,6 @@ class _ChatRoomScreenState extends State<ChatRoomScreen>
         _showError('Мессеж илгээхэд алдаа гарлаа');
       }
     } catch (e) {
-      print('❌ Error sending message: $e');
       _showError('Мессеж илгээхэд алдаа гарлаа: $e');
     } finally {
       setState(() {
@@ -100,9 +89,18 @@ class _ChatRoomScreenState extends State<ChatRoomScreen>
   void _showError(String message) {
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(message), backgroundColor: Colors.red),
+        SnackBar(
+          content: Text(message),
+          backgroundColor: Colors.red,
+        ),
       );
     }
+  }
+
+  void _setReplyMessage(Message message) {
+    setState(() {
+      _replyToMessage = message;
+    });
   }
 
   void _cancelReply() {
@@ -111,248 +109,51 @@ class _ChatRoomScreenState extends State<ChatRoomScreen>
     });
   }
 
-  Widget _buildTopTab(String text, IconData icon, bool isActive) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(20),
-        color: Colors.transparent,
-      ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(
-            icon,
-            size: 16,
-            color: isActive ? const Color(0xFF9C27B0) : Colors.black,
-          ),
-          const SizedBox(width: 8),
-          Text(
-            text,
-            style: TextStyle(
-              color: isActive ? const Color(0xFF9C27B0) : Colors.black,
-              fontWeight: isActive ? FontWeight.w600 : FontWeight.w500,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildAppBarTitle() {
+  String _getChatTitle() {
     if (widget.chatRoom.type == 'group') {
-      return FutureBuilder<List<UserProfile>>(
-        future: ChatService.getParticipantProfiles(widget.chatRoom.participants),
-        builder: (context, snapshot) {
-          if (snapshot.connectionState == ConnectionState.waiting) {
-            return Row(
-              children: [
-                CircleAvatar(
-                  radius: 18,
-                  backgroundColor: const Color(0xFF8B5CF6),
-                  child: const Icon(
-                    Icons.group,
-                    color: Colors.white,
-                    size: 20,
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        widget.chatRoom.name,
-                        style: const TextStyle(
-                          fontWeight: FontWeight.w600,
-                          fontSize: 18,
-                          color: Colors.white,
-                        ),
-                      ),
-                      Text(
-                        'Group Chat',
-                        style: const TextStyle(
-                          fontSize: 13,
-                          color: Colors.white70,
-                          fontWeight: FontWeight.w400,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            );
-          }
-          
-          final participants = snapshot.data ?? [];
-          final otherParticipants = participants
-              .where((p) => p.id != ChatService.currentUserId)
-              .take(2)
-              .toList();
-          
-          Widget groupAvatar;
-          if (otherParticipants.length >= 2) {
-            // Show first 2 users' images overlapping
-            groupAvatar = SizedBox(
-              width: 36,
-              height: 36,
-              child: Stack(
-                children: [
-                  Positioned(
-                    left: 0,
-                    top: 0,
-                    child: Container(
-                      width: 24,
-                      height: 24,
-                      decoration: BoxDecoration(
-                        border: Border.all(color: Colors.white, width: 1.5),
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: CircleAvatar(
-                        radius: 10,
-                        backgroundImage: otherParticipants[0].photoURL != null && 
-                                         otherParticipants[0].photoURL!.isNotEmpty
-                            ? NetworkImage(otherParticipants[0].photoURL!)
-                            : null,
-                        backgroundColor: const Color(0xFF8B5CF6),
-                        child: otherParticipants[0].photoURL == null || 
-                               otherParticipants[0].photoURL!.isEmpty
-                            ? Text(
-                                otherParticipants[0].displayName.isNotEmpty
-                                    ? otherParticipants[0].displayName.substring(0, 1).toUpperCase()
-                                    : 'U',
-                                style: const TextStyle(
-                                  color: Colors.white,
-                                  fontSize: 8,
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              )
-                            : null,
-                      ),
-                    ),
-                  ),
-                  Positioned(
-                    right: 0,
-                    bottom: 0,
-                    child: Container(
-                      width: 24,
-                      height: 24,
-                      decoration: BoxDecoration(
-                        border: Border.all(color: Colors.white, width: 1.5),
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: CircleAvatar(
-                        radius: 10,
-                        backgroundImage: otherParticipants[1].photoURL != null && 
-                                         otherParticipants[1].photoURL!.isNotEmpty
-                            ? NetworkImage(otherParticipants[1].photoURL!)
-                            : null,
-                        backgroundColor: const Color(0xFF8B5CF6),
-                        child: otherParticipants[1].photoURL == null || 
-                               otherParticipants[1].photoURL!.isEmpty
-                            ? Text(
-                                otherParticipants[1].displayName.isNotEmpty
-                                    ? otherParticipants[1].displayName.substring(0, 1).toUpperCase()
-                                    : 'U',
-                                style: const TextStyle(
-                                  color: Colors.white,
-                                  fontSize: 8,
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              )
-                            : null,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            );
-          } else {
-            // Fallback to group icon
-            groupAvatar = CircleAvatar(
-              radius: 18,
-              backgroundColor: const Color(0xFF8B5CF6),
-              child: const Icon(
-                Icons.group,
-                color: Colors.white,
-                size: 20,
-              ),
-            );
-          }
-          
-          return Row(
-            children: [
-              groupAvatar,
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      widget.chatRoom.name,
-                      style: const TextStyle(
-                        fontWeight: FontWeight.w600,
-                        fontSize: 18,
-                        color: Colors.white,
-                      ),
-                    ),
-                    Text(
-                      '${widget.chatRoom.participants.length} members',
-                      style: const TextStyle(
-                        fontSize: 13,
-                        color: Colors.white70,
-                        fontWeight: FontWeight.w400,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          );
-        },
-      );
+      return widget.chatRoom.name;
     } else {
-      // For direct chats, show the other user's avatar
+      // For direct chats, show the other participant's name
       final otherParticipant = _participants.firstWhere(
         (p) => p.id != ChatService.currentUserId,
         orElse: () => UserProfile(
           id: '',
-          displayName: widget.chatRoom.name,
+          displayName: 'Unknown User',
+          email: '',
+        ),
+      );
+      return otherParticipant.displayName;
+    }
+  }
+
+  String _getChatSubtitle() {
+    if (widget.chatRoom.type == 'group') {
+      return '${widget.chatRoom.participants.length} гишүүн';
+    } else {
+      final otherParticipant = _participants.firstWhere(
+        (p) => p.id != ChatService.currentUserId,
+        orElse: () => UserProfile(
+          id: '',
+          displayName: '',
           email: '',
           isOnline: false,
         ),
       );
-      
+      return otherParticipant.isOnline ? 'Онлайн' : 'Оффлайн';
+    }
+  }
+
+  Widget _buildAppBarTitle() {
+    if (widget.chatRoom.type == 'group') {
       return Row(
         children: [
-          Container(
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              border: Border.all(
-                color: otherParticipant.isOnline ? const Color(0xFF10B981) : Colors.white24, 
-                width: 2
-              ),
-            ),
-            child: CircleAvatar(
-              radius: 18,
-              backgroundImage: otherParticipant.photoURL != null && 
-                               otherParticipant.photoURL!.isNotEmpty
-                  ? NetworkImage(otherParticipant.photoURL!)
-                  : null,
-              backgroundColor: const Color(0xFF8B5CF6),
-              child: otherParticipant.photoURL == null || 
-                     otherParticipant.photoURL!.isEmpty
-                  ? Text(
-                      otherParticipant.displayName.isNotEmpty
-                          ? otherParticipant.displayName.substring(0, 1).toUpperCase()
-                          : 'U',
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontWeight: FontWeight.bold,
-                        fontSize: 16,
-                      ),
-                    )
-                  : null,
+          CircleAvatar(
+            radius: 18,
+            backgroundColor: Colors.white24,
+            child: Icon(
+              Icons.group,
+              color: Colors.white,
+              size: 20,
             ),
           ),
           const SizedBox(width: 12),
@@ -361,36 +162,76 @@ class _ChatRoomScreenState extends State<ChatRoomScreen>
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  otherParticipant.displayName.isNotEmpty 
-                      ? otherParticipant.displayName 
-                      : widget.chatRoom.name,
+                  _getChatTitle(),
                   style: const TextStyle(
-                    fontWeight: FontWeight.w600,
+                    fontWeight: FontWeight.bold,
                     fontSize: 18,
                     color: Colors.white,
                   ),
                 ),
-                Row(
-                  children: [
-                    if (otherParticipant.isOnline)
-                      Container(
-                        width: 8,
-                        height: 8,
-                        decoration: const BoxDecoration(
-                          color: Color(0xFF10B981),
-                          shape: BoxShape.circle,
-                        ),
-                      ),
-                    if (otherParticipant.isOnline) const SizedBox(width: 6),
-                    Text(
-                      otherParticipant.isOnline ? 'Online' : 'Offline',
-                      style: const TextStyle(
-                        fontSize: 13,
-                        color: Colors.white70,
-                        fontWeight: FontWeight.w400,
-                      ),
+                Text(
+                  _getChatSubtitle(),
+                  style: const TextStyle(
+                    fontSize: 12,
+                    color: Colors.white70,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      );
+    } else {
+      // For direct chats, show the other participant's image and name
+      final otherParticipant = _participants.firstWhere(
+        (p) => p.id != ChatService.currentUserId,
+        orElse: () => UserProfile(
+          id: '',
+          displayName: 'Unknown User',
+          email: '',
+        ),
+      );
+      
+      return        Row(
+        children: [
+          CircleAvatar(
+            radius: 18,
+            backgroundImage: otherParticipant.photoURL != null && otherParticipant.photoURL!.isNotEmpty
+                ? NetworkImage(otherParticipant.photoURL!)
+                : null,
+            backgroundColor: const Color(0xFF3B82F6),
+            child: otherParticipant.photoURL == null || otherParticipant.photoURL!.isEmpty
+                ? Text(
+                    otherParticipant.displayName.isNotEmpty
+                        ? otherParticipant.displayName.substring(0, 1).toUpperCase()
+                        : 'U',
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 16,
                     ),
-                  ],
+                  )
+                : null,
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  _getChatTitle(),
+                  style: const TextStyle(
+                    fontWeight: FontWeight.bold,
+                    fontSize: 18,
+                    color: Colors.white,
+                  ),
+                ),
+                Text(
+                  _getChatSubtitle(),
+                  style: const TextStyle(
+                    fontSize: 12,
+                    color: Colors.white70,
+                  ),
                 ),
               ],
             ),
@@ -406,9 +247,7 @@ class _ChatRoomScreenState extends State<ChatRoomScreen>
       backgroundColor: const Color(0xFFF8FAFC),
       appBar: AppBar(
         title: _buildAppBarTitle(),
-        backgroundColor: const Color(
-          0xFF9C27B0,
-        ), // Purple color like in the image
+        backgroundColor: const Color(0xFF3B82F6),
         foregroundColor: Colors.white,
         elevation: 0,
         actions: [
@@ -420,48 +259,6 @@ class _ChatRoomScreenState extends State<ChatRoomScreen>
               },
             ),
         ],
-        bottom: PreferredSize(
-          preferredSize: const Size.fromHeight(60),
-          child: Container(
-            color: Colors.white,
-            height: 60,
-            child: Row(
-              children: [
-                Expanded(
-                  child: GestureDetector(
-                    onTap: () {
-                      Navigator.of(context).pop(); // Go back to chats tab
-                      _tabController.animateTo(0);
-                    },
-                    child: _buildTopTab(
-                      'Chats',
-                      Icons.chat_bubble_outline,
-                      true,
-                    ), // Active since we're in chat
-                  ),
-                ),
-                Expanded(
-                  child: GestureDetector(
-                    onTap: () {
-                      Navigator.of(context).pop(); // Go back to messages tab
-                      _tabController.animateTo(1);
-                    },
-                    child: _buildTopTab('Messages', Icons.message, false),
-                  ),
-                ),
-                Expanded(
-                  child: GestureDetector(
-                    onTap: () {
-                      Navigator.of(context).pop(); // Go back to groups tab
-                      _tabController.animateTo(2);
-                    },
-                    child: _buildTopTab('Groups', Icons.group, false),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
       ),
       body: Column(
         children: [
@@ -473,9 +270,7 @@ class _ChatRoomScreenState extends State<ChatRoomScreen>
                 if (snapshot.connectionState == ConnectionState.waiting) {
                   return const Center(
                     child: CircularProgressIndicator(
-                      valueColor: AlwaysStoppedAnimation<Color>(
-                        Color(0xFF8B5CF6),
-                      ),
+                      valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF3B82F6)),
                     ),
                   );
                 }
@@ -526,7 +321,9 @@ class _ChatRoomScreenState extends State<ChatRoomScreen>
                         const SizedBox(height: 8),
                         Text(
                           'Эхний мессежийг илгээгээрэй',
-                          style: TextStyle(color: Colors.grey.shade500),
+                          style: TextStyle(
+                            color: Colors.grey.shade500,
+                          ),
                         ),
                       ],
                     ),
@@ -536,12 +333,12 @@ class _ChatRoomScreenState extends State<ChatRoomScreen>
                 return ListView.builder(
                   controller: _scrollController,
                   reverse: true,
-                  padding: const EdgeInsets.all(16),
+                  padding: const EdgeInsets.symmetric(vertical: 16),
                   itemCount: messages.length,
                   itemBuilder: (context, index) {
                     final message = messages[index];
                     final isMe = message.senderId == ChatService.currentUserId;
-
+                    
                     // Find the sender's profile for avatar and name
                     final senderProfile = _participants.firstWhere(
                       (p) => p.id == message.senderId,
@@ -551,10 +348,19 @@ class _ChatRoomScreenState extends State<ChatRoomScreen>
                         email: '',
                       ),
                     );
-
-                    return Padding(
-                      padding: const EdgeInsets.only(bottom: 12),
-                      child: _buildMessageBubble(message, isMe, senderProfile),
+                    
+                    return MessageBubble(
+                      message: message,
+                      isMe: isMe,
+                      showAvatar: !isMe,
+                      senderName: senderProfile.displayName,
+                      senderPhotoURL: senderProfile.photoURL,
+                      onReply: () => _setReplyMessage(message),
+                      onDelete: () async {
+                        if (isMe) {
+                          await ChatService.deleteMessage(widget.chatRoom.id, message.id);
+                        }
+                      },
                     );
                   },
                 );
@@ -568,10 +374,10 @@ class _ChatRoomScreenState extends State<ChatRoomScreen>
               padding: const EdgeInsets.all(12),
               margin: const EdgeInsets.symmetric(horizontal: 16),
               decoration: BoxDecoration(
-                color: const Color(0xFF8B5CF6).withOpacity(0.1),
+                color: const Color(0xFF3B82F6).withOpacity(0.1),
                 borderRadius: BorderRadius.circular(8),
                 border: Border.all(
-                  color: const Color(0xFF8B5CF6).withOpacity(0.3),
+                  color: const Color(0xFF3B82F6).withOpacity(0.3),
                 ),
               ),
               child: Row(
@@ -580,7 +386,7 @@ class _ChatRoomScreenState extends State<ChatRoomScreen>
                     width: 4,
                     height: 40,
                     decoration: const BoxDecoration(
-                      color: Color(0xFF8B5CF6),
+                      color: Color(0xFF3B82F6),
                       borderRadius: BorderRadius.all(Radius.circular(2)),
                     ),
                   ),
@@ -593,7 +399,7 @@ class _ChatRoomScreenState extends State<ChatRoomScreen>
                           _replyToMessage!.senderName,
                           style: const TextStyle(
                             fontWeight: FontWeight.bold,
-                            color: Color(0xFF8B5CF6),
+                            color: Color(0xFF3B82F6),
                             fontSize: 12,
                           ),
                         ),
@@ -624,162 +430,56 @@ class _ChatRoomScreenState extends State<ChatRoomScreen>
             decoration: const BoxDecoration(
               color: Colors.white,
               border: Border(
-                top: BorderSide(color: Color(0xFFE5E7EB), width: 0.5),
+                top: BorderSide(
+                  color: Color(0xFFE5E7EB),
+                  width: 1,
+                ),
               ),
             ),
-            child: SafeArea(
-              child: Row(
-                children: [
-                  Expanded(
-                    child: Container(
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFF9FAFB),
-                        borderRadius: BorderRadius.circular(12),
-                        border: Border.all(
-                          color: const Color(0xFFE5E7EB),
-                          width: 1,
-                        ),
-                      ),
-                      child: TextField(
-                        controller: _messageController,
-                        decoration: const InputDecoration(
-                          hintText: 'Type a message...',
-                          hintStyle: TextStyle(
-                            color: Color(0xFF9CA3AF),
-                            fontSize: 15,
-                          ),
-                          border: InputBorder.none,
-                          contentPadding: EdgeInsets.symmetric(
-                            horizontal: 18,
-                            vertical: 12,
-                          ),
-                        ),
-                        maxLines: null,
-                        textCapitalization: TextCapitalization.sentences,
-                        onSubmitted: (_) => _sendMessage(),
-                        style: const TextStyle(
-                          fontSize: 15,
-                          color: Color(0xFF1F2937),
-                        ),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  GestureDetector(
-                    onTap: _isLoading ? null : _sendMessage,
-                    child: Container(
-                      height: 44,
-                      width: 44,
-                      decoration: const BoxDecoration(
-                        color: Color(0xFF8B5CF6),
-                        shape: BoxShape.circle,
-                      ),
-                      child: _isLoading
-                          ? const SizedBox(
-                              width: 20,
-                              height: 20,
-                              child: CircularProgressIndicator(
-                                strokeWidth: 2,
-                                valueColor: AlwaysStoppedAnimation<Color>(
-                                  Colors.white,
-                                ),
-                              ),
-                            )
-                          : const Icon(
-                              Icons.send,
-                              color: Colors.white,
-                              size: 20,
-                            ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildMessageBubble(
-    Message message,
-    bool isMe,
-    UserProfile senderProfile,
-  ) {
-    return Align(
-      alignment: isMe ? Alignment.centerRight : Alignment.centerLeft,
-      child: Row(
-        mainAxisAlignment: isMe
-            ? MainAxisAlignment.end
-            : MainAxisAlignment.start,
-        crossAxisAlignment: CrossAxisAlignment.end,
-        children: [
-          if (!isMe) ...[
-            CircleAvatar(
-              radius: 16,
-              backgroundImage:
-                  senderProfile.photoURL != null &&
-                      senderProfile.photoURL!.isNotEmpty
-                  ? NetworkImage(senderProfile.photoURL!)
-                  : null,
-              backgroundColor: const Color(0xFF8B5CF6),
-              child:
-                  senderProfile.photoURL == null ||
-                      senderProfile.photoURL!.isEmpty
-                  ? Text(
-                      senderProfile.displayName.isNotEmpty
-                          ? senderProfile.displayName
-                                .substring(0, 1)
-                                .toUpperCase()
-                          : 'U',
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontWeight: FontWeight.bold,
-                        fontSize: 14,
-                      ),
-                    )
-                  : null,
-            ),
-            const SizedBox(width: 8),
-          ],
-          Flexible(
-            child: Column(
-              crossAxisAlignment: isMe
-                  ? CrossAxisAlignment.end
-                  : CrossAxisAlignment.start,
+            child: Row(
               children: [
+                Expanded(
+                  child: Container(
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFF1F5F9),
+                      borderRadius: BorderRadius.circular(24),
+                    ),
+                    child: TextField(
+                      controller: _messageController,
+                      decoration: const InputDecoration(
+                        hintText: 'Мессеж бичих...',
+                        border: InputBorder.none,
+                        contentPadding: EdgeInsets.symmetric(
+                          horizontal: 20,
+                          vertical: 12,
+                        ),
+                      ),
+                      maxLines: null,
+                      textCapitalization: TextCapitalization.sentences,
+                      onSubmitted: (_) => _sendMessage(),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 8),
                 Container(
-                  constraints: BoxConstraints(
-                    maxWidth: MediaQuery.of(context).size.width * 0.7,
+                  decoration: const BoxDecoration(
+                    gradient: LinearGradient(
+                      colors: [Color(0xFF3B82F6), Color(0xFF1D4ED8)],
+                    ),
+                    shape: BoxShape.circle,
                   ),
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 12,
-                    vertical: 8,
-                  ),
-                  decoration: BoxDecoration(
-                    color: isMe
-                        ? const Color(0xFF8B5CF6)
-                        : const Color(0xFFF3F4F6),
-                    borderRadius: BorderRadius.circular(15),
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        message.content,
-                        style: TextStyle(
-                          color: isMe ? Colors.white : const Color(0xFF1F2937),
-                          fontSize: 15,
-                        ),
-                      ),
-                      Text(
-                        _formatMessageTime(message.timestamp),
-                        style: TextStyle(
-                          fontSize: 11,
-                          color: isMe ? Colors.white : Color(0xFF9CA3AF),
-                        ),
-                      ),
-                    ],
+                  child: IconButton(
+                    icon: _isLoading
+                        ? const SizedBox(
+                            width: 20,
+                            height: 20,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                            ),
+                          )
+                        : const Icon(Icons.send, color: Colors.white),
+                    onPressed: _isLoading ? null : _sendMessage,
                   ),
                 ),
               ],
@@ -788,11 +488,5 @@ class _ChatRoomScreenState extends State<ChatRoomScreen>
         ],
       ),
     );
-  }
-
-  String _formatMessageTime(DateTime time) {
-    final hour = time.hour.toString().padLeft(2, '0');
-    final minute = time.minute.toString().padLeft(2, '0');
-    return '$hour:$minute';
   }
 }

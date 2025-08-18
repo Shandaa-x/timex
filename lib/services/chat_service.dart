@@ -1,7 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import '../models/chat_models.dart';
-import 'notification_service.dart';
 
 class ChatService {
   static final FirebaseFirestore _firestore = FirebaseFirestore.instance;
@@ -131,19 +130,11 @@ class ChatService {
     return _firestore
         .collection('chatRooms')
         .where('participants', arrayContains: currentUserId)
-        // Removed .orderBy('lastMessageTime', descending: true) temporarily to avoid index requirement
+        .orderBy('lastMessageTime', descending: true)
         .snapshots()
-        .map((snapshot) {
-          final chatRooms = snapshot.docs
-              .map((doc) => ChatRoom.fromMap(doc.data(), doc.id))
-              .toList();
-          
-          // Sort in memory instead of in query
-          chatRooms.sort((a, b) => (b.lastMessageTime ?? DateTime.now())
-              .compareTo(a.lastMessageTime ?? DateTime.now()));
-          
-          return chatRooms;
-        });
+        .map((snapshot) => snapshot.docs
+            .map((doc) => ChatRoom.fromMap(doc.data(), doc.id))
+            .toList());
   }
 
   // Get only group chat rooms for the current user
@@ -196,30 +187,6 @@ class ChatService {
         'lastMessageTime': DateTime.now(),
         'lastMessageSender': currentUserId,
       });
-
-      // Get chat room info for notification
-      final chatRoomDoc = await _firestore
-          .collection('chatRooms')
-          .doc(chatRoomId)
-          .get();
-      
-      if (chatRoomDoc.exists) {
-        final chatRoom = ChatRoom.fromMap(chatRoomDoc.data()!, chatRoomDoc.id);
-        
-        // Send notification to other participants (not the sender)
-        print('🔔 Sending notification for chat room: ${chatRoom.id}');
-        print('🔔 Message: $content');
-        print('🔔 Sender: ${currentUser.displayName}');
-        
-        await NotificationService.sendChatNotification(
-          chatRoomId: chatRoomId,
-          senderName: currentUser.displayName,
-          senderPhotoURL: currentUser.photoURL ?? '',
-          message: content,
-          timestamp: DateTime.now(),
-          isGroupChat: chatRoom.type == 'group',
-        );
-      }
 
       return true;
     } catch (e) {
@@ -441,27 +408,6 @@ class ChatService {
     return null;
   }
 
-  // Get direct chat stream for real-time updates
-  static Stream<ChatRoom?> getDirectChatStream(String otherUserId) {
-    if (currentUserId.isEmpty) return Stream.value(null);
-
-    return _firestore
-        .collection('chatRooms')
-        .where('type', isEqualTo: 'direct')
-        .where('participants', arrayContains: currentUserId)
-        .snapshots()
-        .map((snapshot) {
-          // Find the direct chat with the specific user
-          for (var doc in snapshot.docs) {
-            final participants = List<String>.from(doc.data()['participants'] ?? []);
-            if (participants.contains(otherUserId) && participants.length == 2) {
-              return ChatRoom.fromMap(doc.data(), doc.id);
-            }
-          }
-          return null;
-        });
-  }
-
   // Find existing direct chat without creating one
   static Future<ChatRoom?> findExistingDirectChat(String otherUserId) async {
     try {
@@ -483,45 +429,5 @@ class ChatService {
       print('Error finding existing direct chat: $e');
     }
     return null;
-  }
-
-  // Get unread message count across all chats
-  static Stream<int> getUnreadMessageCount() {
-    return _firestore
-        .collection('chatRooms')
-        .where('participants', arrayContains: currentUserId)
-        .snapshots()
-        .asyncMap((snapshot) async {
-      int totalUnread = 0;
-      
-      for (var doc in snapshot.docs) {
-        final chatRoom = ChatRoom.fromMap(doc.data(), doc.id);
-        
-        // Count unread messages in this chat room
-        final unreadQuery = await _firestore
-            .collection('chatRooms')
-            .doc(chatRoom.id)
-            .collection('messages')
-            .where('readBy.$currentUserId', isEqualTo: false)
-            .where('senderId', isNotEqualTo: currentUserId)
-            .get();
-            
-        totalUnread += unreadQuery.docs.length;
-      }
-      
-      return totalUnread;
-    });
-  }
-
-  // Get unread message count for a specific chat room
-  static Stream<int> getUnreadMessageCountForChat(String chatRoomId) {
-    return _firestore
-        .collection('chatRooms')
-        .doc(chatRoomId)
-        .collection('messages')
-        .where('readBy.$currentUserId', isEqualTo: false)
-        .where('senderId', isNotEqualTo: currentUserId)
-        .snapshots()
-        .map((snapshot) => snapshot.docs.length);
   }
 }
