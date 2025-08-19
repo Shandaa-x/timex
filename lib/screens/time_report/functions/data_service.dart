@@ -257,15 +257,4 @@ class DataService {
       return {};
     }
   }
-
-  // Fetch user data (for monthlySalary)
-  static Future<Map<String, dynamic>> getUserData(String userId) async {
-    try {
-      final doc = await _firestore.collection('users').doc(userId).get();
-      return doc.data() ?? {};
-    } catch (e) {
-      debugPrint('Error fetching user data: $e');
-      return {};
-    }
-  }
 }

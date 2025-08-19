@@ -4,11 +4,6 @@ import 'package:timex/screens/main/main_screen.dart';
 import 'package:timex/screens/my_news/my_news_screen.dart';
 import 'package:timex/screens/time_track/time_tracking_screen.dart';
 import 'package:timex/screens/auth/auth_wrapper.dart';
-import 'package:timex/screens/chat/chat_screen.dart';
-import 'package:timex/screens/chat/new_chat_screen.dart';
-import 'package:timex/screens/chat/create_group_screen.dart';
-import 'package:timex/screens/chat/group_management_screen.dart';
-import 'package:timex/models/chat_models.dart';
 
 class Routes {
   static const main = 'MainScreen';
@@ -19,10 +14,6 @@ class Routes {
   static const addEmployee = 'AddEmployeeScreen';
   static const authWrapper = 'AuthWrapper';
   static const myNews = 'MyNewsScreen';
-  static const chat = 'ChatScreen';
-  static const newChat = 'NewChatScreen';
-  static const createGroup = 'CreateGroupScreen';
-  static const groupManagement = 'GroupManagementScreen';
 
   final RouteObserver routeObserver;
 
@@ -59,34 +50,6 @@ class Routes {
       case Routes.myNews:
         route = MaterialPageRoute(
           builder: (context) => const MyNewsScreen(),
-          settings: settings,
-        );
-        break;
-      case Routes.chat:
-        route = MaterialPageRoute(
-          builder: (context) => const ChatScreen(),
-          settings: settings,
-        );
-        break;
-      case Routes.newChat:
-        route = MaterialPageRoute(
-          builder: (context) => const NewChatScreen(),
-          settings: settings,
-        );
-        break;
-      case Routes.createGroup:
-        route = MaterialPageRoute(
-          builder: (context) => CreateGroupScreen(
-            selectedUsers: settings.arguments as List<UserProfile>?,
-          ),
-          settings: settings,
-        );
-        break;
-      case Routes.groupManagement:
-        route = MaterialPageRoute(
-          builder: (context) => GroupManagementScreen(
-            chatRoom: settings.arguments as ChatRoom,
-          ),
           settings: settings,
         );
         break;

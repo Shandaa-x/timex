@@ -7,7 +7,6 @@ import 'package:timex/index.dart';
 import 'package:timex/screens/time_track/time_tracking_screen.dart';
 import 'package:timex/screens/qpay/qr_code_screen.dart';
 import 'package:timex/services/realtime_food_total_service.dart';
-import 'package:timex/routes/routes.dart';
 
 class MainScreen extends StatefulWidget {
   const MainScreen({super.key});
@@ -212,7 +211,6 @@ class _MainScreenState extends State<MainScreen> {
             //       child: Icon(Icons.restaurant),
             //     ),
             //   ),
-            // Chat FAB
           ],
         ),
         bottomNavigationBar: _buildSegmentedTabBar(),
