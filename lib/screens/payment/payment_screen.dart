@@ -245,12 +245,33 @@ class _PaymentScreenState extends State<PaymentScreen> {
                 '${bank['scheme']}qpay?qr=${Uri.encodeComponent(qrText)}';
           }
         } else if (bank['scheme'] == 'khanbank://') {
-          deepLink = 'khanbank://qpay?qrText=$qrText&invoiceId=$invoiceId';
+          deepLink = 'khanbank://q?qPay_QRcode=${Uri.encodeComponent(qrText)}';
         } else if (bank['scheme'] == 'statebank://') {
-          deepLink = 'statebank://qpay?qrText=$qrText&invoiceId=$invoiceId';
+          deepLink = 'statebank://q?qPay_QRcode=${Uri.encodeComponent(qrText)}';
+        } else if (bank['scheme'] == 'tdbbank://') {
+          deepLink = 'tdbbank://q?qPay_QRcode=${Uri.encodeComponent(qrText)}';
+        } else if (bank['scheme'] == 'xacbank://') {
+          deepLink = 'xacbank://q?qPay_QRcode=${Uri.encodeComponent(qrText)}';
+        } else if (bank['scheme'] == 'most://') {
+          deepLink = 'most://q?qPay_QRcode=${Uri.encodeComponent(qrText)}';
+        } else if (bank['scheme'] == 'nibank://') {
+          deepLink = 'nibank://q?qPay_QRcode=${Uri.encodeComponent(qrText)}';
+        } else if (bank['scheme'] == 'ckbank://') {
+          deepLink = 'ckbank://q?qPay_QRcode=${Uri.encodeComponent(qrText)}';
+        } else if (bank['scheme'] == 'capitronbank://') {
+          deepLink = 'capitronbank://q?qPay_QRcode=${Uri.encodeComponent(qrText)}';
+        } else if (bank['scheme'] == 'bogdbank://') {
+          deepLink = 'bogdbank://q?qPay_QRcode=${Uri.encodeComponent(qrText)}';
+        } else if (bank['scheme'] == 'chinggisnbank://') {
+          deepLink = 'ckbank://q?qPay_QRcode=${Uri.encodeComponent(qrText)}';
+        } else if (bank['scheme'] == 'arigbank://') {
+          deepLink = 'arigbank://q?qPay_QRcode=${Uri.encodeComponent(qrText)}';
+        } else if (bank['scheme'] == 'transbank://') {
+          deepLink = 'transbank://q?qPay_QRcode=${Uri.encodeComponent(qrText)}';
+        } else if (bank['scheme'] == 'ardbank://') {
+          deepLink = 'ardbank://q?qPay_QRcode=${Uri.encodeComponent(qrText)}';
         } else {
-          deepLink =
-              '${bank['scheme']}qpay?qrText=$qrText&invoiceId=$invoiceId';
+          deepLink = '${bank['scheme']}q?qPay_QRcode=${Uri.encodeComponent(qrText)}';
         }
 
         // Launch banking app

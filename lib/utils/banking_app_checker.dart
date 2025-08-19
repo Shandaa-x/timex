@@ -6,10 +6,11 @@ import 'logger.dart';
 
 /// Class to check what banking apps are available on the device
 class BankingAppChecker {
-  /// Common Mongolian banking app schemes based on QPay documentation
+  /// Common Mongolian banking app schemes based on official QPay documentation
   static const Map<String, String> bankingAppSchemes = {
     'Khan Bank': 'khanbank://',
     'Khan Bank Alt': 'khanbankapp://',
+    'Khan Bank Retail': 'khanbank-retail://',
     'Social Pay': 'socialpay://',
     'Social Pay Payment': 'socialpay-payment://',
     'State Bank': 'statebank://',
@@ -22,20 +23,12 @@ class BankingAppChecker {
     'Most Money Alt': 'mostmoney://',
     'NIB Bank': 'nibank://',
     'UB Bank': 'ulaanbaatarbank://',
-    'UB Bank Alt': 'ubbank://',
     'Chinggis Khaan Bank': 'ckbank://',
     'Chinggis Alt': 'chinggisnbank://',
     'Capitron Bank': 'capitronbank://',
     'Capitron Alt': 'capitron://',
     'Bogd Bank': 'bogdbank://',
     'Bogd Alt': 'bogd://',
-    'Arig Bank': 'arigbank://',
-    'Trans Bank': 'transbank://',
-    'M Bank': 'mbank://',
-    'Golomt Bank': 'golomtbank://',
-    'Credit Bank': 'creditbank://',
-    'Mongol Bank': 'mongolbank://',
-    'Development Bank': 'developmentbank://',
     'Candy Pay': 'candypay://',
     'Candy Alt': 'candy://',
     'QPay Wallet': 'qpay://',
@@ -139,9 +132,9 @@ class BankingAppChecker {
     final workingSchemes = <String, String>{};
     final encodedQR = Uri.encodeComponent(qrText);
 
-    // Test schemes for each bank
+    // Test schemes for each bank (based on QPay developer documentation)
     final bankSchemes = {
-      'Khan Bank': ['khanbank://', 'khanbankapp://'],
+      'Khan Bank': ['khanbank://', 'khanbankapp://', 'khanbank-retail://'],
       'Social Pay': ['socialpay-payment://', 'socialpay://'],
       'State Bank': ['statebank://', 'statebankapp://'],
       'TDB Bank': ['tdbbank://', 'tdb://'],
@@ -151,9 +144,6 @@ class BankingAppChecker {
       'Chinggis Khaan Bank': ['ckbank://', 'chinggisnbank://'],
       'Capitron Bank': ['capitronbank://', 'capitron://'],
       'Bogd Bank': ['bogdbank://', 'bogd://'],
-      'Arig Bank': ['arigbank://', 'arig://'],
-      'Trans Bank': ['transbank://'],
-      'M Bank': ['mbank://'],
       'Candy Pay': ['candypay://', 'candy://'],
       'QPay Wallet': ['qpay://'],
     };
@@ -171,10 +161,26 @@ class BankingAppChecker {
           deepLink = 'socialpay://qpay?qr=$encodedQR';
         } else if (workingScheme.startsWith('khanbank://')) {
           deepLink = 'khanbank://q?qPay_QRcode=$encodedQR';
+        } else if (workingScheme.startsWith('khanbank-retail://')) {
+          deepLink = 'khanbank-retail://q?qPay_QRcode=$encodedQR';
         } else if (workingScheme.startsWith('tdbbank://')) {
           deepLink = 'tdbbank://q?qPay_QRcode=$encodedQR';
         } else if (workingScheme.startsWith('xacbank://')) {
           deepLink = 'xacbank://q?qPay_QRcode=$encodedQR';
+        } else if (workingScheme.startsWith('statebank://')) {
+          deepLink = 'statebank://q?qPay_QRcode=$encodedQR';
+        } else if (workingScheme.startsWith('most://')) {
+          deepLink = 'most://q?qPay_QRcode=$encodedQR';
+        } else if (workingScheme.startsWith('nibank://')) {
+          deepLink = 'nibank://q?qPay_QRcode=$encodedQR';
+        } else if (workingScheme.startsWith('ckbank://')) {
+          deepLink = 'ckbank://q?qPay_QRcode=$encodedQR';
+        } else if (workingScheme.startsWith('capitronbank://')) {
+          deepLink = 'capitronbank://q?qPay_QRcode=$encodedQR';
+        } else if (workingScheme.startsWith('bogdbank://')) {
+          deepLink = 'bogdbank://q?qPay_QRcode=$encodedQR';
+        } else if (workingScheme.startsWith('candypay://')) {
+          deepLink = 'candypay://q?qPay_QRcode=$encodedQR';
         } else {
           // Generic format for other banks
           deepLink = '${workingScheme}qpay?qr=$encodedQR';

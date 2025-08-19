@@ -12,6 +12,7 @@ import '../../services/qpay_helper_service.dart';
 import '../../utils/qr_utils.dart';
 import '../../utils/banking_app_checker.dart';
 import '../../utils/socialpay_integration.dart';
+import '../../utils/khan_bank_launcher.dart';
 
 class QRCodeScreen extends StatefulWidget {
   const QRCodeScreen({super.key});
@@ -390,6 +391,19 @@ class _QRCodeScreenState extends State<QRCodeScreen> {
             print(
               '❌ Cannot launch ${primaryBankingApp.name}, trying fallback...',
             );
+            // For Khan Bank specifically, use specialized launcher
+            if (primaryBankingApp.name.toLowerCase().contains('khan')) {
+              final qrText = qpayResult!['qr_text'] ?? '';
+              final invoiceId = qpayResult!['invoice_id'];
+              
+              if (await KhanBankLauncher.launchKhanBankApp(
+                qrText: qrText,
+                invoiceId: invoiceId,
+              )) {
+                _showMessage('Opened Khan Bank App', isError: false);
+                return;
+              }
+            }
           }
         } catch (uriError) {
           print('❌ Error parsing URI for ${primaryBankingApp.name}: $uriError');

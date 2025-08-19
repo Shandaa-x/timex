@@ -243,7 +243,7 @@ class QRUtils {
       deepLinks['qpay'] = 'qpay://invoice?id=$invoiceId';
     }
 
-    // Enhanced deep links for different banks with proper QR handling
+    // Enhanced deep links for different banks using official QPay format
     if (qrText.isNotEmpty) {
       final encodedQR = Uri.encodeComponent(qrText);
 
@@ -251,45 +251,35 @@ class QRUtils {
       deepLinks['socialpay'] =
           'socialpay-payment://q?qPay_QRcode=$encodedQR';
 
-      // Khan Bank app deep link - try multiple formats
+      // Khan Bank app deep link - official QPay format
       deepLinks['khanbank'] = 'khanbank://q?qPay_QRcode=$encodedQR';
-      deepLinks['khanbankalt'] = 'khanbankapp://payment?qr=$encodedQR';
 
-      // State Bank deep links
-      deepLinks['statebank'] = 'statebank://payment?qr=$encodedQR';
-      deepLinks['statebankalt'] = 'statebankapp://qpay?code=$encodedQR';
+      // State Bank deep link - official QPay format
+      deepLinks['statebank'] = 'statebank://q?qPay_QRcode=$encodedQR';
 
-      // TDB Bank deep links
-      deepLinks['tdbbank'] = 'tdbbank://qpay?qr=$encodedQR';
-      deepLinks['tdb'] = 'tdb://payment?code=$encodedQR';
+      // TDB Bank deep link - official QPay format
+      deepLinks['tdbbank'] = 'tdbbank://q?qPay_QRcode=$encodedQR';
 
-      // Xac Bank deep links
-      deepLinks['xacbank'] = 'xacbank://qpay?qr=$encodedQR';
-      deepLinks['xac'] = 'xac://payment?qr=$encodedQR';
+      // Xac Bank deep link - official QPay format
+      deepLinks['xacbank'] = 'xacbank://q?qPay_QRcode=$encodedQR';
 
-      // Most Money deep links
-      deepLinks['most'] = 'most://qpay?qr=$encodedQR';
-      deepLinks['mostmoney'] = 'mostmoney://payment?code=$encodedQR';
+      // Most Money deep link - official QPay format
+      deepLinks['most'] = 'most://q?qPay_QRcode=$encodedQR';
 
-      // NIB Bank deep links
-      deepLinks['nibank'] = 'nibank://qpay?qr=$encodedQR';
-      deepLinks['ulaanbaatarbank'] = 'ulaanbaatarbank://payment?qr=$encodedQR';
+      // NIB Bank deep link - official QPay format
+      deepLinks['nibank'] = 'nibank://q?qPay_QRcode=$encodedQR';
 
-      // Chinggis Khaan Bank deep links
-      deepLinks['ckbank'] = 'ckbank://qpay?qr=$encodedQR';
-      deepLinks['chinggisnbank'] = 'chinggisnbank://payment?code=$encodedQR';
+      // Chinggis Khaan Bank deep link - official QPay format
+      deepLinks['ckbank'] = 'ckbank://q?qPay_QRcode=$encodedQR';
 
-      // Capitron Bank deep links
-      deepLinks['capitronbank'] = 'capitronbank://qpay?qr=$encodedQR';
-      deepLinks['capitron'] = 'capitron://payment?qr=$encodedQR';
+      // Capitron Bank deep link - official QPay format
+      deepLinks['capitronbank'] = 'capitronbank://q?qPay_QRcode=$encodedQR';
 
-      // Bogd Bank deep links
-      deepLinks['bogdbank'] = 'bogdbank://qpay?qr=$encodedQR';
-      deepLinks['bogd'] = 'bogd://payment?code=$encodedQR';
+      // Bogd Bank deep link - official QPay format
+      deepLinks['bogdbank'] = 'bogdbank://q?qPay_QRcode=$encodedQR';
 
-      // Candy Pay deep links
-      deepLinks['candypay'] = 'candypay://qpay?qr=$encodedQR';
-      deepLinks['candy'] = 'candy://payment?qr=$encodedQR';
+      // Candy Pay deep link - official QPay format
+      deepLinks['candypay'] = 'candypay://q?qPay_QRcode=$encodedQR';
     }
 
     // Generic banking URL (web fallback)
@@ -312,30 +302,20 @@ class QRUtils {
   ) {
     final deepLinks = generateDeepLinks(qrText, qpayShortUrl, invoiceId);
 
-    // Priority order with fallback schemes
+    // Priority order with official QPay schemes first
     final priorityOrder = [
       'qpay',
       'socialpay',
       'khanbank',
-      'khanbankalt',
       'statebank',
-      'statebankalt',
       'tdbbank',
-      'tdb',
       'xacbank',
-      'xac',
       'most',
-      'mostmoney',
       'nibank',
-      'ulaanbaatarbank',
       'ckbank',
-      'chinggisnbank',
       'capitronbank',
-      'capitron',
       'bogdbank',
-      'bogd',
       'candypay',
-      'candy',
       'banking',
     ];
 
