@@ -5,6 +5,9 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:timex/widgets/custom_drawer.dart';
 import 'stat_widgets/index.dart';
 import 'functions/index.dart';
+import 'package:timex/screens/salary_breakdown/salary_breakdown_screen.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:intl/intl.dart';
 
 class MonthlyStatisticsScreen extends StatefulWidget {
   final Function(int)? onNavigateToTab;
@@ -26,6 +29,14 @@ class _MonthlyStatisticsScreenState extends State<MonthlyStatisticsScreen> {
   Map<String, dynamic>? _selectedDayData;
   bool _isLoading = true;
   double _totalHours = 0.0;
+
+  // Salary calculation fields
+  double? _monthlySalary;
+  int _eligibleWorkingDays = 0;
+  double _grossSalary = 0.0;
+  double _socialSecurityDeduction = 0.0;
+  double _incomeTaxDeduction = 0.0;
+  double _netSalary = 0.0;
 
   // Track which days are being confirmed
   Set<String> _confirmingDays = {};
@@ -64,6 +75,79 @@ class _MonthlyStatisticsScreenState extends State<MonthlyStatisticsScreen> {
   void initState() {
     super.initState();
     _loadMonthlyData();
+    // Fetch monthly salary from Firestore
+    _fetchMonthlySalary();
+    _verifyFirestoreData();
+  }
+
+  // Fetch monthlySalary from Firestore
+  Future<void> _fetchMonthlySalary() async {
+    try {
+      // Fetch user document from 'users' collection
+      final userDoc = await FirebaseFirestore.instance
+          .collection('users')
+          .doc(_userId)
+          .get();
+      final data = userDoc.data();
+      if (data != null && data['monthlySalary'] != null) {
+        _monthlySalary =
+            double.tryParse(data['monthlySalary'].toString()) ?? 0.0;
+      } else {
+        _monthlySalary = 0.0;
+      }
+      _calculateSalary();
+      setState(() {});
+    } catch (e) {
+      debugPrint('Error fetching monthly salary: $e');
+      _monthlySalary = 0.0;
+      setState(() {});
+    }
+  }
+
+  // Calculate salary logic
+  void _calculateSalary({List<Map<String, dynamic>>? filteredDays}) {
+    final days = filteredDays ?? _monthData;
+
+    // Count actual worked days (documents in calendarDays subcollection)
+    int workedDays = days.length;
+    _eligibleWorkingDays = workedDays;
+
+    // Calculate total working hours from all worked days
+    double totalWorkingHours = 0.0;
+    for (final day in days) {
+      final hours = (day['workingHours'] ?? 0.0) as double;
+      totalWorkingHours += hours;
+    }
+    _totalHours = totalWorkingHours;
+
+    // Calculate working days in the month, excluding weekends
+    int workingDaysInMonth = 0;
+    final daysInMonth = DateUtils.getDaysInMonth(_selectedYear, _selectedMonth);
+    for (int day = 1; day <= daysInMonth; day++) {
+      final date = DateTime(_selectedYear, _selectedMonth, day);
+      if (date.weekday != DateTime.saturday && date.weekday != DateTime.sunday) {
+        workingDaysInMonth++;
+      }
+    }
+
+    // 1. Total working hours in month
+    final expectedMonthlyHours = workingDaysInMonth * 8;
+
+    // 2. Hourly wage
+    double hourlyRate = (_monthlySalary != null && _monthlySalary! > 0)
+      ? _monthlySalary! / expectedMonthlyHours
+      : 0.0;
+
+    // 3. Salary for hours worked
+    _grossSalary = hourlyRate * totalWorkingHours;
+
+    // 4. Social insurance deduction (24%)
+    _socialSecurityDeduction = _grossSalary * 0.24;
+
+    // 5. Net salary
+    _netSalary = _grossSalary - _socialSecurityDeduction;
+
+    setState(() {});
   }
 
   // Show calendar dialog
@@ -119,6 +203,11 @@ class _MonthlyStatisticsScreenState extends State<MonthlyStatisticsScreen> {
     });
 
     try {
+      debugPrint('=== LOADING MONTHLY DATA ===');
+      debugPrint('User ID: $_userId');
+      debugPrint('Selected month: $_selectedMonth');
+      debugPrint('Selected year: $_selectedYear');
+
       final result = await DataService.loadMonthlyData(
         _userId,
         _selectedMonth,
@@ -128,19 +217,61 @@ class _MonthlyStatisticsScreenState extends State<MonthlyStatisticsScreen> {
       final processedDays = result['days'] as List<Map<String, dynamic>>;
       final totalWorkedHours = result['totalHours'] as double;
 
+      debugPrint('Processed days from DataService: ${processedDays.length}');
+      debugPrint('Total worked hours from DataService: $totalWorkedHours');
+
+      // Print each day received from DataService
+      for (int i = 0; i < processedDays.length; i++) {
+        final day = processedDays[i];
+        debugPrint(
+          'Day $i from DataService: ${day['date']} - Hours: ${day['workingHours']}',
+        );
+      }
+
       setState(() {
         _monthData = processedDays;
         _totalHours = totalWorkedHours;
         _isLoading = false;
       });
 
+      debugPrint('_monthData set to length: ${_monthData.length}');
+      debugPrint('_totalHours set to: $_totalHours');
+
       // Load eaten food data for the month
       await _loadEatenFoodData();
+
+      // Calculate salary after loading data
+      _calculateSalary();
     } catch (e) {
       debugPrint('Error loading monthly data: $e');
       setState(() {
         _isLoading = false;
       });
+    }
+  }
+
+  Future<void> _verifyFirestoreData() async {
+    try {
+      debugPrint('=== VERIFYING FIRESTORE DATA ===');
+
+      final snapshot = await FirebaseFirestore.instance
+          .collection('users')
+          .doc(_userId)
+          .collection('calendarDays')
+          .where('month', isEqualTo: _selectedMonth)
+          .where('year', isEqualTo: _selectedYear)
+          .get();
+
+      debugPrint(
+        'Direct Firestore query result: ${snapshot.docs.length} documents',
+      );
+
+      for (var doc in snapshot.docs) {
+        final data = doc.data();
+        debugPrint('Document ${doc.id}: ${data}');
+      }
+    } catch (e) {
+      debugPrint('Error verifying Firestore data: $e');
     }
   }
 
@@ -400,6 +531,67 @@ class _MonthlyStatisticsScreenState extends State<MonthlyStatisticsScreen> {
     return '$h цаг, $m минут';
   }
 
+  // Helper method for salary info rows
+  Widget _buildSalaryInfoRow({
+    required IconData icon,
+    required String label,
+    required String value,
+    required Color color,
+  }) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      decoration: BoxDecoration(
+        color: color.withOpacity(0.05),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: color.withOpacity(0.1),
+          width: 1,
+        ),
+      ),
+      child: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              color: color.withOpacity(0.1),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Icon(
+              icon,
+              size: 20,
+              color: color,
+            ),
+          ),
+          const SizedBox(width: 16),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  label,
+                  style: TextStyle(
+                    fontSize: 14,
+                    color: Colors.grey.shade600,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  value,
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                    color: color,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final screenWidth = MediaQuery.of(context).size.width;
@@ -438,9 +630,7 @@ class _MonthlyStatisticsScreenState extends State<MonthlyStatisticsScreen> {
       },
       child: Scaffold(
         backgroundColor: const Color(0xFFF8FAFC),
-        drawer: CustomDrawer(
-          onNavigateToTab: widget.onNavigateToTab,
-        ),
+        drawer: CustomDrawer(onNavigateToTab: widget.onNavigateToTab),
         body: CustomScrollView(
           slivers: [
             // Modern App Bar
@@ -570,6 +760,212 @@ class _MonthlyStatisticsScreenState extends State<MonthlyStatisticsScreen> {
                             isTablet: isTablet,
                           ),
 
+                          const SizedBox(height: 20),
+
+                          // Modern Salary Info Card
+                          Container(
+                            margin: const EdgeInsets.symmetric(vertical: 10),
+                            decoration: BoxDecoration(
+                              gradient: LinearGradient(
+                                begin: Alignment.topLeft,
+                                end: Alignment.bottomRight,
+                                colors: [
+                                  Colors.white,
+                                  Colors.grey.shade50,
+                                ],
+                              ),
+                              borderRadius: BorderRadius.circular(20),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: Colors.black.withOpacity(0.08),
+                                  blurRadius: 20,
+                                  offset: const Offset(0, 4),
+                                ),
+                              ],
+                            ),
+                            child: Padding(
+                              padding: const EdgeInsets.all(24.0),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  // Header with icon
+                                  Row(
+                                    children: [
+                                      Container(
+                                        padding: const EdgeInsets.all(12),
+                                        decoration: BoxDecoration(
+                                          gradient: const LinearGradient(
+                                            colors: [Color(0xFF3B82F6), Color(0xFF1D4ED8)],
+                                          ),
+                                          borderRadius: BorderRadius.circular(12),
+                                        ),
+                                        child: const Icon(
+                                          Icons.account_balance_wallet,
+                                          color: Colors.white,
+                                          size: 24,
+                                        ),
+                                      ),
+                                      const SizedBox(width: 16),
+                                      const Text(
+                                        'Цалингийн мэдээлэл',
+                                        style: TextStyle(
+                                          fontSize: 20,
+                                          fontWeight: FontWeight.bold,
+                                          color: Color(0xFF1E293B),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                  const SizedBox(height: 24),
+                                  
+                                  // Salary details with better formatting
+                                  _buildSalaryInfoRow(
+                                    icon: Icons.monetization_on,
+                                    label: 'Сарын цалин',
+                                    value: '${NumberFormat('#,##0.00', 'en_US').format(_monthlySalary ?? 0)}₮',
+                                    color: const Color(0xFF8B5CF6),
+                                  ),
+                                  const SizedBox(height: 16),
+                                  
+                                  _buildSalaryInfoRow(
+                                    icon: Icons.calendar_today,
+                                    label: 'Нийт ажилласан өдөр',
+                                    value: '$_eligibleWorkingDays өдөр',
+                                    color: const Color(0xFF3B82F6),
+                                  ),
+                                  const SizedBox(height: 16),
+                                  
+                                  _buildSalaryInfoRow(
+                                    icon: Icons.access_time,
+                                    label: 'Нийт ажилласан цаг',
+                                    value: '${_totalHours.floor()}ц ${((_totalHours - _totalHours.floor()) * 60).round()}м',
+                                    color: const Color(0xFFF59E0B),
+                                  ),
+                                  const SizedBox(height: 16),
+                                  
+                                  _buildSalaryInfoRow(
+                                    icon: Icons.remove_circle_outline,
+                                    label: 'Нийгмийн даатгал (24%)',
+                                    value: '-${NumberFormat('#,##0.00', 'en_US').format(_socialSecurityDeduction)}₮',
+                                    color: const Color(0xFFEF4444),
+                                  ),
+                                  
+                                  // Stylish divider
+                                  Container(
+                                    margin: const EdgeInsets.symmetric(vertical: 20),
+                                    height: 1,
+                                    decoration: BoxDecoration(
+                                      gradient: LinearGradient(
+                                        colors: [
+                                          Colors.transparent,
+                                          Colors.grey.shade300,
+                                          Colors.transparent,
+                                        ],
+                                      ),
+                                    ),
+                                  ),
+                                  
+                                  // Net salary highlight
+                                  Container(
+                                    padding: const EdgeInsets.all(20),
+                                    decoration: BoxDecoration(
+                                      gradient: const LinearGradient(
+                                        begin: Alignment.topLeft,
+                                        end: Alignment.bottomRight,
+                                        colors: [Color(0xFF10B981), Color(0xFF059669)],
+                                      ),
+                                      borderRadius: BorderRadius.circular(16),
+                                      boxShadow: [
+                                        BoxShadow(
+                                          color: const Color(0xFF10B981).withOpacity(0.3),
+                                          blurRadius: 12,
+                                          offset: const Offset(0, 4),
+                                        ),
+                                      ],
+                                    ),
+                                    child: Row(
+                                      children: [
+                                        const Icon(
+                                          Icons.attach_money,
+                                          color: Colors.white,
+                                          size: 28,
+                                        ),
+                                        const SizedBox(width: 12),
+                                        Expanded(
+                                          child: Column(
+                                            crossAxisAlignment: CrossAxisAlignment.start,
+                                            children: [
+                                              const Text(
+                                                'Гар дээр авах цалин',
+                                                style: TextStyle(
+                                                  color: Colors.white70,
+                                                  fontSize: 14,
+                                                  fontWeight: FontWeight.w500,
+                                                ),
+                                              ),
+                                              const SizedBox(height: 4),
+                                              Text(
+                                                '${NumberFormat('#,##0.00', 'en_US').format(_netSalary)}₮',
+                                                style: const TextStyle(
+                                                  color: Colors.white,
+                                                  fontSize: 24,
+                                                  fontWeight: FontWeight.bold,
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                  
+                                  const SizedBox(height: 24),
+                                  
+                                  // Modern Salary Breakdown Button
+                                  SizedBox(
+                                    width: double.infinity,
+                                    child: ElevatedButton(
+                                      onPressed: () {
+                                        Navigator.of(context).push(
+                                          MaterialPageRoute(
+                                            builder: (context) => SalaryBreakdownScreen(
+                                              monthlySalary: _monthlySalary ?? 0.0,
+                                              allWorkedDaysDetails: [
+                                                ..._monthData,
+                                              ],
+                                            ),
+                                          ),
+                                        );
+                                      },
+                                      style: ElevatedButton.styleFrom(
+                                        backgroundColor: const Color(0xFF3B82F6),
+                                        foregroundColor: Colors.white,
+                                        elevation: 0,
+                                        padding: const EdgeInsets.symmetric(vertical: 16),
+                                        shape: RoundedRectangleBorder(
+                                          borderRadius: BorderRadius.circular(12),
+                                        ),
+                                      ),
+                                      child: Row(
+                                        mainAxisAlignment: MainAxisAlignment.center,
+                                        children: const [
+                                          Icon(Icons.analytics_outlined, size: 20),
+                                          SizedBox(width: 8),
+                                          Text(
+                                            'Цалингийн задаргаа',
+                                            style: TextStyle(
+                                              fontSize: 16,
+                                              fontWeight: FontWeight.w600,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
                           const SizedBox(height: 20),
 
                           // Monthly Statistics (show for current month or filter)
