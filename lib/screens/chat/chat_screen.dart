@@ -63,73 +63,105 @@ class _ChatScreenState extends State<ChatScreen>
         backgroundColor: const Color(0xFF3B82F6),
         foregroundColor: Colors.white,
         elevation: 0,
+        centerTitle: true,
+        leading: IconButton(
+          icon: const Icon(Icons.menu, color: Colors.white),
+          onPressed: () {
+            // TODO: Open drawer
+          },
+        ),
+        actions: [
+          // Test notification button
+          IconButton(
+            icon: const Icon(Icons.notification_add),
+            onPressed: () async {
+              print('🔔 Testing notifications and debugging...');
+
+              // Debug current user's FCM token
+              await NotificationService.debugCheckFCMToken();
+
+              // Try to send a test notification to mungunshand_6
+              print('🔔 Testing direct notification to mungunshand_6...');
+              await NotificationService.debugSendNotificationToUser(
+                'mungunshand_6',
+                'This is a test notification from debug',
+              );
+
+              // Send test local notification on current device
+              await NotificationService.sendTestNotification();
+              
+              // FORCE show a notification (for immediate testing)
+              await NotificationService.debugForceShowNotification(
+                'TEST NOTIFICATION', 
+                'This should appear immediately!'
+              );
+
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                  content: Text(
+                    'Debug complete! Check console for FCM status.',
+                  ),
+                  duration: Duration(seconds: 3),
+                ),
+              );
+            },
+            tooltip: 'Test Notification & Debug',
+          ),
+        ],
         bottom: PreferredSize(
-          preferredSize: const Size.fromHeight(100),
-          child: Column(
-            children: [
-              // Search Bar
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                child: TextField(
-                  controller: _searchController,
-                  onChanged: (value) {
-                    setState(() {
-                      _searchQuery = value.toLowerCase();
-                    });
-                  },
-                  decoration: InputDecoration(
-                    hintText: 'Чат хайх...',
-                    prefixIcon: const Icon(Icons.search, color: Color(0xFF64748B)),
-                    suffixIcon: _searchQuery.isNotEmpty
-                        ? IconButton(
-                            icon: const Icon(Icons.clear, color: Color(0xFF64748B)),
-                            onPressed: () {
-                              _searchController.clear();
-                              setState(() {
-                                _searchQuery = '';
-                              });
-                            },
-                          )
-                        : null,
-                    filled: true,
-                    fillColor: Colors.white,
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      borderSide: BorderSide.none,
-                    ),
-                    contentPadding: const EdgeInsets.symmetric(
-                      horizontal: 16,
-                      vertical: 12,
+          preferredSize: const Size.fromHeight(60),
+          child: Container(
+            color: const Color.fromARGB(255, 255, 255, 255), // Light purple background
+            height: 60,              child: Row(
+                children: [
+                  Expanded(
+                    child: GestureDetector(
+                      onTap: () => _tabController.animateTo(0),
+                      child: _buildTopTab('Chats', Icons.chat_bubble_outline, _tabController.index == 0),
                     ),
                   ),
-                ),
-              ),
-              // Tabs
-              TabBar(
-                controller: _tabController,
-                indicatorColor: Colors.white,
-                indicatorWeight: 3,
-                labelColor: Colors.white,
-                unselectedLabelColor: Colors.white70,
-                labelStyle: const TextStyle(
-                  fontWeight: FontWeight.w600,
-                  fontSize: 16,
-                ),
-                tabs: const [
-                  Tab(text: 'Бүгд'),
-                  Tab(text: 'Бүлэг'),
+                  Expanded(
+                    child: GestureDetector(
+                      onTap: () => _tabController.animateTo(1),
+                      child: _buildTopTab('Messages', Icons.message, _tabController.index == 1),
+                    ),
+                  ),
+                  Expanded(
+                    child: GestureDetector(
+                      onTap: () => _tabController.animateTo(2),
+                      child: _buildTopTab('Groups', Icons.group, _tabController.index == 2),
+                    ),
+                  ),
                 ],
-              ),
-            ],
+            ),
           ),
         ),
       ),
       body: TabBarView(
         controller: _tabController,
         children: [
-          _buildUserList(), // Show all users in "Бүгд" tab
-          _buildGroupChatList(), // Show group chats in "Бүлэг" tab
+          _buildAllChatsList(), // Tab 0: "Chats" - Show ALL chats (users + groups)
+          _buildUserChatsList(), // Tab 1: "Messages" - Show only user-to-user chats  
+          _buildGroupChatList(), // Tab 2: "Groups" - Show group chats only
         ],
+      ),
+      bottomNavigationBar: Container(
+        height: 90,
+        decoration: const BoxDecoration(
+          color: Colors.white,
+          border: Border(top: BorderSide(color: Color(0xFFE5E7EB), width: 0.5)),
+        ),
+        child: SafeArea(
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceAround,
+            children: [
+              _buildBottomNavItem('Home', Icons.home, false),
+              _buildBottomNavItem('Search', Icons.search, false),
+              _buildBottomNavItem('Chat', Icons.chat, true), // Active tab
+              _buildBottomNavItem('Dates', Icons.calendar_today, false),
+            ],
+          ),
+        ),
       ),
       floatingActionButton: _tabController.index == 1 // Show FAB only on Group tab
           ? FloatingActionButton(
@@ -147,58 +179,111 @@ class _ChatScreenState extends State<ChatScreen>
     );
   }
 
-  Widget _buildUserList() {
+  Widget _buildAllChatsList() {
+    return StreamBuilder<List<UserProfile>>(
+      stream: ChatService.getAllUsers(),
+      builder: (context, userSnapshot) {
+        return StreamBuilder<List<ChatRoom>>(
+          stream: ChatService.getUserChatRooms(),
+          builder: (context, chatSnapshot) {
+            if (userSnapshot.connectionState == ConnectionState.waiting ||
+                chatSnapshot.connectionState == ConnectionState.waiting) {
+              return const Center(
+                child: CircularProgressIndicator(
+                  valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF8B5CF6)),
+                ),
+              );
+            }
+
+            if (userSnapshot.hasError || chatSnapshot.hasError) {
+              return Center(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(
+                      Icons.error_outline,
+                      size: 64,
+                      color: Colors.grey.shade400,
+                    ),
+                    const SizedBox(height: 16),
+                    Text(
+                      'Алдаа гарлаа',
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.w600,
+                        color: Colors.grey.shade600,
+                      ),
+                    ),
+                  ],
+                ),
+              );
+            }
+
+            final List<UserProfile> allUsers = userSnapshot.data ?? [];
+            final List<ChatRoom> groupChats = (chatSnapshot.data ?? [])
+                .where((chat) => chat.type == 'group')
+                .toList();
+
+            // Filter out current user
+            final otherUsers = allUsers
+                .where((user) => user.id != ChatService.currentUserId)
+                .toList();
+
+            if (otherUsers.isEmpty && groupChats.isEmpty) {
+              return Center(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(
+                      Icons.chat_bubble_outline,
+                      size: 64,
+                      color: Colors.grey.shade400,
+                    ),
+                    const SizedBox(height: 16),
+                    Text(
+                      'Чат байхгүй байна',
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.w600,
+                        color: Colors.grey.shade600,
+                      ),
+                    ),
+                  ],
+                ),
+              );
+            }
+
+            return ListView.builder(
+              padding: const EdgeInsets.symmetric(vertical: 8),
+              itemCount: otherUsers.length + groupChats.length,
+              itemBuilder: (context, index) {
+                if (index < otherUsers.length) {
+                  // Show user
+                  final user = otherUsers[index];
+                  return _buildUserTile(user);
+                } else {
+                  // Show group chat
+                  final groupChat = groupChats[index - otherUsers.length];
+                  return _buildChatRoomTile(groupChat);
+                }
+              },
+            );
+          },
+        );
+      },
+    );
+  }
+
+  Widget _buildUserChatsList() {
     return StreamBuilder<List<UserProfile>>(
       stream: ChatService.getAllUsers(),
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
           return const Center(
             child: CircularProgressIndicator(
-              valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF3B82F6)),
+              valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF8B5CF6)),
             ),
           );
-        }
-
-        if (snapshot.hasError) {
-          return Center(
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Icon(
-                  Icons.error_outline,
-                  size: 64,
-                  color: Colors.grey.shade400,
-                ),
-                const SizedBox(height: 16),
-                Text(
-                  'Алдаа гарлаа',
-                  style: TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.w600,
-                    color: Colors.grey.shade600,
-                  ),
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  snapshot.error.toString(),
-                  style: TextStyle(
-                    color: Colors.grey.shade500,
-                  ),
-                  textAlign: TextAlign.center,
-                ),
-              ],
-            ),
-          );
-        }
-
-        List<UserProfile> users = snapshot.data ?? [];
-
-        // Filter by search query
-        if (_searchQuery.isNotEmpty) {
-          users = users.where((user) =>
-              user.displayName.toLowerCase().contains(_searchQuery) ||
-              (user.email?.toLowerCase().contains(_searchQuery) ?? false)
-          ).toList();
         }
 
         if (users.isEmpty) {
@@ -222,11 +307,31 @@ class _ChatScreenState extends State<ChatScreen>
                     color: Colors.grey.shade600,
                   ),
                 ),
-                const SizedBox(height: 8),
+              ],
+            ),
+          );
+        }
+
+        final List<UserProfile> allUsers = snapshot.data ?? [];
+        
+        // Filter out current user
+        final otherUsers = allUsers
+            .where((user) => user.id != ChatService.currentUserId)
+            .toList();
+
+        if (otherUsers.isEmpty) {
+          return Center(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(
+                  Icons.person_outline,
+                  size: 64,
+                  color: Colors.grey.shade400,
+                ),
+                const SizedBox(height: 16),
                 Text(
-                  _searchQuery.isNotEmpty
-                      ? 'Өөр түлхүүр үг оруулж хайж үзээрэй'
-                      : 'Одоогоор хэрэглэгч байхгүй байна',
+                  'Хэрэглэгч байхгүй байна',
                   style: TextStyle(
                     color: Colors.grey.shade500,
                   ),
@@ -239,9 +344,9 @@ class _ChatScreenState extends State<ChatScreen>
 
         return ListView.builder(
           padding: const EdgeInsets.symmetric(vertical: 8),
-          itemCount: users.length,
+          itemCount: otherUsers.length,
           itemBuilder: (context, index) {
-            final user = users[index];
+            final user = otherUsers[index];
             return _buildUserTile(user);
           },
         );
@@ -379,190 +484,209 @@ class _ChatScreenState extends State<ChatScreen>
     );
   }
 
-  Widget _buildUserTile(UserProfile user) {
-    return FutureBuilder<ChatRoom?>(
-      future: _getExistingDirectChat(user.id),
-      builder: (context, chatSnapshot) {
-        final chatRoom = chatSnapshot.data;
-        final hasConversation = chatRoom != null;
-        final lastMessage = chatRoom?.lastMessage;
-        final lastMessageSender = chatRoom?.lastMessageSender;
-        
-        String displayMessage = '';
-        if (hasConversation && lastMessage != null && lastMessage.isNotEmpty) {
-          if (lastMessageSender == ChatService.currentUserId) {
-            displayMessage = 'You: $lastMessage';
-          } else {
-            displayMessage = '${user.displayName}: $lastMessage';
-          }
-        } else if (hasConversation) {
-          displayMessage = 'Зураг илгээсэн';
-        } else {
-          displayMessage = 'Чат эхлүүлэх';
-        }
-        
-        return Container(
-          margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(12),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withOpacity(0.05),
-                blurRadius: 4,
-                offset: const Offset(0, 2),
-              ),
-            ],
+  Widget _buildTopTab(String text, IconData icon, bool isActive) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(20),
+        color: Colors.transparent,
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(
+            icon, 
+            size: 16, 
+            color: isActive ? const Color(0xFF9C27B0) : Colors.black
           ),
-          child: ListTile(
-            contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-            leading: Stack(
-              children: [
-                CircleAvatar(
-                  radius: 28,
-                  backgroundImage: user.photoURL != null && user.photoURL!.isNotEmpty
-                      ? NetworkImage(user.photoURL!)
-                      : null,
-                  backgroundColor: const Color(0xFF3B82F6),
-                  child: user.photoURL == null || user.photoURL!.isEmpty
-                      ? Text(
-                          user.displayName.isNotEmpty 
-                              ? user.displayName.substring(0, 1).toUpperCase()
-                              : '?',
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 18,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        )
-                      : null,
-                ),
-                if (user.isOnline)
-                  Positioned(
-                    right: 0,
-                    bottom: 0,
-                    child: Container(
-                      width: 16,
-                      height: 16,
-                      decoration: BoxDecoration(
-                        color: const Color(0xFF10B981),
-                        shape: BoxShape.circle,
-                        border: Border.all(
-                          color: Colors.white,
-                          width: 2,
-                        ),
-                      ),
-                    ),
-                  ),
-              ],
+          const SizedBox(width: 8),
+          Text(
+            text,
+            style: TextStyle(
+              color: isActive ? const Color(0xFF9C27B0) : Colors.black,
+              fontWeight: isActive ? FontWeight.w600 : FontWeight.w500,
             ),
-            title: Text(
-              user.displayName,
-              style: const TextStyle(
-                fontWeight: FontWeight.w600,
-                fontSize: 16,
-                color: Color(0xFF1E293B),
-              ),
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildBottomNavItem(String label, IconData icon, bool isActive) {
+    return GestureDetector(
+      onTap: () {
+        // Handle navigation
+        print('Tapped $label');
+      },
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 8),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              icon,
+              size: 24,
+              color: isActive ? const Color(0xFF9C27B0) : Colors.grey,
             ),
             subtitle: Text(
               displayMessage,
               style: TextStyle(
-                color: hasConversation 
-                    ? Colors.grey.shade600 
-                    : Colors.grey.shade500,
-                fontSize: 14,
-                fontStyle: !hasConversation ? FontStyle.italic : FontStyle.normal,
-                fontWeight: lastMessageSender == ChatService.currentUserId && hasConversation
-                    ? FontWeight.w500
-                    : FontWeight.normal,
+                fontSize: 12,
+                color: isActive ? const Color(0xFF9C27B0) : Colors.grey,
+                fontWeight: isActive ? FontWeight.w600 : FontWeight.normal,
               ),
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
             ),
-            trailing: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                if (chatRoom?.lastMessageTime != null)
-                  Text(
-                    _formatMessageTime(chatRoom!.lastMessageTime!),
-                    style: TextStyle(
-                      color: Colors.grey.shade400,
-                      fontSize: 12,
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildUserTile(UserProfile user) {
+    return StreamBuilder<ChatRoom?>(
+      stream: ChatService.getOrCreateDirectChat(user.id).asStream(),
+      builder: (context, chatSnapshot) {
+        final chatRoom = chatSnapshot.data;
+        
+        return ListTile(
+          contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+          leading: Stack(
+            children: [
+              CircleAvatar(
+                radius: 28,
+                backgroundImage: user.photoURL != null && user.photoURL!.isNotEmpty
+                    ? NetworkImage(user.photoURL!)
+                    : null,
+                backgroundColor: const Color(0xFF8B5CF6),
+                child: user.photoURL == null || user.photoURL!.isEmpty
+                    ? Text(
+                        user.displayName.isNotEmpty
+                            ? user.displayName.substring(0, 1).toUpperCase()
+                            : 'U',
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontWeight: FontWeight.bold,
+                          fontSize: 18,
+                        ),
+                      )
+                    : null,
+              ),
+              // Online indicator
+              if (user.isOnline)
+                Positioned(
+                  bottom: 2,
+                  right: 2,
+                  child: Container(
+                    width: 12,
+                    height: 12,
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF10B981),
+                      shape: BoxShape.circle,
+                      border: Border.all(
+                        color: Colors.white,
+                        width: 2,
+                      ),
                     ),
                   ),
-                const SizedBox(width: 8),
-                Icon(
-                  hasConversation ? Icons.chat : Icons.chat_bubble_outline,
-                  color: hasConversation 
-                      ? const Color(0xFF3B82F6) 
-                      : Colors.grey.shade400,
-                  size: 20,
                 ),
-              ],
-            ),
-            onTap: () => _startChatWithUser(user),
+            ],
           ),
+          title: Text(
+            user.displayName,
+            style: const TextStyle(
+              fontWeight: FontWeight.w600,
+              fontSize: 16,
+              color: Color(0xFF1F2937),
+            ),
+          ),
+          subtitle: chatRoom?.lastMessage != null
+              ? Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const SizedBox(height: 4),
+                    Row(
+                      children: [
+                        if (chatRoom!.lastMessageSender == ChatService.currentUserId)
+                          const Text(
+                            'You: ',
+                            style: TextStyle(
+                              fontWeight: FontWeight.w500,
+                              color: Color(0xFF6B7280),
+                              fontSize: 14,
+                            ),
+                          ),
+                        Expanded(
+                          child: Text(
+                            chatRoom.lastMessage ?? '',
+                            style: const TextStyle(
+                              color: Color(0xFF6B7280),
+                              fontSize: 14,
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                )
+              : Text(
+                  user.isOnline ? 'Online' : 'Offline',
+                  style: TextStyle(
+                    color: user.isOnline ? const Color(0xFF10B981) : const Color(0xFF6B7280),
+                    fontSize: 14,
+                  ),
+                ),
+          trailing: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              if (chatRoom?.lastMessageTime != null)
+                Text(
+                  _formatTime(chatRoom!.lastMessageTime!),
+                  style: const TextStyle(
+                    color: Color(0xFF6B7280),
+                    fontSize: 12,
+                  ),
+                ),
+              const SizedBox(height: 4),
+              // TODO: Add unread count when available in ChatRoom model
+            ],
+          ),
+          onTap: () async {
+            // Get or create direct chat
+            final directChatRoom = await ChatService.getOrCreateDirectChat(user.id);
+            if (directChatRoom != null) {
+              Navigator.of(context).push(
+                MaterialPageRoute(
+                  builder: (context) => ChatRoomScreen(chatRoom: directChatRoom),
+                ),
+              );
+            }
+          },
         );
       },
     );
   }
 
-  Future<ChatRoom?> _getExistingDirectChat(String userId) async {
-    try {
-      return await ChatService.findExistingDirectChat(userId);
-    } catch (e) {
-      return null;
-    }
-  }
-
-  String _formatMessageTime(DateTime time) {
+  String _formatTime(DateTime timestamp) {
     final now = DateTime.now();
-    final today = DateTime(now.year, now.month, now.day);
-    final messageDate = DateTime(time.year, time.month, time.day);
+    final difference = now.difference(timestamp);
     
-    if (messageDate == today) {
-      // Today: show time
-      return '${time.hour.toString().padLeft(2, '0')}:${time.minute.toString().padLeft(2, '0')}';
-    } else if (messageDate == today.subtract(const Duration(days: 1))) {
-      // Yesterday
-      return 'Өчигдөр';
-    } else if (now.difference(messageDate).inDays < 7) {
-      // This week: show day name
-      const days = ['Даваа', 'Мягмар', 'Лхагва', 'Пүрэв', 'Баасан', 'Бямба', 'Ням'];
-      return days[time.weekday - 1];
+    if (difference.inDays > 0) {
+      if (difference.inDays == 1) {
+        return 'Yesterday';
+      } else if (difference.inDays < 7) {
+        return '${difference.inDays}d ago';
+      } else {
+        return '${timestamp.day}/${timestamp.month}';
+      }
+    } else if (difference.inHours > 0) {
+      return '${difference.inHours}h ago';
+    } else if (difference.inMinutes > 0) {
+      return '${difference.inMinutes}m ago';
     } else {
-      // Older: show date
-      return '${time.day}/${time.month}';
-    }
-  }
-
-  void _startChatWithUser(UserProfile user) async {
-    try {
-      // Check if a direct chat already exists
-      final existingChatRoom = await ChatService.getOrCreateDirectChat(user.id);
-      
-      if (existingChatRoom != null) {
-        // Navigate to existing chat
-        Navigator.of(context).push(
-          MaterialPageRoute(
-            builder: (context) => ChatRoomScreen(
-              chatRoom: existingChatRoom,
-            ),
-          ),
-        );
-      }
-    } catch (e) {
-      // Show error message
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Чат эхлүүлэхэд алдаа гарлаа: $e'),
-            backgroundColor: Colors.red,
-          ),
-        );
-      }
+      return 'Just now';
     }
   }
 }

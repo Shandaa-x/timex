@@ -114,7 +114,7 @@ class _GroupManagementScreenState extends State<GroupManagementScreen> {
 
     setState(() => _isLoading = true);
     try {
-      await ChatService.removeFromGroup(widget.chatRoom.id, userId);
+      await ChatService.removeMemberFromGroup(widget.chatRoom.id, userId);
       await _loadParticipants();
       
       if (mounted) {
@@ -148,7 +148,7 @@ class _GroupManagementScreenState extends State<GroupManagementScreen> {
       setState(() => _isLoading = true);
       try {
         final participantIds = result.map((user) => user.id).toList();
-        await ChatService.addToGroup(widget.chatRoom.id, participantIds);
+        await ChatService.addMembersToGroup(widget.chatRoom.id, participantIds);
         await _loadParticipants();
         
         if (mounted) {
@@ -192,16 +192,13 @@ class _GroupManagementScreenState extends State<GroupManagementScreen> {
 
     setState(() => _isLoading = true);
     try {
-      final currentUserId = FirebaseAuth.instance.currentUser?.uid;
-      if (currentUserId != null) {
-        await ChatService.removeFromGroup(widget.chatRoom.id, currentUserId);
-        
-        if (mounted) {
-          Navigator.popUntil(context, (route) => route.isFirst);
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Left group successfully')),
-          );
-        }
+      await ChatService.leaveGroup(widget.chatRoom.id);
+      
+      if (mounted) {
+        Navigator.popUntil(context, (route) => route.isFirst);
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Left group successfully')),
+        );
       }
     } catch (e) {
       if (mounted) {
@@ -448,14 +445,68 @@ class _AddMembersScreenState extends State<AddMembersScreen> {
   Future<void> _loadUsers() async {
     setState(() => _isLoading = true);
     try {
-      final users = await ChatService.searchUsers('');
+      print('🔍 Loading users for adding to group...');
+      print('   Current group participants: ${widget.currentParticipants.length}');
+      for (var p in widget.currentParticipants) {
+        print('   - ${p.displayName} (${p.id})');
+      }
+      
+      List<UserProfile> allUsers = [];
+      
+      try {
+        // Try to get all users first
+        final userStream = ChatService.getAllUsers();
+        allUsers = await userStream.first;
+        print('📋 Got ${allUsers.length} total users from database');
+        
+        for (var user in allUsers) {
+          print('   - ${user.displayName} (${user.id}) - ${user.email}');
+        }
+      } catch (e) {
+        print('❌ Error getting all users: $e');
+        // Fallback to search with common letters
+        final searches = ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k', 'l', 'm', 'n', 'o', 'p', 'q', 'r', 's', 't', 'u', 'v', 'w', 'x', 'y', 'z'];
+        for (String letter in searches) {
+          final searchResults = await ChatService.searchUsers(letter);
+          allUsers.addAll(searchResults);
+        }
+        // Remove duplicates
+        allUsers = allUsers.toSet().toList();
+        print('📋 Got ${allUsers.length} users from search fallback');
+      }
+
+      // Filter out current user and existing group members
+      final currentUserId = ChatService.currentUserId;
       final participantIds = widget.currentParticipants.map((p) => p.id).toList();
       
+      print('🔍 Filtering users...');
+      print('   Current user ID: $currentUserId');
+      print('   Group participant IDs: $participantIds');
+      
+      final availableUsers = allUsers.where((user) {
+        final isCurrentUser = user.id == currentUserId;
+        final isGroupMember = participantIds.contains(user.id);
+        
+        print('   Checking ${user.displayName} (${user.id}):');
+        print('     - Is current user: $isCurrentUser');
+        print('     - Is group member: $isGroupMember');
+        print('     - Should include: ${!isCurrentUser && !isGroupMember}');
+        
+        return !isCurrentUser && !isGroupMember;
+      }).toList();
+      
       setState(() {
-        _availableUsers = users.where((user) => !participantIds.contains(user.id)).toList();
+        _availableUsers = availableUsers;
         _filteredUsers = _availableUsers;
       });
+      
+      print('✅ Final result: ${_availableUsers.length} users available to add');
+      for (var user in _availableUsers) {
+        print('   ✓ ${user.displayName} (${user.email})');
+      }
+      
     } catch (e) {
+      print('❌ Error loading users: $e');
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('Error loading users: $e')),

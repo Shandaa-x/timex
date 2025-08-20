@@ -8,6 +8,7 @@ class ChatRoom {
   final DateTime? lastMessageTime;
   final String? lastMessageSender;
   final Map<String, dynamic>? groupSettings;
+  final Map<String, String>? lastReadBy; // userId -> messageId mapping
   final DateTime createdAt;
   final String createdBy;
 
@@ -21,6 +22,7 @@ class ChatRoom {
     this.lastMessageTime,
     this.lastMessageSender,
     this.groupSettings,
+    this.lastReadBy,
     required this.createdAt,
     required this.createdBy,
   });
@@ -36,6 +38,9 @@ class ChatRoom {
       lastMessageTime: map['lastMessageTime']?.toDate(),
       lastMessageSender: map['lastMessageSender'],
       groupSettings: map['groupSettings'],
+      lastReadBy: map['lastReadBy'] != null 
+          ? Map<String, String>.from(map['lastReadBy']) 
+          : null,
       createdAt: map['createdAt']?.toDate() ?? DateTime.now(),
       createdBy: map['createdBy'] ?? '',
     );
@@ -51,6 +56,7 @@ class ChatRoom {
       'lastMessageTime': lastMessageTime,
       'lastMessageSender': lastMessageSender,
       'groupSettings': groupSettings,
+      'lastReadBy': lastReadBy,
       'createdAt': createdAt,
       'createdBy': createdBy,
     };
@@ -63,12 +69,16 @@ class Message {
   final String senderId;
   final String senderName;
   final String content;
-  final String type; // 'text', 'image', 'file'
+  final String type; // 'text', 'image', 'file', 'system'
   final DateTime timestamp;
   final Map<String, bool> readBy;
   final bool isEdited;
   final DateTime? editedAt;
   final String? replyToId;
+  final bool isDeleted;
+  final DateTime? deletedAt;
+  final String? targetUserId; // For system messages visible to specific users only
+  final String? excludeUserId; // For system messages excluding specific users
 
   Message({
     required this.id,
@@ -82,7 +92,33 @@ class Message {
     this.isEdited = false,
     this.editedAt,
     this.replyToId,
+    this.isDeleted = false,
+    this.deletedAt,
+    this.targetUserId,
+    this.excludeUserId,
   });
+
+  // Check if current user can see this message
+  bool canUserSeeMessage(String userId) {
+    // If message is deleted, don't show it
+    if (isDeleted) return false;
+    
+    // If it's a targeted message, only show to target user
+    if (targetUserId != null) {
+      return targetUserId == userId;
+    }
+    
+    // If it excludes a user, don't show to that user
+    if (excludeUserId != null) {
+      return excludeUserId != userId;
+    }
+    
+    // Otherwise, show to all users
+    return true;
+  }
+  
+  // Check if this is a system message
+  bool get isSystemMessage => senderId == 'system' || type == 'system';
 
   factory Message.fromMap(Map<String, dynamic> map, String id) {
     return Message(
@@ -97,6 +133,10 @@ class Message {
       isEdited: map['isEdited'] ?? false,
       editedAt: map['editedAt']?.toDate(),
       replyToId: map['replyToId'],
+      isDeleted: map['isDeleted'] ?? false,
+      deletedAt: map['deletedAt']?.toDate(),
+      targetUserId: map['targetUserId'],
+      excludeUserId: map['excludeUserId'],
     );
   }
 
@@ -112,6 +152,10 @@ class Message {
       'isEdited': isEdited,
       'editedAt': editedAt,
       'replyToId': replyToId,
+      'isDeleted': isDeleted,
+      'deletedAt': deletedAt,
+      'targetUserId': targetUserId,
+      'excludeUserId': excludeUserId,
     };
   }
 }

@@ -91,8 +91,35 @@ Future<void> _initializeNotifications() async {
     },
   );
 
-  // 🆕 Request notification permission for Android 13+
-  await _requestNotificationPermission();
+    // 🆕 Request notification permission for Android 13+
+    await _requestNotificationPermission();
+    
+    // Set up FCM background message handler
+    try {
+      FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
+      print('🔔 FCM background handler set up');
+    } catch (e) {
+      print('❌ Error setting up FCM background handler: $e');
+    }
+    
+    // Initialize chat notification service with timeout
+    await NotificationService.initialize().timeout(
+      const Duration(seconds: 10),
+      onTimeout: () {
+        print('⚠️ NotificationService initialization timed out');
+        throw TimeoutException('Notification service initialization timeout', Duration(seconds: 10));
+      },
+    );
+    
+    // Initialize push notification listener
+    await NotificationService.initializePushNotificationListener();
+    
+    print('✅ Notification initialization completed');
+  } catch (e, stackTrace) {
+    print('❌ Error in notification initialization: $e');
+    print('Stack trace: $stackTrace');
+    rethrow;
+  }
 }
 
 Future<void> _requestNotificationPermission() async {
