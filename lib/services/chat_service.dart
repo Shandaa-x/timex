@@ -305,10 +305,13 @@ class ChatService {
       
       // Find the target message and mark all messages up to it as read
       bool foundTarget = false;
+      final readTimestamp = DateTime.now();
+      
       for (var doc in messages) {
-        // Mark this message as read by current user
+        // Mark this message as read by current user with timestamp
         batch.update(doc.reference, {
           'readBy.$currentUserId': true,
+          'readTimestamp.$currentUserId': readTimestamp,
         });
         
         // If this is the target message, stop here
@@ -936,6 +939,87 @@ class ChatService {
       return lastReadTimestamp.compareTo(targetTimestamp) >= 0;
     } catch (e) {
       print('Error checking if user read up to message: $e');
+      return false;
+    }
+  }
+
+  // Get real-time message read status
+  static Stream<Map<String, dynamic>> getMessageReadStatus(String chatRoomId, String messageId) {
+    return _firestore
+        .collection('chatRooms')
+        .doc(chatRoomId)
+        .collection('messages')
+        .doc(messageId)
+        .snapshots()
+        .map((snapshot) {
+      if (!snapshot.exists) return {};
+      
+      final data = snapshot.data() as Map<String, dynamic>;
+      
+      // Extract read timestamps
+      Map<String, dynamic> readTimestamps = {};
+      data.forEach((key, value) {
+        if (key.startsWith('readTimestamp.')) {
+          final userId = key.substring('readTimestamp.'.length);
+          readTimestamps[userId] = value;
+        }
+      });
+      
+      return {
+        'readBy': data['readBy'] ?? {},
+        'readTimestamps': readTimestamps,
+        'timestamp': data['timestamp'],
+      };
+    });
+  }
+
+  // Vote/react on a message
+  static Future<bool> voteOnMessage({
+    required String chatRoomId,
+    required String messageId,
+    required String reaction, // '👍', '❤️', '😂', etc.
+  }) async {
+    try {
+      final currentUser = ChatService.currentUserId;
+      if (currentUser.isEmpty) return false;
+
+      await _firestore
+          .collection('chatRooms')
+          .doc(chatRoomId)
+          .collection('messages')
+          .doc(messageId)
+          .update({
+        'votes.$currentUser': reaction,
+      });
+
+      return true;
+    } catch (e) {
+      print('Error voting on message: $e');
+      return false;
+    }
+  }
+
+  // Remove vote/reaction from a message
+  static Future<bool> removeVoteFromMessage({
+    required String chatRoomId,
+    required String messageId,
+  }) async {
+    try {
+      final currentUser = ChatService.currentUserId;
+      if (currentUser.isEmpty) return false;
+
+      await _firestore
+          .collection('chatRooms')
+          .doc(chatRoomId)
+          .collection('messages')
+          .doc(messageId)
+          .update({
+        'votes.$currentUser': FieldValue.delete(),
+      });
+
+      return true;
+    } catch (e) {
+      print('Error removing vote from message: $e');
       return false;
     }
   }

@@ -79,6 +79,7 @@ class Message {
   final DateTime? deletedAt;
   final String? targetUserId; // For system messages visible to specific users only
   final String? excludeUserId; // For system messages excluding specific users
+  final Map<String, String> votes; // userId -> emoji/reaction type
 
   Message({
     required this.id,
@@ -96,6 +97,7 @@ class Message {
     this.deletedAt,
     this.targetUserId,
     this.excludeUserId,
+    this.votes = const {},
   });
 
   // Check if current user can see this message
@@ -137,6 +139,7 @@ class Message {
       deletedAt: map['deletedAt']?.toDate(),
       targetUserId: map['targetUserId'],
       excludeUserId: map['excludeUserId'],
+      votes: Map<String, String>.from(map['votes'] ?? {}),
     );
   }
 
@@ -156,6 +159,7 @@ class Message {
       'deletedAt': deletedAt,
       'targetUserId': targetUserId,
       'excludeUserId': excludeUserId,
+      'votes': votes,
     };
   }
 }

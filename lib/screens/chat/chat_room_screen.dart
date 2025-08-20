@@ -555,6 +555,7 @@ class _ChatRoomScreenState extends State<ChatRoomScreen>
                   itemBuilder: (context, index) {
                     final message = messages[index];
                     final isMe = message.senderId == ChatService.currentUserId;
+                    final isLastMessage = index == 0; // Since reversed, first item is the latest
 
                     // Check if this is a system message
                     if (message.isSystemMessage) {
@@ -584,7 +585,23 @@ class _ChatRoomScreenState extends State<ChatRoomScreen>
 
                     return Padding(
                       padding: const EdgeInsets.only(bottom: 12),
-                      child: _buildMessageBubble(message, isMe, senderProfile),
+                      child: Column(
+                        children: [
+                          _buildMessageBubble(message, isMe, senderProfile),
+                          // Show vote display for group chats
+                          if (widget.chatRoom.type == 'group')
+                            Align(
+                              alignment: isMe ? Alignment.centerRight : Alignment.centerLeft,
+                              child: _buildVoteDisplay(message),
+                            ),
+                          // Show read receipt under the last message from current user
+                          if (isMe && isLastMessage)
+                            Padding(
+                              padding: const EdgeInsets.only(top: 4, right: 16),
+                              child: _buildReadReceiptStatus(message),
+                            ),
+                        ],
+                      ),
                     );
                   },
                 );
@@ -790,43 +807,52 @@ class _ChatRoomScreenState extends State<ChatRoomScreen>
                   ),
                   const SizedBox(height: 2),
                 ],
-                GestureDetector(
-                  onLongPress: isMe ? () => _showMessageOptions(message) : null,
-                  onTap: () => _showReadReceipts(message),
-                  child: Container(
-                    constraints: BoxConstraints(
-                      maxWidth: MediaQuery.of(context).size.width * 0.7,
-                    ),
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 12,
-                      vertical: 8,
-                    ),
-                    decoration: BoxDecoration(
-                      color: isMe
-                          ? const Color(0xFF8B5CF6)
-                          : const Color(0xFFF3F4F6),
-                      borderRadius: BorderRadius.circular(15),
-                    ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,                      children: [
-                        Text(
-                          message.isEdited ? '${message.content} (edited)' : message.content,
-                          style: TextStyle(
-                            color: isMe ? Colors.white : const Color(0xFF1F2937),
-                            fontSize: 15,
-                            fontStyle: message.isEdited ? FontStyle.italic : FontStyle.normal,
-                          ),
+                Column(
+                  crossAxisAlignment: isMe
+                      ? CrossAxisAlignment.end
+                      : CrossAxisAlignment.start,
+                  children: [                GestureDetector(
+                  onLongPress: () => _showMessageOptions(message),
+                      child: Container(
+                        constraints: BoxConstraints(
+                          maxWidth: MediaQuery.of(context).size.width * 0.7,
                         ),
-                        Text(
-                          _formatMessageTime(message.timestamp),
-                          style: TextStyle(
-                            fontSize: 11,
-                            color: isMe ? Colors.white : Color(0xFF9CA3AF),
-                          ),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 8,
                         ),
-                      ],
+                        decoration: BoxDecoration(
+                          color: isMe
+                              ? const Color(0xFF8B5CF6)
+                              : const Color(0xFFF3F4F6),
+                          borderRadius: BorderRadius.circular(15),
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              message.isEdited ? '${message.content} (edited)' : message.content,
+                              style: TextStyle(
+                                color: isMe ? Colors.white : const Color(0xFF1F2937),
+                                fontSize: 15,
+                                fontStyle: message.isEdited ? FontStyle.italic : FontStyle.normal,
+                              ),
+                            ),
+                            Text(
+                              _formatMessageTime(message.timestamp),
+                              style: TextStyle(
+                                fontSize: 11,
+                                color: isMe ? Colors.white : const Color(0xFF9CA3AF),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
                     ),
-                  ),
+                    // Show vote display for group chats
+                    if (widget.chatRoom.type == 'group')
+                      _buildVoteDisplay(message),
+                  ],
                 ),
               ],
             ),
@@ -910,6 +936,10 @@ class _ChatRoomScreenState extends State<ChatRoomScreen>
   }
 
   void _showMessageOptions(Message message) {
+    final currentUserId = ChatService.currentUserId;
+    final isMe = message.senderId == currentUserId;
+    final hasVoted = message.votes.containsKey(currentUserId);
+    
     showModalBottomSheet(
       context: context,
       builder: (context) => Container(
@@ -917,22 +947,38 @@ class _ChatRoomScreenState extends State<ChatRoomScreen>
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            ListTile(
-              leading: const Icon(Icons.edit, color: Color(0xFF8B5CF6)),
-              title: const Text('Edit'),
-              onTap: () {
-                Navigator.pop(context);
-                _editMessage(message);
-              },
-            ),
-            ListTile(
-              leading: const Icon(Icons.delete, color: Colors.red),
-              title: const Text('Delete'),
-              onTap: () {
-                Navigator.pop(context);
-                _deleteMessage(message);
-              },
-            ),
+            // Show vote/unvote option for group chats
+            if (widget.chatRoom.type == 'group')
+              ListTile(
+                leading: Icon(
+                  hasVoted ? Icons.thumb_down : Icons.thumb_up,
+                  color: const Color(0xFF8B5CF6),
+                ),
+                title: Text(hasVoted ? 'Unvote' : 'Vote'),
+                onTap: () {
+                  Navigator.pop(context);
+                  _toggleVote(message);
+                },
+              ),
+            // Show edit/delete options only for own messages
+            if (isMe) ...[
+              ListTile(
+                leading: const Icon(Icons.edit, color: Color(0xFF8B5CF6)),
+                title: const Text('Edit'),
+                onTap: () {
+                  Navigator.pop(context);
+                  _editMessage(message);
+                },
+              ),
+              ListTile(
+                leading: const Icon(Icons.delete, color: Colors.red),
+                title: const Text('Delete'),
+                onTap: () {
+                  Navigator.pop(context);
+                  _deleteMessage(message);
+                },
+              ),
+            ],
           ],
         ),
       ),
@@ -1030,165 +1076,187 @@ class _ChatRoomScreenState extends State<ChatRoomScreen>
     );
   }
 
-  void _showReadReceipts(Message message) async {
-    try {
-      if (widget.chatRoom.type == 'group') {
-        await _showGroupReadReceipts(message);
-      } else {
-        await _showOneToOneReadStatus(message);
-      }
-    } catch (e) {
-      print('Error showing read receipts: $e');
+  void _toggleVote(Message message) async {
+    final currentUserId = ChatService.currentUserId;
+    final hasVoted = message.votes.containsKey(currentUserId);
+    
+    if (hasVoted) {
+      // Remove vote if already voted
+      await ChatService.removeVoteFromMessage(
+        chatRoomId: widget.chatRoom.id,
+        messageId: message.id,
+      );
+    } else {
+      // Add vote (using 'vote' as the reaction type)
+      await ChatService.voteOnMessage(
+        chatRoomId: widget.chatRoom.id,
+        messageId: message.id,
+        reaction: 'vote',
+      );
     }
   }
 
-  Future<void> _showGroupReadReceipts(Message message) async {
-    // Get all participants who have read this message
-    final readByUserIds = message.readBy.entries
-        .where((entry) => entry.value == true)
-        .map((entry) => entry.key)
-        .toList();
-    
-    // Remove current user from read list
-    readByUserIds.remove(ChatService.currentUserId);
-    
-    // Get user profiles for those who read the message
-    List<UserProfile> readByUsers = [];
-    for (String userId in readByUserIds) {
-      final userProfile = _participants.firstWhere(
+  Widget _buildVoteDisplay(Message message) {
+    if (message.votes.isEmpty) {
+      return const SizedBox.shrink();
+    }
+
+    final voteCount = message.votes.length;
+    final currentUserId = ChatService.currentUserId;
+    final hasVoted = message.votes.containsKey(currentUserId);
+
+    return Padding(
+      padding: const EdgeInsets.only(top: 4),
+      child: GestureDetector(
+        onTap: () => _showVotersList(message),
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+          decoration: BoxDecoration(
+            color: hasVoted 
+                ? const Color(0xFF8B5CF6).withOpacity(0.1)
+                : Colors.grey.shade100,
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(
+              color: hasVoted 
+                  ? const Color(0xFF8B5CF6) 
+                  : Colors.grey.shade300,
+              width: 1,
+            ),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(
+                Icons.thumb_up,
+                size: 14,
+                color: hasVoted 
+                    ? const Color(0xFF8B5CF6) 
+                    : Colors.grey.shade600,
+              ),
+              const SizedBox(width: 4),
+              Text(
+                voteCount.toString(),
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: hasVoted ? FontWeight.bold : FontWeight.normal,
+                  color: hasVoted 
+                      ? const Color(0xFF8B5CF6) 
+                      : Colors.grey.shade600,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  void _showVotersList(Message message) {
+    final voterIds = message.votes.keys.toList();
+    final voterNames = voterIds.map((userId) {
+      final participant = _participants.firstWhere(
         (p) => p.id == userId,
         orElse: () => UserProfile(id: userId, displayName: 'Unknown', email: ''),
       );
-      if (userProfile.displayName != 'Unknown') {
-        readByUsers.add(userProfile);
-      }
-    }
-    
-    // Show bottom sheet with read receipts
+      return participant.displayName;
+    }).where((name) => name != 'Unknown').toList();
+
     showModalBottomSheet(
       context: context,
       builder: (context) => Container(
         padding: const EdgeInsets.all(16),
         child: Column(
           mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(
-              'Message Status',
-              style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-            const SizedBox(height: 16),
-            if (readByUsers.isEmpty)
-              const Text(
-                'Nobody seen',
-                style: TextStyle(
-                  color: Colors.grey,
-                  fontSize: 16,
-                ),
-              )
-            else ...[
-              Text(
-                'Seen by ${_formatSeenByText(readByUsers)}',
-                style: const TextStyle(fontSize: 16),
-              ),
-              const SizedBox(height: 8),
-              if (readByUsers.length > 3)
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                const Icon(Icons.thumb_up, color: Color(0xFF8B5CF6)),
+                const SizedBox(width: 8),
                 Text(
-                  'and ${readByUsers.length - 3} others',
-                  style: TextStyle(
-                    color: Colors.grey.shade600,
-                    fontSize: 14,
-                  ),
+                  '${voterIds.length} ${voterIds.length == 1 ? 'vote' : 'votes'}',
+                  style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
                 ),
-            ],
-            const SizedBox(height: 16),
-          ],
-        ),
-      ),
-    );
-  }
-
-  String _formatSeenByText(List<UserProfile> readByUsers) {
-    if (readByUsers.isEmpty) return '';
-    
-    if (readByUsers.length <= 3) {
-      return readByUsers.map((user) => user.displayName).join(', ');
-    } else {
-      final first3 = readByUsers.take(3).map((user) => user.displayName).join(', ');
-      return '$first3 +${readByUsers.length - 3}';
-    }
-  }
-
-  Future<void> _showOneToOneReadStatus(Message message) async {
-    final otherUserId = widget.chatRoom.participants
-        .firstWhere((id) => id != ChatService.currentUserId);
-    
-    final hasRead = message.readBy[otherUserId] ?? false;
-    
-    showModalBottomSheet(
-      context: context,
-      builder: (context) => Container(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              'Message Status',
-              style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                fontWeight: FontWeight.bold,
-              ),
+              ],
             ),
             const SizedBox(height: 16),
-            if (hasRead) ...[
-              const Text(
-                'Seen',
-                style: TextStyle(
-                  color: Colors.green,
-                  fontSize: 16,
-                  fontWeight: FontWeight.w500,
+            ...voterNames.map((name) => ListTile(
+              leading: CircleAvatar(
+                backgroundColor: const Color(0xFF8B5CF6),
+                child: Text(
+                  name.isNotEmpty ? name[0].toUpperCase() : 'U',
+                  style: const TextStyle(color: Colors.white),
                 ),
               ),
-              Text(
-                _formatRelativeTime(message.timestamp),
-                style: TextStyle(
-                  color: Colors.grey.shade600,
-                  fontSize: 14,
-                ),
-              ),
-            ] else
-              const Text(
-                'Not seen',
-                style: TextStyle(
-                  color: Colors.grey,
-                  fontSize: 16,
-                ),
-              ),
-            const SizedBox(height: 16),
+              title: Text(name),
+            )),
           ],
         ),
       ),
     );
   }
 
-  String _formatRelativeTime(DateTime messageTime) {
-    final now = DateTime.now();
-    final difference = now.difference(messageTime);
-    
-    if (difference.inMinutes < 1) {
-      return 'just now';
-    } else if (difference.inMinutes < 60) {
-      return '${difference.inMinutes} minute${difference.inMinutes == 1 ? '' : 's'} ago';
-    } else if (difference.inHours < 24) {
-      return '${difference.inHours} hour${difference.inHours == 1 ? '' : 's'} ago';
-    } else if (difference.inDays < 7) {
-      return '${difference.inDays} day${difference.inDays == 1 ? '' : 's'} ago';
+  Widget _buildReadReceiptStatus(Message message) {
+    if (widget.chatRoom.type == 'group') {
+      // Group chat: show "Seen by name1, name2, +X"
+      final readByUsers = message.readBy.entries
+          .where((entry) => entry.key != ChatService.currentUserId && entry.value)
+          .map((entry) => entry.key)
+          .toList();
+
+      if (readByUsers.isEmpty) {
+        return const Text(
+          'Not seen',
+          style: TextStyle(
+            fontSize: 11,
+            color: Colors.grey,
+          ),
+        );
+      }
+
+      final readByNames = readByUsers.take(2).map((userId) {
+        final participant = _participants.firstWhere(
+          (p) => p.id == userId,
+          orElse: () => UserProfile(id: userId, displayName: 'Unknown', email: ''),
+        );
+        return participant.displayName;
+      }).where((name) => name != 'Unknown').toList();
+
+      String displayText = 'Seen by ${readByNames.join(', ')}';
+      if (readByUsers.length > 2) {
+        displayText += ', +${readByUsers.length - 2}';
+      }
+
+      return Text(
+        displayText,
+        style: const TextStyle(
+          fontSize: 11,
+          color: Colors.grey,
+        ),
+      );
     } else {
-      final hour = messageTime.hour.toString().padLeft(2, '0');
-      final minute = messageTime.minute.toString().padLeft(2, '0');
-      return '${messageTime.day}/${messageTime.month}/${messageTime.year} $hour:$minute';
+      // Direct chat: show "Seen X ago" or "Not seen"
+      final otherUserId = widget.chatRoom.participants
+          .firstWhere((id) => id != ChatService.currentUserId);
+      
+      if (message.readBy[otherUserId] == true) {
+        // Calculate time ago - this is simplified, in a real app you'd store read timestamps
+        return const Text(
+          'Seen',
+          style: TextStyle(
+            fontSize: 11,
+            color: Colors.grey,
+          ),
+        );
+      } else {
+        return const Text(
+          'Not seen',
+          style: TextStyle(
+            fontSize: 11,
+            color: Colors.grey,
+          ),
+        );
+      }
     }
   }
 }
