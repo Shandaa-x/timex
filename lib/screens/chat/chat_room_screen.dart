@@ -863,27 +863,16 @@ class _ChatRoomScreenState extends State<ChatRoomScreen>
                                       vertical: 2,
                                     ),
                                     decoration: BoxDecoration(
-                                      color: Colors.black12,
+                                      color: const Color(0xFF10B981),
                                       borderRadius: BorderRadius.circular(8),
                                     ),
-                                    child: Row(
-                                      mainAxisSize: MainAxisSize.min,
-                                      children: [
-                                        Icon(
-                                          Icons.thumb_up,
-                                          size: 10,
-                                          color: Colors.grey.shade600,
-                                        ),
-                                        const SizedBox(width: 2),
-                                        Text(
-                                          message.votes.length.toString(),
-                                          style: TextStyle(
-                                            fontSize: 10,
-                                            color: Colors.grey.shade600,
-                                            fontWeight: FontWeight.w500,
-                                          ),
-                                        ),
-                                      ],
+                                    child: Text(
+                                      message.votes.length.toString(),
+                                      style: const TextStyle(
+                                        fontSize: 10,
+                                        color: Colors.white,
+                                        fontWeight: FontWeight.bold,
+                                      ),
                                     ),
                                   ),
                                   const SizedBox(width: 8),
@@ -910,24 +899,13 @@ class _ChatRoomScreenState extends State<ChatRoomScreen>
                                       color: Colors.white24,
                                       borderRadius: BorderRadius.circular(8),
                                     ),
-                                    child: Row(
-                                      mainAxisSize: MainAxisSize.min,
-                                      children: [
-                                        const Icon(
-                                          Icons.thumb_up,
-                                          size: 10,
-                                          color: Colors.white,
-                                        ),
-                                        const SizedBox(width: 2),
-                                        Text(
-                                          message.votes.length.toString(),
-                                          style: const TextStyle(
-                                            fontSize: 10,
-                                            color: Colors.white,
-                                            fontWeight: FontWeight.w500,
-                                          ),
-                                        ),
-                                      ],
+                                    child: Text(
+                                      message.votes.length.toString(),
+                                      style: const TextStyle(
+                                        fontSize: 10,
+                                        color: Colors.white,
+                                        fontWeight: FontWeight.bold,
+                                      ),
                                     ),
                                   ),
                                 ],
