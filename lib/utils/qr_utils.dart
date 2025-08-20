@@ -243,53 +243,66 @@ class QRUtils {
       deepLinks['qpay'] = 'qpay://invoice?id=$invoiceId';
     }
 
-    // Enhanced deep links for different banks with proper QR handling
+    // Enhanced deep links for different banks using the correct format that works
     if (qrText.isNotEmpty) {
       final encodedQR = Uri.encodeComponent(qrText);
 
-      // Social Pay deep link (Khan Bank) - use the correct payment scheme that works
-      deepLinks['socialpay'] =
-          'socialpay-payment://q?qPay_QRcode=$encodedQR';
+      // Use the `q?qPay_QRcode=` format that works with SocialPay for all banks
+      // This format seems to be the standard that actually passes invoice data
 
-      // Khan Bank app deep link - try multiple formats
+      // Social Pay deep link - confirmed working format
+      deepLinks['socialpay'] = 'socialpay-payment://q?qPay_QRcode=$encodedQR';
+      deepLinks['socialpaymain'] = 'socialpay://q?qPay_QRcode=$encodedQR';
+
+      // Khan Bank - use the same format as SocialPay
       deepLinks['khanbank'] = 'khanbank://q?qPay_QRcode=$encodedQR';
-      deepLinks['khanbankalt'] = 'khanbankapp://payment?qr=$encodedQR';
+      deepLinks['khanbankalt'] = 'khanbankapp://q?qPay_QRcode=$encodedQR';
 
-      // State Bank deep links
-      deepLinks['statebank'] = 'statebank://payment?qr=$encodedQR';
-      deepLinks['statebankalt'] = 'statebankapp://qpay?code=$encodedQR';
+      // State Bank - use consistent format
+      deepLinks['statebank'] = 'statebank://q?qPay_QRcode=$encodedQR';
+      deepLinks['statebankalt'] = 'statebankapp://q?qPay_QRcode=$encodedQR';
 
-      // TDB Bank deep links
-      deepLinks['tdbbank'] = 'tdbbank://qpay?qr=$encodedQR';
-      deepLinks['tdb'] = 'tdb://payment?code=$encodedQR';
+      // TDB Bank - use consistent format
+      deepLinks['tdbbank'] = 'tdbbank://q?qPay_QRcode=$encodedQR';
+      deepLinks['tdb'] = 'tdb://q?qPay_QRcode=$encodedQR';
 
-      // Xac Bank deep links
-      deepLinks['xacbank'] = 'xacbank://qpay?qr=$encodedQR';
-      deepLinks['xac'] = 'xac://payment?qr=$encodedQR';
+      // Xac Bank - use consistent format
+      deepLinks['xacbank'] = 'xacbank://q?qPay_QRcode=$encodedQR';
+      deepLinks['xac'] = 'xac://q?qPay_QRcode=$encodedQR';
 
-      // Most Money deep links
-      deepLinks['most'] = 'most://qpay?qr=$encodedQR';
-      deepLinks['mostmoney'] = 'mostmoney://payment?code=$encodedQR';
+      // Most Money - use consistent format
+      deepLinks['most'] = 'most://q?qPay_QRcode=$encodedQR';
+      deepLinks['mostmoney'] = 'mostmoney://q?qPay_QRcode=$encodedQR';
 
-      // NIB Bank deep links
-      deepLinks['nibank'] = 'nibank://qpay?qr=$encodedQR';
-      deepLinks['ulaanbaatarbank'] = 'ulaanbaatarbank://payment?qr=$encodedQR';
+      // NIB Bank - use consistent format
+      deepLinks['nibank'] = 'nibank://q?qPay_QRcode=$encodedQR';
+      deepLinks['ulaanbaatarbank'] =
+          'ulaanbaatarbank://q?qPay_QRcode=$encodedQR';
 
-      // Chinggis Khaan Bank deep links
-      deepLinks['ckbank'] = 'ckbank://qpay?qr=$encodedQR';
-      deepLinks['chinggisnbank'] = 'chinggisnbank://payment?code=$encodedQR';
+      // Chinggis Khaan Bank - use consistent format
+      deepLinks['ckbank'] = 'ckbank://q?qPay_QRcode=$encodedQR';
+      deepLinks['chinggisnbank'] = 'chinggisnbank://q?qPay_QRcode=$encodedQR';
 
-      // Capitron Bank deep links
-      deepLinks['capitronbank'] = 'capitronbank://qpay?qr=$encodedQR';
-      deepLinks['capitron'] = 'capitron://payment?qr=$encodedQR';
+      // Capitron Bank - use consistent format
+      deepLinks['capitronbank'] = 'capitronbank://q?qPay_QRcode=$encodedQR';
+      deepLinks['capitron'] = 'capitron://q?qPay_QRcode=$encodedQR';
 
-      // Bogd Bank deep links
-      deepLinks['bogdbank'] = 'bogdbank://qpay?qr=$encodedQR';
-      deepLinks['bogd'] = 'bogd://payment?code=$encodedQR';
+      // Bogd Bank - use consistent format
+      deepLinks['bogdbank'] = 'bogdbank://q?qPay_QRcode=$encodedQR';
+      deepLinks['bogd'] = 'bogd://q?qPay_QRcode=$encodedQR';
 
-      // Candy Pay deep links
-      deepLinks['candypay'] = 'candypay://qpay?qr=$encodedQR';
-      deepLinks['candy'] = 'candy://payment?qr=$encodedQR';
+      // Arig Bank - use consistent format
+      deepLinks['arigbank'] = 'arigbank://q?qPay_QRcode=$encodedQR';
+
+      // Trans Bank - use consistent format
+      deepLinks['transbank'] = 'transbank://q?qPay_QRcode=$encodedQR';
+
+      // M Bank - use consistent format
+      deepLinks['mbank'] = 'mbank://q?qPay_QRcode=$encodedQR';
+
+      // Candy Pay - use consistent format
+      deepLinks['candypay'] = 'candypay://q?qPay_QRcode=$encodedQR';
+      deepLinks['candy'] = 'candy://q?qPay_QRcode=$encodedQR';
     }
 
     // Generic banking URL (web fallback)

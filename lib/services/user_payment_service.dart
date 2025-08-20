@@ -204,11 +204,22 @@ class UserPaymentService {
         (sum, amount) => sum + amount,
       );
 
+      final double totalFoodAmount = rawTotalFoodAmount is String
+          ? double.tryParse(rawTotalFoodAmount) ?? 0.0
+          : (rawTotalFoodAmount as num).toDouble();
+
+      // Get the stored qpayStatus from Firebase
+      final String storedQpayStatus = data['qpayStatus'] ?? 'none';
+
+      // Override payment status logic: if totalFoodAmount > 0, user has balance to pay
+      // regardless of what's stored in the database
+      final String actualQpayStatus = totalFoodAmount > 0
+          ? 'pending'
+          : storedQpayStatus;
+
       return {
         'success': true,
-        'totalFoodAmount': rawTotalFoodAmount is String
-            ? double.tryParse(rawTotalFoodAmount) ?? 0.0
-            : (rawTotalFoodAmount as num).toDouble(),
+        'totalFoodAmount': totalFoodAmount,
         'originalFoodAmount': rawOriginalFoodAmount is String
             ? double.tryParse(rawOriginalFoodAmount) ?? 0.0
             : (rawOriginalFoodAmount as num).toDouble(),
@@ -217,7 +228,7 @@ class UserPaymentService {
         'paymentAmounts':
             paymentAmounts, // Return the array for detailed tracking
         'paymentCount': paymentAmounts.length, // Number of payments made
-        'qpayStatus': data['qpayStatus'] ?? 'none',
+        'qpayStatus': actualQpayStatus, // Use the calculated status
         'paymentStatus': data['paymentStatus'] ?? false, // Boolean status
         'lastPaymentAmount': rawLastPaymentAmount is String
             ? double.tryParse(rawLastPaymentAmount) ?? 0.0

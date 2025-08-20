@@ -131,7 +131,7 @@ class BankingAppChecker {
     return null;
   }
 
-  /// Get optimized deep links for each bank
+  /// Get optimized deep links for each bank with correct parameters
   static Future<Map<String, String>> getOptimizedDeepLinks(
     String qrText,
     String? invoiceId,
@@ -139,7 +139,7 @@ class BankingAppChecker {
     final workingSchemes = <String, String>{};
     final encodedQR = Uri.encodeComponent(qrText);
 
-    // Test schemes for each bank
+    // Test schemes for each bank with their specific deep link formats
     final bankSchemes = {
       'Khan Bank': ['khanbank://', 'khanbankapp://'],
       'Social Pay': ['socialpay-payment://', 'socialpay://'],
@@ -161,24 +161,14 @@ class BankingAppChecker {
     for (final entry in bankSchemes.entries) {
       final workingScheme = await findWorkingScheme(entry.value);
       if (workingScheme != null) {
-        // Create proper deep link based on the working scheme
-        String deepLink;
-        if (workingScheme.startsWith('qpay://') && invoiceId != null) {
-          deepLink = 'qpay://invoice?id=$invoiceId';
-        } else if (workingScheme.startsWith('socialpay-payment://')) {
-          deepLink = 'socialpay-payment://q?qPay_QRcode=$encodedQR';
-        } else if (workingScheme.startsWith('socialpay://')) {
-          deepLink = 'socialpay://qpay?qr=$encodedQR';
-        } else if (workingScheme.startsWith('khanbank://')) {
-          deepLink = 'khanbank://q?qPay_QRcode=$encodedQR';
-        } else if (workingScheme.startsWith('tdbbank://')) {
-          deepLink = 'tdbbank://q?qPay_QRcode=$encodedQR';
-        } else if (workingScheme.startsWith('xacbank://')) {
-          deepLink = 'xacbank://q?qPay_QRcode=$encodedQR';
-        } else {
-          // Generic format for other banks
-          deepLink = '${workingScheme}qpay?qr=$encodedQR';
-        }
+        // Create proper deep link based on the working scheme and bank-specific formats
+        String deepLink = _generateBankSpecificDeepLink(
+          entry.key,
+          workingScheme,
+          qrText,
+          encodedQR,
+          invoiceId,
+        );
 
         workingSchemes[entry.key] = deepLink;
         AppLogger.success('${entry.key}: $deepLink');
@@ -186,6 +176,104 @@ class BankingAppChecker {
     }
 
     return workingSchemes;
+  }
+
+  /// Generate bank-specific deep link with correct parameters
+  static String _generateBankSpecificDeepLink(
+    String bankName,
+    String scheme,
+    String qrText,
+    String encodedQR,
+    String? invoiceId,
+  ) {
+    switch (bankName) {
+      case 'QPay Wallet':
+        if (invoiceId != null && invoiceId.isNotEmpty) {
+          return 'qpay://invoice?id=$invoiceId';
+        }
+        return 'qpay://qr?data=$encodedQR';
+
+      case 'Social Pay':
+        // SocialPay uses a specific format that works
+        if (scheme.contains('payment')) {
+          return 'socialpay-payment://q?qPay_QRcode=$encodedQR';
+        }
+        return 'socialpay://qpay?qr=$encodedQR';
+
+      case 'Khan Bank':
+        // Khan Bank variations - try the format that works like SocialPay
+        if (scheme.contains('khanbank://')) {
+          return 'khanbank://q?qPay_QRcode=$encodedQR';
+        }
+        return 'khanbankapp://qpay?qr=$encodedQR';
+
+      case 'State Bank':
+        if (scheme.contains('statebank://')) {
+          return 'statebank://q?qPay_QRcode=$encodedQR';
+        }
+        return 'statebankapp://qpay?qr=$encodedQR';
+
+      case 'TDB Bank':
+        if (scheme.contains('tdbbank://')) {
+          return 'tdbbank://q?qPay_QRcode=$encodedQR';
+        }
+        return 'tdb://qpay?qr=$encodedQR';
+
+      case 'Xac Bank':
+        if (scheme.contains('xacbank://')) {
+          return 'xacbank://q?qPay_QRcode=$encodedQR';
+        }
+        return 'xac://qpay?qr=$encodedQR';
+
+      case 'Most Money':
+        if (scheme.contains('most://')) {
+          return 'most://q?qPay_QRcode=$encodedQR';
+        }
+        return 'mostmoney://qpay?qr=$encodedQR';
+
+      case 'NIB Bank':
+        if (scheme.contains('nibank://')) {
+          return 'nibank://q?qPay_QRcode=$encodedQR';
+        }
+        return 'ulaanbaatarbank://qpay?qr=$encodedQR';
+
+      case 'Chinggis Khaan Bank':
+        if (scheme.contains('ckbank://')) {
+          return 'ckbank://q?qPay_QRcode=$encodedQR';
+        }
+        return 'chinggisnbank://qpay?qr=$encodedQR';
+
+      case 'Capitron Bank':
+        if (scheme.contains('capitronbank://')) {
+          return 'capitronbank://q?qPay_QRcode=$encodedQR';
+        }
+        return 'capitron://qpay?qr=$encodedQR';
+
+      case 'Bogd Bank':
+        if (scheme.contains('bogdbank://')) {
+          return 'bogdbank://q?qPay_QRcode=$encodedQR';
+        }
+        return 'bogd://qpay?qr=$encodedQR';
+
+      case 'Arig Bank':
+        return 'arigbank://q?qPay_QRcode=$encodedQR';
+
+      case 'Trans Bank':
+        return 'transbank://q?qPay_QRcode=$encodedQR';
+
+      case 'M Bank':
+        return 'mbank://q?qPay_QRcode=$encodedQR';
+
+      case 'Candy Pay':
+        if (scheme.contains('candypay://')) {
+          return 'candypay://q?qPay_QRcode=$encodedQR';
+        }
+        return 'candy://qpay?qr=$encodedQR';
+
+      default:
+        // Generic format - use the SocialPay-like format as it seems to work
+        return '${scheme}q?qPay_QRcode=$encodedQR';
+    }
   }
 
   /// Get a formatted report of available banking apps

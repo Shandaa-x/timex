@@ -5,7 +5,6 @@ import 'package:url_launcher/url_launcher.dart';
 import '../../services/money_format.dart';
 import '../../services/qpay_helper_service.dart';
 import '../../services/user_payment_service.dart';
-import '../../utils/socialpay_integration.dart';
 import '../../widgets/beautiful_circular_progress.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -13,8 +12,9 @@ import 'dart:async';
 
 class PaymentScreen extends StatefulWidget {
   final int? initialAmount;
+  final Map<String, dynamic>? selectedBank;
 
-  const PaymentScreen({super.key, this.initialAmount});
+  const PaymentScreen({super.key, this.initialAmount, this.selectedBank});
 
   @override
   State<PaymentScreen> createState() => _PaymentScreenState();
@@ -27,7 +27,6 @@ class _PaymentScreenState extends State<PaymentScreen> {
   List<Map<String, dynamic>> _availableBanks = [];
   double _currentBalance = 0.0;
   String _currentPaymentStatus = 'none';
-  bool _showBankOptions = false;
   bool _isProcessingPayment = false;
 
   // Bank data with proper icons and information matching the design
@@ -151,10 +150,65 @@ class _PaymentScreenState extends State<PaymentScreen> {
     }
   }
 
+  /// Generate bank-specific deep link with correct format
+  String _generateBankDeepLink(
+    Map<String, dynamic> bank,
+    String qrText,
+    String? invoiceId,
+  ) {
+    final encodedQR = Uri.encodeComponent(qrText);
+    final bankName = bank['name'] as String;
+    final scheme = bank['scheme'] as String;
+
+    switch (bankName) {
+      case 'SocialPay':
+        return 'socialpay-payment://q?qPay_QRcode=$encodedQR';
+
+      case 'Khan Bank':
+        return 'khanbank://q?qPay_QRcode=$encodedQR';
+
+      case 'State Bank':
+        return 'statebank://q?qPay_QRcode=$encodedQR';
+
+      case 'Xac Bank':
+        return 'xacbank://q?qPay_QRcode=$encodedQR';
+
+      case 'TDB Bank':
+        return 'tdbbank://q?qPay_QRcode=$encodedQR';
+
+      case 'Most Money':
+        return 'most://q?qPay_QRcode=$encodedQR';
+
+      case 'Trade Bank':
+        return 'tradebank://q?qPay_QRcode=$encodedQR';
+
+      case 'Chinggis Khaan Bank':
+        return 'chinggisnbank://q?qPay_QRcode=$encodedQR';
+
+      case 'Capitron Bank':
+        return 'capitronbank://q?qPay_QRcode=$encodedQR';
+
+      case 'Bogd Bank':
+        return 'bogdbank://q?qPay_QRcode=$encodedQR';
+
+      case 'Ard Bank':
+        return 'ardbank://q?qPay_QRcode=$encodedQR';
+
+      case 'Arig Bank':
+        return 'arigbank://q?qPay_QRcode=$encodedQR';
+
+      case 'Trans Bank':
+        return 'transbank://q?qPay_QRcode=$encodedQR';
+
+      default:
+        // Generic format using the q?qPay_QRcode format that works
+        return '${scheme}q?qPay_QRcode=$encodedQR';
+    }
+  }
+
   void _onAmountChanged(String value) {
     setState(() {
       _enteredAmount = int.tryParse(value) ?? 0;
-      _showBankOptions = _enteredAmount > 0;
     });
   }
 
@@ -223,35 +277,8 @@ class _PaymentScreenState extends State<PaymentScreen> {
         _currentOrderId = orderId;
         _currentAccessToken = result['access_token'];
 
-        // Create deep link based on bank scheme
-        String deepLink;
-        if (bank['name'] == 'SocialPay') {
-          // Use the SocialPay integration for proper deeplink format
-          final socialPayLink = SocialPayIntegration.getSocialPayDeepLink(
-            qrText: qrText,
-            invoiceId: invoiceId,
-          );
-          if (socialPayLink != null) {
-            deepLink = socialPayLink;
-          } else {
-            // Fallback to alternative format
-            final altLink =
-                SocialPayIntegration.getAlternativeSocialPayDeepLink(
-                  qrText: qrText,
-                  invoiceId: invoiceId,
-                );
-            deepLink =
-                altLink ??
-                '${bank['scheme']}qpay?qr=${Uri.encodeComponent(qrText)}';
-          }
-        } else if (bank['scheme'] == 'khanbank://') {
-          deepLink = 'khanbank://qpay?qrText=$qrText&invoiceId=$invoiceId';
-        } else if (bank['scheme'] == 'statebank://') {
-          deepLink = 'statebank://qpay?qrText=$qrText&invoiceId=$invoiceId';
-        } else {
-          deepLink =
-              '${bank['scheme']}qpay?qrText=$qrText&invoiceId=$invoiceId';
-        }
+        // Create deep link based on bank with correct format
+        String deepLink = _generateBankDeepLink(bank, qrText, invoiceId);
 
         // Launch banking app
         final uri = Uri.parse(deepLink);
@@ -587,7 +614,7 @@ class _PaymentScreenState extends State<PaymentScreen> {
           onPressed: () => Navigator.of(context).pop(),
         ),
         title: const Text(
-          'Хэтэвч цэнэглэх',
+          'Төлбөр төлөх',
           style: TextStyle(
             color: Colors.black,
             fontSize: 18,
@@ -812,29 +839,8 @@ class _PaymentScreenState extends State<PaymentScreen> {
               ),
             ),
 
-          // Banks list section - only show after amount is entered
-          if (_showBankOptions && _currentPaymentStatus != 'paid') ...[
-            Container(
-              margin: const EdgeInsets.symmetric(horizontal: 16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'Select Bank',
-                    style: TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w600,
-                      color: Colors.black87,
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    'Choose your preferred bank to complete the payment',
-                    style: TextStyle(fontSize: 14, color: Colors.grey[600]),
-                  ),
-                ],
-              ),
-            ),
+          // Banks list section - always show banks
+          if (_currentPaymentStatus != 'paid') ...[
             const SizedBox(height: 16),
             Expanded(
               child: _isLoading
@@ -854,7 +860,7 @@ class _PaymentScreenState extends State<PaymentScreen> {
                             backgroundColor: const Color(0x1A10B981),
                             centerGlowColor: const Color(0xFF10B981),
                             centerGlowSize: 35,
-                            animationDuration: const Duration(seconds: 2),
+                            animationDuration: Duration(seconds: 2),
                           ),
                           const SizedBox(height: 24),
                           Text(
@@ -887,52 +893,8 @@ class _PaymentScreenState extends State<PaymentScreen> {
                     ),
             ),
           ] else ...[
-            // Show guidance when no amount is entered
-            if (!_showBankOptions && _currentPaymentStatus != 'paid')
-              Expanded(
-                child: Center(
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Container(
-                        width: 120,
-                        height: 120,
-                        decoration: BoxDecoration(
-                          color: const Color(0xFF10B981).withOpacity(0.1),
-                          shape: BoxShape.circle,
-                        ),
-                        child: const Icon(
-                          Icons.account_balance_wallet_rounded,
-                          size: 50,
-                          color: Color(0xFF10B981),
-                        ),
-                      ),
-                      const SizedBox(height: 24),
-                      Text(
-                        'Enter Payment Amount',
-                        style: TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.w600,
-                          color: Colors.grey[700],
-                        ),
-                      ),
-                      const SizedBox(height: 12),
-                      Text(
-                        'Please enter the amount you want to pay\nto see available banking options',
-                        textAlign: TextAlign.center,
-                        style: TextStyle(
-                          fontSize: 14,
-                          color: Colors.grey[500],
-                          height: 1.5,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
             // Show "no more payments needed" for fully paid
-            if (_currentPaymentStatus == 'paid')
-              const Expanded(child: SizedBox.shrink()),
+            const Expanded(child: SizedBox.shrink()),
           ],
         ],
       ),
@@ -1014,8 +976,17 @@ class _PaymentScreenState extends State<PaymentScreen> {
               ),
             )
           : Icon(Icons.arrow_forward_ios, size: 16, color: Colors.grey[400]),
-      onTap: (_enteredAmount > 0 && !_isProcessingPayment)
-          ? () => _processPayment(bank)
+      onTap: !_isProcessingPayment
+          ? () {
+              if (_enteredAmount <= 0) {
+                _showSnackBar(
+                  'Please enter a valid amount first',
+                  Colors.orange,
+                );
+                return;
+              }
+              _processPayment(bank);
+            }
           : null,
     );
   }
