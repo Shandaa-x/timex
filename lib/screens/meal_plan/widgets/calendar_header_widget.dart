@@ -27,7 +27,7 @@ class CalendarHeaderWidget extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
-    
+
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
       decoration: BoxDecoration(
@@ -123,14 +123,14 @@ class CalendarHeaderWidget extends StatelessWidget {
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
               decoration: BoxDecoration(
-                color: isFilterMode 
-                  ? Colors.orange.withOpacity(0.1)
-                  : AppTheme.primaryLight.withOpacity(0.1),
+                color: isFilterMode
+                    ? Colors.orange.withOpacity(0.1)
+                    : AppTheme.primaryLight.withOpacity(0.1),
                 borderRadius: BorderRadius.circular(20),
                 border: Border.all(
-                  color: isFilterMode 
-                    ? Colors.orange.withOpacity(0.3)
-                    : AppTheme.primaryLight.withOpacity(0.3),
+                  color: isFilterMode
+                      ? Colors.orange.withOpacity(0.3)
+                      : AppTheme.primaryLight.withOpacity(0.3),
                   width: 1,
                 ),
               ),
@@ -141,18 +141,22 @@ class CalendarHeaderWidget extends StatelessWidget {
                     isFilterMode
                         ? Icons.filter_alt
                         : isWeekView
-                            ? Icons.calendar_view_month
-                            : Icons.calendar_view_week,
+                        ? Icons.calendar_view_month
+                        : Icons.calendar_view_week,
                     color: isFilterMode ? Colors.orange : AppTheme.primaryLight,
                     size: 16,
                   ),
                   const SizedBox(width: 8),
                   Text(
-                    isFilterMode 
+                    isFilterMode
                         ? (selectedFilter ?? 'All')
-                        : isWeekView ? 'Month' : 'Week',
+                        : isWeekView
+                        ? 'Month'
+                        : 'Week',
                     style: theme.textTheme.labelMedium?.copyWith(
-                      color: isFilterMode ? Colors.orange : AppTheme.primaryLight,
+                      color: isFilterMode
+                          ? Colors.orange
+                          : AppTheme.primaryLight,
                       fontWeight: FontWeight.w600,
                     ),
                   ),
@@ -167,8 +171,9 @@ class CalendarHeaderWidget extends StatelessWidget {
 
   String _getHeaderTitle() {
     if (isWeekView) {
-      final weekStart =
-          currentDate.subtract(Duration(days: currentDate.weekday - 1));
+      final weekStart = currentDate.subtract(
+        Duration(days: currentDate.weekday - 1),
+      );
       final weekEnd = weekStart.add(const Duration(days: 6));
 
       if (weekStart.month == weekEnd.month) {
@@ -183,7 +188,9 @@ class CalendarHeaderWidget extends StatelessWidget {
 
   String _getSubtitle() {
     if (isFilterMode) {
-      return selectedFilter != null ? 'Filtered: $selectedFilter' : 'Filter Mode';
+      return selectedFilter != null
+          ? 'Filtered: $selectedFilter'
+          : 'Filter Mode';
     } else if (isWeekView) {
       return 'Week View';
     } else {
@@ -207,7 +214,7 @@ class CalendarHeaderWidget extends StatelessWidget {
       'September',
       'October',
       'November',
-      'December'
+      'December',
     ];
     return months[month - 1];
   }
