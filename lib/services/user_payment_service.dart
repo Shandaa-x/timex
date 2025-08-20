@@ -105,6 +105,8 @@ class UserPaymentService {
           'qpayStatus': paymentStatus,
           'paymentStatus': isFullyPaid, // Boolean field for easier querying
           'lastPaymentAmount': paidAmount,
+          'lastPaymentInvoiceId':
+              invoiceId, // Track the invoice ID for this payment
           'lastPaymentDate': FieldValue.serverTimestamp(),
           'lastPaymentStatusUpdate': FieldValue.serverTimestamp(),
           'updatedAt': FieldValue.serverTimestamp(),

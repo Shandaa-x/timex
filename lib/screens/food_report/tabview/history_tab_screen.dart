@@ -6,8 +6,6 @@ class HistoryTabScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return const SingleChildScrollView(
-      child: PaginatedPaymentHistoryWidget(),
-    );
+    return const PaginatedPaymentHistoryWidget();
   }
 }

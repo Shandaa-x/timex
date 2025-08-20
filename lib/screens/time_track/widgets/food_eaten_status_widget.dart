@@ -25,7 +25,7 @@ class FoodEatenStatusWidget extends StatefulWidget {
 class _FoodEatenStatusWidgetState extends State<FoodEatenStatusWidget> {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   bool _isUpdating = false;
-  
+
   // Track selected foods
   Map<int, bool> _selectedFoods = {};
 
@@ -45,7 +45,7 @@ class _FoodEatenStatusWidgetState extends State<FoodEatenStatusWidget> {
 
   void _initializeFoodSelections() {
     _selectedFoods.clear();
-    
+
     for (int i = 0; i < widget.todayFoods.length; i++) {
       _selectedFoods[i] = false;
     }
@@ -81,7 +81,7 @@ class _FoodEatenStatusWidgetState extends State<FoodEatenStatusWidget> {
 
   Future<void> _showEatenConfirmationDialog() async {
     final selectedFoods = _selectedFoodsList;
-    
+
     if (selectedFoods.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
@@ -108,13 +108,15 @@ class _FoodEatenStatusWidgetState extends State<FoodEatenStatusWidget> {
                 style: const TextStyle(fontWeight: FontWeight.w600),
               ),
               const SizedBox(height: 8),
-              ...selectedFoods.map((food) => Padding(
-                padding: const EdgeInsets.symmetric(vertical: 2),
-                child: Text(
-                  '• ${food['name']} = ${MoneyFormatService.formatWithSymbol(food['price'] ?? 0)}',
-                  style: const TextStyle(fontSize: 14),
+              ...selectedFoods.map(
+                (food) => Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 2),
+                  child: Text(
+                    '• ${food['name']} = ${MoneyFormatService.formatWithSymbol(food['price'] ?? 0)}',
+                    style: const TextStyle(fontSize: 14),
+                  ),
                 ),
-              )),
+              ),
               const SizedBox(height: 8),
               Text(
                 'Нийт дүн: ${MoneyFormatService.formatWithSymbol(_selectedTotalPrice)}',
@@ -158,6 +160,7 @@ class _FoodEatenStatusWidgetState extends State<FoodEatenStatusWidget> {
       await _saveSelectedFoodsToEatens();
     }
   }
+
   Future<void> _saveSelectedFoodsToEatens() async {
     setState(() => _isUpdating = true);
 
@@ -214,14 +217,8 @@ class _FoodEatenStatusWidgetState extends State<FoodEatenStatusWidget> {
           .doc(widget.dateString)
           .set(eatenData);
 
-      // Update users collection with totalFoodAmount
-      await _firestore
-          .collection('users')
-          .doc(_userId)
-          .update({
-            'totalFoodAmount': FieldValue.increment(totalPrice),
-            'lastFoodUpdate': FieldValue.serverTimestamp(),
-          });
+      // Note: totalFoodAmount will be automatically updated by RealtimeFoodTotalService
+      // when it detects changes in the eatens collection
 
       widget.onStatusChanged();
 
@@ -274,9 +271,7 @@ class _FoodEatenStatusWidgetState extends State<FoodEatenStatusWidget> {
       child: Container(
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
-          border: Border(
-            bottom: BorderSide(color: Colors.grey[200]!),
-          ),
+          border: Border(bottom: BorderSide(color: Colors.grey[200]!)),
           color: isSelected ? Colors.green[50] : Colors.white,
         ),
         child: Row(
@@ -284,14 +279,16 @@ class _FoodEatenStatusWidgetState extends State<FoodEatenStatusWidget> {
             // Checkbox
             Checkbox(
               value: isSelected,
-              onChanged: widget.eatenForDay ? null : (bool? value) {
-                setState(() {
-                  _selectedFoods[index] = value ?? false;
-                });
-              },
+              onChanged: widget.eatenForDay
+                  ? null
+                  : (bool? value) {
+                      setState(() {
+                        _selectedFoods[index] = value ?? false;
+                      });
+                    },
               activeColor: Colors.green,
             ),
-            
+
             // Food image
             Container(
               width: 48,
@@ -307,15 +304,18 @@ class _FoodEatenStatusWidgetState extends State<FoodEatenStatusWidget> {
                         base64Decode(food['image']),
                         fit: BoxFit.cover,
                         errorBuilder: (context, error, stackTrace) {
-                          return const Icon(Icons.restaurant, color: Colors.grey);
+                          return const Icon(
+                            Icons.restaurant,
+                            color: Colors.grey,
+                          );
                         },
                       ),
                     )
                   : const Icon(Icons.restaurant, color: Colors.grey),
             ),
-            
+
             const SizedBox(width: 12),
-            
+
             // Food details
             Expanded(
               child: Column(
@@ -328,15 +328,13 @@ class _FoodEatenStatusWidgetState extends State<FoodEatenStatusWidget> {
                       fontWeight: FontWeight.w600,
                     ),
                   ),
-                  if (food['description'] != null && food['description'].isNotEmpty)
+                  if (food['description'] != null &&
+                      food['description'].isNotEmpty)
                     Padding(
                       padding: const EdgeInsets.only(top: 4),
                       child: Text(
                         food['description'],
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: Colors.grey[600],
-                        ),
+                        style: TextStyle(fontSize: 12, color: Colors.grey[600]),
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                       ),
@@ -353,17 +351,13 @@ class _FoodEatenStatusWidgetState extends State<FoodEatenStatusWidget> {
                 ],
               ),
             ),
-            
+
             // Show selection indicator or tap indicator
             Column(
               crossAxisAlignment: CrossAxisAlignment.end,
               children: [
                 if (isSelected) ...[
-                  Icon(
-                    Icons.check_circle,
-                    color: Colors.green,
-                    size: 20,
-                  ),
+                  Icon(Icons.check_circle, color: Colors.green, size: 20),
                 ] else ...[
                   Icon(Icons.info_outline, size: 16, color: Colors.grey[400]),
                 ],
@@ -448,7 +442,8 @@ class _FoodEatenStatusWidgetState extends State<FoodEatenStatusWidget> {
                               : Colors.grey[700],
                         ),
                       ),
-                      if (!widget.eatenForDay && _selectedFoodsList.isNotEmpty) ...[
+                      if (!widget.eatenForDay &&
+                          _selectedFoodsList.isNotEmpty) ...[
                         Text(
                           'Сонгосон: ${_selectedFoodsList.length} хоол • ${MoneyFormatService.formatWithSymbol(_selectedTotalPrice)}',
                           style: TextStyle(
@@ -489,7 +484,11 @@ class _FoodEatenStatusWidgetState extends State<FoodEatenStatusWidget> {
                 children: [
                   Row(
                     children: [
-                      Icon(Icons.shopping_cart, color: Colors.green[700], size: 20),
+                      Icon(
+                        Icons.shopping_cart,
+                        color: Colors.green[700],
+                        size: 20,
+                      ),
                       const SizedBox(width: 8),
                       Text(
                         'Сонгосон хоол (${_selectedFoodsList.length})',
@@ -502,28 +501,30 @@ class _FoodEatenStatusWidgetState extends State<FoodEatenStatusWidget> {
                     ],
                   ),
                   const SizedBox(height: 12),
-                  ..._selectedFoodsList.map((food) => Padding(
-                    padding: const EdgeInsets.symmetric(vertical: 2),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Expanded(
-                          child: Text(
-                            '• ${food['name']}',
-                            style: const TextStyle(fontSize: 14),
+                  ..._selectedFoodsList.map(
+                    (food) => Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 2),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Expanded(
+                            child: Text(
+                              '• ${food['name']}',
+                              style: const TextStyle(fontSize: 14),
+                            ),
                           ),
-                        ),
-                        Text(
-                          MoneyFormatService.formatWithSymbol(food['price']),
-                          style: TextStyle(
-                            fontSize: 14,
-                            fontWeight: FontWeight.w600,
-                            color: Colors.green[700],
+                          Text(
+                            MoneyFormatService.formatWithSymbol(food['price']),
+                            style: TextStyle(
+                              fontSize: 14,
+                              fontWeight: FontWeight.w600,
+                              color: Colors.green[700],
+                            ),
                           ),
-                        ),
-                      ],
+                        ],
+                      ),
                     ),
-                  )),
+                  ),
                   const Divider(height: 16),
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -537,7 +538,9 @@ class _FoodEatenStatusWidgetState extends State<FoodEatenStatusWidget> {
                         ),
                       ),
                       Text(
-                        MoneyFormatService.formatWithSymbol(_selectedTotalPrice),
+                        MoneyFormatService.formatWithSymbol(
+                          _selectedTotalPrice,
+                        ),
                         style: TextStyle(
                           fontSize: 18,
                           fontWeight: FontWeight.bold,
@@ -551,7 +554,9 @@ class _FoodEatenStatusWidgetState extends State<FoodEatenStatusWidget> {
             ),
 
           // Food list
-          ...widget.todayFoods.asMap().entries.map((entry) => _buildFoodItem(entry.value, entry.key)),
+          ...widget.todayFoods.asMap().entries.map(
+            (entry) => _buildFoodItem(entry.value, entry.key),
+          ),
 
           // Action buttons
           Padding(

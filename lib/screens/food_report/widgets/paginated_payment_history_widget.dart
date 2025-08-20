@@ -2,16 +2,20 @@ import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../../../services/money_format.dart';
 import '../services/payment_service.dart';
+import '../../../theme/app_theme.dart';
+import '../../../config/qpay_config.dart';
 import 'dart:async';
 
 class PaginatedPaymentHistoryWidget extends StatefulWidget {
   const PaginatedPaymentHistoryWidget({super.key});
 
   @override
-  State<PaginatedPaymentHistoryWidget> createState() => _PaginatedPaymentHistoryWidgetState();
+  State<PaginatedPaymentHistoryWidget> createState() =>
+      _PaginatedPaymentHistoryWidgetState();
 }
 
-class _PaginatedPaymentHistoryWidgetState extends State<PaginatedPaymentHistoryWidget> {
+class _PaginatedPaymentHistoryWidgetState
+    extends State<PaginatedPaymentHistoryWidget> {
   final List<Map<String, dynamic>> _paymentHistory = [];
   final ScrollController _scrollController = ScrollController();
   bool _isLoading = false;
@@ -38,30 +42,33 @@ class _PaginatedPaymentHistoryWidgetState extends State<PaginatedPaymentHistoryW
 
   void _setupRealTimeListener() {
     // Set up real-time listener for new payments
-    _realTimeSubscription = PaymentService.getPaymentHistoryStream(limit: 5).listen(
-      (snapshot) {
-        if (!_isInitialLoading && mounted) {
-          // Check for new documents
-          final newDocs = snapshot.docChanges
-              .where((change) => change.type == DocumentChangeType.added)
-              .map((change) => change.doc)
-              .toList();
-
-          if (newDocs.isNotEmpty) {
-            setState(() {
-              // Add new payments to the beginning of the list
-              final newPayments = newDocs
-                  .map((doc) => PaymentService.convertDocumentToPayment(doc))
+    _realTimeSubscription = PaymentService.getPaymentHistoryStream(limit: 5)
+        .listen(
+          (snapshot) {
+            if (!_isInitialLoading && mounted) {
+              // Check for new documents
+              final newDocs = snapshot.docChanges
+                  .where((change) => change.type == DocumentChangeType.added)
+                  .map((change) => change.doc)
                   .toList();
-              _paymentHistory.insertAll(0, newPayments);
-            });
-          }
-        }
-      },
-      onError: (error) {
-        print('Real-time listener error: $error');
-      },
-    );
+
+              if (newDocs.isNotEmpty) {
+                setState(() {
+                  // Add new payments to the beginning of the list
+                  final newPayments = newDocs
+                      .map(
+                        (doc) => PaymentService.convertDocumentToPayment(doc),
+                      )
+                      .toList();
+                  _paymentHistory.insertAll(0, newPayments);
+                });
+              }
+            }
+          },
+          onError: (error) {
+            print('Real-time listener error: $error');
+          },
+        );
   }
 
   Future<void> _loadInitialData() async {
@@ -72,15 +79,19 @@ class _PaginatedPaymentHistoryWidgetState extends State<PaginatedPaymentHistoryW
 
     try {
       final snapshot = await PaymentService.getInitialPaymentHistory();
-      
+
       if (mounted) {
         setState(() {
           _paymentHistory.clear();
           _paymentHistory.addAll(
-            snapshot.docs.map((doc) => PaymentService.convertDocumentToPayment(doc)).toList(),
+            snapshot.docs
+                .map((doc) => PaymentService.convertDocumentToPayment(doc))
+                .toList(),
           );
           _lastDocument = snapshot.docs.isNotEmpty ? snapshot.docs.last : null;
-          _hasMoreData = snapshot.docs.length >= 10; // If we got full page, there might be more
+          _hasMoreData =
+              snapshot.docs.length >=
+              10; // If we got full page, there might be more
           _isInitialLoading = false;
         });
       }
@@ -102,15 +113,21 @@ class _PaginatedPaymentHistoryWidgetState extends State<PaginatedPaymentHistoryW
     });
 
     try {
-      final snapshot = await PaymentService.getNextPaymentHistoryPage(_lastDocument!);
-      
+      final snapshot = await PaymentService.getNextPaymentHistoryPage(
+        _lastDocument!,
+      );
+
       if (mounted) {
         setState(() {
           _paymentHistory.addAll(
-            snapshot.docs.map((doc) => PaymentService.convertDocumentToPayment(doc)).toList(),
+            snapshot.docs
+                .map((doc) => PaymentService.convertDocumentToPayment(doc))
+                .toList(),
           );
           _lastDocument = snapshot.docs.isNotEmpty ? snapshot.docs.last : null;
-          _hasMoreData = snapshot.docs.length >= 10; // If we got full page, there might be more
+          _hasMoreData =
+              snapshot.docs.length >=
+              10; // If we got full page, there might be more
           _isLoading = false;
         });
       }
@@ -130,117 +147,291 @@ class _PaginatedPaymentHistoryWidgetState extends State<PaginatedPaymentHistoryW
   }
 
   void _onScroll() {
-    if (_scrollController.position.pixels == _scrollController.position.maxScrollExtent) {
+    if (_scrollController.position.pixels ==
+        _scrollController.position.maxScrollExtent) {
       _loadMoreData();
     }
   }
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+
     if (_isInitialLoading) {
-      return const Center(
-        child: CircularProgressIndicator(),
-      );
+      return _buildShimmerLoading();
     }
 
     if (_error != null) {
-      return Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(
-              Icons.error_outline,
-              size: 64,
-              color: Colors.red[400],
-            ),
-            const SizedBox(height: 16),
-            Text(
-              'Алдаа гарлаа',
-              style: TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.w600,
-                color: Colors.grey[800],
-              ),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              _error!,
-              style: TextStyle(
-                fontSize: 14,
-                color: Colors.grey[600],
-              ),
-              textAlign: TextAlign.center,
-            ),
-            const SizedBox(height: 16),
-            ElevatedButton(
-              onPressed: _loadInitialData,
-              child: const Text('Дахин оролдох'),
-            ),
-          ],
-        ),
-      );
+      return _buildErrorState(theme, colorScheme);
     }
 
     if (_paymentHistory.isEmpty) {
-      return Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(
-              Icons.history_outlined,
-              size: 64,
-              color: Colors.grey[400],
-            ),
-            const SizedBox(height: 16),
-            Text(
-              'Төлбөрийн түүх байхгүй байна',
-              style: TextStyle(
-                fontSize: 16,
-                color: Colors.grey[600],
-                fontWeight: FontWeight.w500,
-              ),
-            ),
-          ],
-        ),
-      );
+      return _buildEmptyState(theme, colorScheme);
     }
 
-    return RefreshIndicator(
-      onRefresh: _loadInitialData,
-      child: ListView.builder(
-        controller: _scrollController,
-        itemCount: _paymentHistory.length + (_hasMoreData ? 1 : 0),
-        itemBuilder: (context, index) {
-          if (index == _paymentHistory.length) {
-            // Loading indicator at the bottom
-            return Container(
-              padding: const EdgeInsets.all(16),
-              alignment: Alignment.center,
-              child: _isLoading
-                  ? const CircularProgressIndicator()
-                  : const SizedBox.shrink(),
-            );
-          }
+    return Container(
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+          colors: [colorScheme.surface, colorScheme.surface.withOpacity(0.8)],
+        ),
+      ),
+      child: RefreshIndicator(
+        onRefresh: _loadInitialData,
+        color: AppTheme.primaryLight,
+        backgroundColor: Colors.white,
+        child: ListView.builder(
+          controller: _scrollController,
+          physics: const BouncingScrollPhysics(),
+          padding: const EdgeInsets.all(16),
+          itemCount: _paymentHistory.length + (_hasMoreData ? 1 : 0),
+          itemBuilder: (context, index) {
+            if (index == _paymentHistory.length) {
+              return _buildLoadingIndicator();
+            }
 
-          final payment = _paymentHistory[index];
-          return _buildPaymentCard(payment);
-        },
+            final payment = _paymentHistory[index];
+            return AnimatedContainer(
+              duration: Duration(milliseconds: 300 + (index * 50)),
+              curve: Curves.easeOutBack,
+              child: _buildPaymentCard(payment),
+            );
+          },
+        ),
       ),
     );
   }
 
+  Widget _buildShimmerLoading() {
+    return Padding(
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        children: List.generate(
+          5,
+          (index) => Container(
+            margin: const EdgeInsets.only(bottom: 16),
+            height: 120,
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(16),
+              gradient: LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [
+                  Colors.grey[200]!,
+                  Colors.grey[100]!,
+                  Colors.grey[200]!,
+                ],
+                stops: const [0.0, 0.5, 1.0],
+              ),
+            ),
+            child: _buildShimmerAnimation(),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildShimmerAnimation() {
+    return AnimatedContainer(
+      duration: const Duration(milliseconds: 1500),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(16),
+        gradient: LinearGradient(
+          begin: Alignment(-1.0, 0.0),
+          end: Alignment(1.0, 0.0),
+          colors: [
+            Colors.grey[200]!,
+            Colors.white.withOpacity(0.8),
+            Colors.grey[200]!,
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildErrorState(ThemeData theme, ColorScheme colorScheme) {
+    return Center(
+      child: Container(
+        margin: const EdgeInsets.all(32),
+        padding: const EdgeInsets.all(32),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(20),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.red.withOpacity(0.1),
+              blurRadius: 20,
+              offset: const Offset(0, 10),
+            ),
+          ],
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 80,
+              height: 80,
+              decoration: BoxDecoration(
+                color: Colors.red[50],
+                shape: BoxShape.circle,
+              ),
+              child: Icon(
+                Icons.error_outline_rounded,
+                size: 40,
+                color: Colors.red[400],
+              ),
+            ),
+            const SizedBox(height: 24),
+            Text(
+              'Алдаа гарлаа',
+              style: theme.textTheme.titleLarge?.copyWith(
+                fontWeight: FontWeight.w700,
+                color: Colors.red[600],
+              ),
+            ),
+            const SizedBox(height: 12),
+            Text(
+              _error!,
+              style: theme.textTheme.bodyMedium?.copyWith(
+                color: Colors.grey[600],
+              ),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 24),
+            ElevatedButton.icon(
+              onPressed: _loadInitialData,
+              icon: const Icon(Icons.refresh_rounded),
+              label: const Text('Дахин оролдох'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.red[400],
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 24,
+                  vertical: 12,
+                ),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildEmptyState(ThemeData theme, ColorScheme colorScheme) {
+    return Center(
+      child: Container(
+        margin: const EdgeInsets.all(32),
+        padding: const EdgeInsets.all(32),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(20),
+          boxShadow: [
+            BoxShadow(
+              color: AppTheme.primaryLight.withOpacity(0.1),
+              blurRadius: 20,
+              offset: const Offset(0, 10),
+            ),
+          ],
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 120,
+              height: 120,
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                  colors: [
+                    AppTheme.primaryLight.withOpacity(0.1),
+                    AppTheme.primaryLight.withOpacity(0.05),
+                  ],
+                ),
+                shape: BoxShape.circle,
+              ),
+              child: Icon(
+                Icons.receipt_long_outlined,
+                size: 60,
+                color: AppTheme.primaryLight,
+              ),
+            ),
+            const SizedBox(height: 24),
+            Text(
+              'Төлбөрийн түүх байхгүй байна',
+              style: theme.textTheme.titleLarge?.copyWith(
+                fontWeight: FontWeight.w600,
+                color: Colors.grey[700],
+              ),
+            ),
+            const SizedBox(height: 12),
+            Text(
+              'Хоолоо идээд төлбөрөө хийсний дараа энд харагдах болно',
+              style: theme.textTheme.bodyMedium?.copyWith(
+                color: Colors.grey[500],
+              ),
+              textAlign: TextAlign.center,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildLoadingIndicator() {
+    return Container(
+      padding: const EdgeInsets.all(20),
+      alignment: Alignment.center,
+      child: _isLoading
+          ? Column(
+              children: [
+                SizedBox(
+                  width: 32,
+                  height: 32,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 3,
+                    valueColor: AlwaysStoppedAnimation<Color>(
+                      AppTheme.primaryLight,
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                Text(
+                  'Илүү мэдээлэл ачаалж байна...',
+                  style: TextStyle(color: Colors.grey[600], fontSize: 12),
+                ),
+              ],
+            )
+          : const SizedBox.shrink(),
+    );
+  }
+
   Widget _buildPaymentCard(Map<String, dynamic> payment) {
-    final amount = payment['amount'] as num? ?? 0;
-    final type = payment['type'] as String? ?? 'payment';
-    final description = payment['description'] as String? ?? '';
-    final status = payment['status'] as String? ?? 'completed';
-    final paymentMethod = payment['paymentMethod'] as String? ?? 'unknown';
-    
+    // Safe data extraction with null checks
+    final amount = (payment['amount'] as num?)?.toInt() ?? 0;
+    // Use bank receiver name with safe fallback
+    String bankReceiverName;
+    try {
+      bankReceiverName = QPayConfig.username.isNotEmpty
+          ? QPayConfig.username
+          : 'GRAND_IT';
+    } catch (e) {
+      // Fallback if QPayConfig is not initialized
+      bankReceiverName = 'GRAND_IT';
+    }
+
     // Parse date from various possible formats
     DateTime date;
     try {
-      if (payment['timestamp'] is Timestamp) {
-        date = (payment['timestamp'] as Timestamp).toDate();
+      if (payment['createdAt'] is Timestamp) {
+        date = (payment['createdAt'] as Timestamp).toDate();
+      } else if (payment['date'] is Timestamp) {
+        date = (payment['date'] as Timestamp).toDate();
       } else if (payment['date'] is String) {
         date = DateTime.parse(payment['date'] as String);
       } else {
@@ -250,162 +441,71 @@ class _PaginatedPaymentHistoryWidgetState extends State<PaginatedPaymentHistoryW
       date = DateTime.now();
     }
 
-    // Determine card color and icon based on type and status
-    Color cardColor;
-    Color iconColor;
-    IconData icon;
-    String title;
-
-    switch (type.toLowerCase()) {
-      case 'payment':
-        cardColor = Colors.red[50]!;
-        iconColor = Colors.red[600]!;
-        icon = Icons.payment;
-        title = 'Төлбөр төлөгдлөө';
-        break;
-      case 'topup':
-      case 'deposit':
-        cardColor = Colors.green[50]!;
-        iconColor = Colors.green[600]!;
-        icon = Icons.account_balance_wallet;
-        title = 'Данс цэнэглэгдлээ';
-        break;
-      case 'refund':
-        cardColor = Colors.blue[50]!;
-        iconColor = Colors.blue[600]!;
-        icon = Icons.replay;
-        title = 'Буцаан олголт';
-        break;
-      default:
-        cardColor = Colors.grey[50]!;
-        iconColor = Colors.grey[600]!;
-        icon = Icons.account_balance_wallet;
-        title = type;
-    }
-
-    if (status != 'completed') {
-      cardColor = Colors.orange[50]!;
-      iconColor = Colors.orange[600]!;
-    }
+    // Use green colors as shown in the image
+    final primaryColor = Colors.green[600]!;
+    final backgroundColor = Colors.white;
 
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
-      padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: cardColor,
+        color: backgroundColor,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.grey[200]!),
+        border: Border.all(color: Colors.grey[200]!, width: 1),
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Container(
-                padding: const EdgeInsets.all(8),
-                decoration: BoxDecoration(
-                  color: iconColor.withOpacity(0.1),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Icon(
-                  icon,
-                  color: iconColor,
-                  size: 20,
-                ),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Row(
+          children: [
+            // Icon section
+            Container(
+              width: 40,
+              height: 40,
+              decoration: BoxDecoration(
+                color: primaryColor.withOpacity(0.1),
+                borderRadius: BorderRadius.circular(8),
               ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      title,
-                      style: const TextStyle(
-                        fontWeight: FontWeight.w600,
-                        fontSize: 16,
-                      ),
-                    ),
-                    if (description.isNotEmpty) ...[
-                      const SizedBox(height: 4),
-                      Text(
-                        description,
-                        style: TextStyle(
-                          color: Colors.grey[600],
-                          fontSize: 14,
-                        ),
-                      ),
-                    ],
-                  ],
-                ),
-              ),
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.end,
+              child: Icon(Icons.restaurant, color: primaryColor, size: 20),
+            ),
+            const SizedBox(width: 12),
+
+            // Content section
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    '${type == 'payment' ? '-' : '+'}${MoneyFormatService.formatWithSymbol(amount.toInt())}',
+                    bankReceiverName, // Display bank receiver name with safe fallback
                     style: TextStyle(
-                      fontWeight: FontWeight.bold,
                       fontSize: 16,
-                      color: type == 'payment' ? Colors.red[600] : Colors.green[600],
+                      fontWeight: FontWeight.w600,
+                      color: Colors.grey[800],
                     ),
                   ),
-                  if (status != 'completed') ...[
-                    const SizedBox(height: 4),
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                      decoration: BoxDecoration(
-                        color: Colors.orange[100],
-                        borderRadius: BorderRadius.circular(4),
-                      ),
-                      child: Text(
-                        status.toUpperCase(),
-                        style: TextStyle(
-                          fontSize: 10,
-                          fontWeight: FontWeight.w600,
-                          color: Colors.orange[800],
-                        ),
-                      ),
-                    ),
-                  ],
+                  const SizedBox(height: 4),
+                  Text(
+                    _formatFullDate(date),
+                    style: TextStyle(fontSize: 12, color: Colors.grey[500]),
+                  ),
                 ],
               ),
-            ],
-          ),
-          const SizedBox(height: 12),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text(
-                '${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')} ${date.hour.toString().padLeft(2, '0')}:${date.minute.toString().padLeft(2, '0')}',
-                style: TextStyle(
-                  color: Colors.grey[600],
-                  fontSize: 12,
-                ),
-              ),
-              if (paymentMethod != 'unknown')
-                Text(
-                  paymentMethod,
-                  style: TextStyle(
-                    color: Colors.grey[600],
-                    fontSize: 12,
-                    fontStyle: FontStyle.italic,
-                  ),
-                ),
-            ],
-          ),
-          if (payment['transactionId'] != null) ...[
-            const SizedBox(height: 8),
+            ),
+
+            // Amount section
             Text(
-              'ID: ${payment['transactionId']}',
+              '-${MoneyFormatService.formatWithSymbol(amount)}',
               style: TextStyle(
-                color: Colors.grey[500],
-                fontSize: 10,
-                fontFamily: 'monospace',
+                fontSize: 16,
+                fontWeight: FontWeight.w600,
+                color: Colors.red[600],
               ),
             ),
           ],
-        ],
+        ),
       ),
     );
+  }
+
+  String _formatFullDate(DateTime date) {
+    return '${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')} ${date.hour.toString().padLeft(2, '0')}:${date.minute.toString().padLeft(2, '0')}';
   }
 }

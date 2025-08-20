@@ -36,8 +36,8 @@ class QPayConfig {
       dotenv.env['QPAY_CALLBACK_URL'] ?? 'http://localhost:3000/qpay/callback';
 
   // Business Logic Constants
-  static const int sessionTimeoutMs = 180000; // 3 minutes
-  static const int checkIntervalMs = 180000; // Check every 3 minutes
+  static const int sessionTimeoutMs = 3000; // 3 seconds
+  static const int checkIntervalMs = 3000; // Check every 3 minutes
   static const int maxDescriptionLength = 255;
   static const int maxInvoiceNoLength = 45;
 

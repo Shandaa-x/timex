@@ -1025,6 +1025,7 @@ class _PaymentStatusBottomSheetState extends State<PaymentStatusBottomSheet>
   late AnimationController _animationController;
   StreamSubscription<DocumentSnapshot>? _userDocumentListener;
   String _currentPaymentStatus = 'pending';
+  String? _lastProcessedInvoiceId;
 
   @override
   void initState() {
@@ -1053,25 +1054,42 @@ class _PaymentStatusBottomSheetState extends State<PaymentStatusBottomSheet>
               if (documentSnapshot.exists && mounted) {
                 final data = documentSnapshot.data()!;
                 final String newStatus = data['qpayStatus'] ?? 'pending';
+                final String? lastPaymentInvoiceId =
+                    data['lastPaymentInvoiceId'];
 
                 if (newStatus != _currentPaymentStatus && mounted) {
                   setState(() {
                     _currentPaymentStatus = newStatus;
                   });
 
-                  // If payment is completed, show success (only for full payment)
-                  if (newStatus == 'paid' && mounted) {
+                  // Only show success dialog if:
+                  // 1. Payment is completed (status = 'paid')
+                  // 2. This is for the current payment session (matching invoice ID)
+                  // 3. We haven't already processed this invoice ID (prevent duplicates)
+                  if (newStatus == 'paid' &&
+                      mounted &&
+                      lastPaymentInvoiceId != null &&
+                      lastPaymentInvoiceId == widget.invoiceId &&
+                      _lastProcessedInvoiceId != lastPaymentInvoiceId) {
+                    // Mark this invoice as processed to prevent duplicate dialogs
+                    _lastProcessedInvoiceId = lastPaymentInvoiceId;
                     final dynamic rawPaidAmount =
                         data['lastPaymentAmount'] ?? 0.0;
                     final double paidAmount = rawPaidAmount is String
                         ? double.tryParse(rawPaidAmount) ?? 0.0
                         : (rawPaidAmount as num).toDouble();
 
+                    final dynamic rawTotalFoodAmount =
+                        data['totalFoodAmount'] ?? 0.0;
+                    final double newBalance = rawTotalFoodAmount is String
+                        ? double.tryParse(rawTotalFoodAmount) ?? 0.0
+                        : (rawTotalFoodAmount as num).toDouble();
+
                     // Close the bottom sheet and show success
                     Navigator.of(context).pop();
                     _showPaymentCompletedFromListener(
                       paidAmount,
-                      0.0, // newBalance is 0 for fully paid
+                      newBalance,
                       newStatus,
                     );
                   }
