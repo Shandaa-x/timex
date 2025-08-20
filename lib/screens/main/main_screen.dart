@@ -1,12 +1,13 @@
 import 'package:flutter/material.dart';
-import 'package:timex/screens/meal_plan/meal_plan_calendar.dart';
-import 'package:timex/screens/time_report/monthly_statistic_screen.dart';
-import 'package:timex/screens/food_report/food_report_screen.dart';
-import 'package:timex/screens/home/home_screen.dart';
+import 'package:timex/screens/food/meal_plan/meal_plan_calendar.dart';
+import 'package:timex/screens/time/time_report/monthly_statistic_screen.dart';
+import 'package:timex/screens/food/food_report/food_report_screen.dart';
+import 'package:timex/screens/main/home/home_screen.dart';
 import 'package:timex/index.dart';
-import 'package:timex/screens/time_track/time_tracking_screen.dart';
+import 'package:timex/screens/time/time_track/time_tracking_screen.dart';
 import 'package:timex/screens/qpay/qr_code_screen.dart';
 import 'package:timex/services/realtime_food_total_service.dart';
+import 'package:timex/screens/chat/services/notification_service.dart';
 import 'package:timex/routes/routes.dart';
 
 class MainScreen extends StatefulWidget {
@@ -40,6 +41,23 @@ class _MainScreenState extends State<MainScreen> {
 
     // Start listening to real-time food total updates
     RealtimeFoodTotalService.startListening();
+    
+    // Initialize notification listeners now that user is logged in
+    _initializeNotifications();
+  }
+  
+  Future<void> _initializeNotifications() async {
+    try {
+      print('🔔 MainScreen: Initializing notification listeners after login...');
+      
+      // Small delay to ensure user authentication is fully complete
+      await Future.delayed(Duration(seconds: 2));
+      
+      await NotificationService.initializeAfterLogin();
+      print('✅ MainScreen: Notification listeners initialized successfully');
+    } catch (e) {
+      print('❌ MainScreen: Error initializing notifications: $e');
+    }
   }
 
   @override

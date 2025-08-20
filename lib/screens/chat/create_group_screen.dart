@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import '../../models/chat_models.dart';
+import 'services/chat_models.dart';
 import '../../services/chat_service.dart';
 
 class CreateGroupScreen extends StatefulWidget {

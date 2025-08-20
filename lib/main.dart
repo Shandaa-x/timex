@@ -8,14 +8,14 @@ import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:get/get_navigation/src/root/get_material_app.dart';
 import 'package:timex/index.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
-import 'package:timex/screens/auth/auth_wrapper.dart';
+import 'package:timex/screens/main/auth/auth_wrapper.dart';
 import 'package:timex/theme/assets.dart';
 import 'package:timezone/data/latest.dart' as tz;
 import 'package:timezone/timezone.dart' as tz;
 import 'package:permission_handler/permission_handler.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'firebase_options.dart';
-import 'services/notification_service.dart';
+import 'screens/chat/services/notification_service.dart';
 
 // Top-level background message handler
 @pragma('vm:entry-point')
@@ -128,8 +128,8 @@ Future<void> _initializeNotifications() async {
       },
     );
     
-    // Initialize push notification listener
-    await NotificationService.initializePushNotificationListener();
+    // Note: Push notification listener will be initialized after user login
+    // This prevents trying to listen for notifications when no user is logged in
     
     print('✅ Notification initialization completed');
   } catch (e, stackTrace) {

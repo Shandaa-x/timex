@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'dart:convert';
-import 'package:timex/screens/home/widgets/custom_sliver_appbar.dart';
-import '../home/widgets/add_news_bottom_sheet.dart';
-import '../../models/news_model.dart';
+import 'package:timex/screens/main/home/widgets/custom_sliver_appbar.dart';
+import '../main/home/widgets/add_news_bottom_sheet.dart';
+import 'widgets/news_model.dart';
 import '../../services/news_service.dart';
 import 'news_form_screen.dart';
 

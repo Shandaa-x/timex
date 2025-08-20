@@ -6,7 +6,7 @@ import 'package:flutter/foundation.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:url_launcher/url_launcher.dart';
-import '../login/google_login_screen.dart';
+import '../main/login/google_login_screen.dart';
 import '../../services/qpay_webhook_service.dart';
 import '../../services/qpay_helper_service.dart';
 import '../../utils/qr_utils.dart';

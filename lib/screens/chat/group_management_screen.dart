@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import '../../models/chat_models.dart';
+import 'services/chat_models.dart';
 import '../../services/chat_service.dart';
 
 class GroupManagementScreen extends StatefulWidget {
@@ -15,7 +15,6 @@ class GroupManagementScreen extends StatefulWidget {
 class _GroupManagementScreenState extends State<GroupManagementScreen> {
   final TextEditingController _groupNameController = TextEditingController();
   final TextEditingController _groupDescriptionController = TextEditingController();
-  List<UserProfile> _participants = [];
   bool _isLoading = false;
   bool _isAdmin = false;
 
@@ -24,7 +23,6 @@ class _GroupManagementScreenState extends State<GroupManagementScreen> {
     super.initState();
     _groupNameController.text = widget.chatRoom.name;
     _groupDescriptionController.text = widget.chatRoom.description ?? '';
-    _loadParticipants();
     _checkAdminStatus();
   }
 
@@ -38,24 +36,6 @@ class _GroupManagementScreenState extends State<GroupManagementScreen> {
   void _checkAdminStatus() {
     final currentUserId = FirebaseAuth.instance.currentUser?.uid;
     _isAdmin = widget.chatRoom.createdBy == currentUserId;
-  }
-
-  Future<void> _loadParticipants() async {
-    setState(() => _isLoading = true);
-    try {
-      final participants = await ChatService.getParticipantProfiles(widget.chatRoom.participants);
-      setState(() {
-        _participants = participants;
-      });
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error loading participants: $e')),
-        );
-      }
-    } finally {
-      setState(() => _isLoading = false);
-    }
   }
 
   Future<void> _updateGroupInfo() async {
@@ -91,6 +71,14 @@ class _GroupManagementScreenState extends State<GroupManagementScreen> {
   }
 
   Future<void> _removeMember(String userId) async {
+    // Check if current user is admin
+    if (!_isAdmin) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Only group admins can remove members')),
+      );
+      return;
+    }
+
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
@@ -114,8 +102,8 @@ class _GroupManagementScreenState extends State<GroupManagementScreen> {
 
     setState(() => _isLoading = true);
     try {
+      // Use the enhanced method that sends system messages
       await ChatService.removeMemberFromGroup(widget.chatRoom.id, userId);
-      await _loadParticipants();
       
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -134,12 +122,27 @@ class _GroupManagementScreenState extends State<GroupManagementScreen> {
   }
 
   Future<void> _addMembers() async {
+    // Check if current user is admin
+    if (!_isAdmin) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Only group admins can add members')),
+      );
+      return;
+    }
+
+    // Get the current participants from the latest stream data
+    final chatRoomStream = ChatService.getChatRoomStream(widget.chatRoom.id);
+    final currentChatRoom = await chatRoomStream.first;
+    if (currentChatRoom == null) return;
+
+    final participants = await ChatService.getParticipantProfiles(currentChatRoom.participants);
+
     final result = await Navigator.push<List<UserProfile>>(
       context,
       MaterialPageRoute(
         builder: (context) => AddMembersScreen(
-          chatRoom: widget.chatRoom,
-          currentParticipants: _participants,
+          chatRoom: currentChatRoom,
+          currentParticipants: participants,
         ),
       ),
     );
@@ -148,8 +151,8 @@ class _GroupManagementScreenState extends State<GroupManagementScreen> {
       setState(() => _isLoading = true);
       try {
         final participantIds = result.map((user) => user.id).toList();
+        // Use the enhanced method that sends system messages
         await ChatService.addMembersToGroup(widget.chatRoom.id, participantIds);
-        await _loadParticipants();
         
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
@@ -192,13 +195,16 @@ class _GroupManagementScreenState extends State<GroupManagementScreen> {
 
     setState(() => _isLoading = true);
     try {
-      await ChatService.leaveGroup(widget.chatRoom.id);
-      
-      if (mounted) {
-        Navigator.popUntil(context, (route) => route.isFirst);
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Left group successfully')),
-        );
+      final currentUserId = FirebaseAuth.instance.currentUser?.uid;
+      if (currentUserId != null) {
+        await ChatService.removeFromGroup(widget.chatRoom.id, currentUserId);
+        
+        if (mounted) {
+          Navigator.popUntil(context, (route) => route.isFirst);
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Left group successfully')),
+          );
+        }
       }
     } catch (e) {
       if (mounted) {
@@ -271,98 +277,121 @@ class _GroupManagementScreenState extends State<GroupManagementScreen> {
                   const SizedBox(height: 16),
 
                   // Members Section
-                  Card(
-                    child: Padding(
-                      padding: const EdgeInsets.all(16),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                            children: [
-                              Text(
-                                'Members (${_participants.length})',
-                                style: theme.textTheme.titleLarge,
+                  StreamBuilder<ChatRoom?>(
+                    stream: ChatService.getChatRoomStream(widget.chatRoom.id),
+                    builder: (context, chatRoomSnapshot) {
+                      final currentChatRoom = chatRoomSnapshot.data ?? widget.chatRoom;
+                      
+                      return StreamBuilder<List<UserProfile>>(
+                        stream: ChatService.getParticipantProfilesStream(currentChatRoom.participants),
+                        builder: (context, participantsSnapshot) {
+                          if (participantsSnapshot.connectionState == ConnectionState.waiting) {
+                            return const Card(
+                              child: Padding(
+                                padding: EdgeInsets.all(16),
+                                child: Center(child: CircularProgressIndicator()),
                               ),
-                              if (_isAdmin)
-                                TextButton.icon(
-                                  onPressed: _addMembers,
-                                  icon: const Icon(Icons.person_add),
-                                  label: const Text('Add'),
-                                ),
-                            ],
-                          ),
-                          const SizedBox(height: 16),
-                          ListView.builder(
-                            shrinkWrap: true,
-                            physics: const NeverScrollableScrollPhysics(),
-                            itemCount: _participants.length,
-                            itemBuilder: (context, index) {
-                              final participant = _participants[index];
-                              final isCurrentUser = participant.id == FirebaseAuth.instance.currentUser?.uid;
-                              final isCreator = participant.id == widget.chatRoom.createdBy;
-
-                              return ListTile(
-                                contentPadding: EdgeInsets.zero,
-                                leading: Stack(
-                                  children: [
-                                    CircleAvatar(
-                                      backgroundImage: participant.photoURL != null
-                                          ? NetworkImage(participant.photoURL!)
-                                          : null,
-                                      child: participant.photoURL == null
-                                          ? Text(
-                                              participant.displayName.isNotEmpty
-                                                  ? participant.displayName[0].toUpperCase()
-                                                  : 'U',
-                                              style: const TextStyle(fontWeight: FontWeight.bold),
-                                            )
-                                          : null,
-                                    ),
-                                    if (participant.isOnline)
-                                      Positioned(
-                                        bottom: 0,
-                                        right: 0,
-                                        child: Container(
-                                          width: 12,
-                                          height: 12,
-                                          decoration: BoxDecoration(
-                                            color: Colors.green,
-                                            shape: BoxShape.circle,
-                                            border: Border.all(color: Colors.white, width: 2),
-                                          ),
-                                        ),
-                                      ),
-                                  ],
-                                ),
-                                title: Text(participant.displayName),
-                                subtitle: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Text('${participant.email}'),
-                                    if (isCreator)
+                            );
+                          }
+                          
+                          final participants = participantsSnapshot.data ?? [];
+                          
+                          return Card(
+                            child: Padding(
+                              padding: const EdgeInsets.all(16),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Row(
+                                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                    children: [
                                       Text(
-                                        'Group Admin',
-                                        style: TextStyle(
-                                          color: theme.colorScheme.primary,
-                                          fontWeight: FontWeight.w500,
-                                        ),
+                                        'Members (${participants.length})',
+                                        style: theme.textTheme.titleLarge,
                                       ),
-                                  ],
-                                ),
-                                trailing: _isAdmin && !isCurrentUser && !isCreator
-                                    ? IconButton(
-                                        onPressed: () => _removeMember(participant.id),
-                                        icon: const Icon(Icons.remove_circle_outline),
-                                        color: Colors.red,
-                                      )
-                                    : null,
-                              );
-                            },
-                          ),
-                        ],
-                      ),
-                    ),
+                                      if (_isAdmin)
+                                        TextButton.icon(
+                                          onPressed: _addMembers,
+                                          icon: const Icon(Icons.person_add),
+                                          label: const Text('Add'),
+                                        ),
+                                    ],
+                                  ),
+                                  const SizedBox(height: 16),
+                                  ListView.builder(
+                                    shrinkWrap: true,
+                                    physics: const NeverScrollableScrollPhysics(),
+                                    itemCount: participants.length,
+                                    itemBuilder: (context, index) {
+                                      final participant = participants[index];
+                                      final isCurrentUser = participant.id == FirebaseAuth.instance.currentUser?.uid;
+                                      final isCreator = participant.id == currentChatRoom.createdBy;
+
+                                      return ListTile(
+                                        contentPadding: EdgeInsets.zero,
+                                        leading: Stack(
+                                          children: [
+                                            CircleAvatar(
+                                              backgroundImage: participant.photoURL != null
+                                                  ? NetworkImage(participant.photoURL!)
+                                                  : null,
+                                              child: participant.photoURL == null
+                                                  ? Text(
+                                                      participant.displayName.isNotEmpty
+                                                          ? participant.displayName[0].toUpperCase()
+                                                          : 'U',
+                                                      style: const TextStyle(fontWeight: FontWeight.bold),
+                                                    )
+                                                  : null,
+                                            ),
+                                            if (participant.isOnline)
+                                              Positioned(
+                                                bottom: 0,
+                                                right: 0,
+                                                child: Container(
+                                                  width: 12,
+                                                  height: 12,
+                                                  decoration: BoxDecoration(
+                                                    color: Colors.green,
+                                                    shape: BoxShape.circle,
+                                                    border: Border.all(color: Colors.white, width: 2),
+                                                  ),
+                                                ),
+                                              ),
+                                          ],
+                                        ),
+                                        title: Text(participant.displayName),
+                                        subtitle: Column(
+                                          crossAxisAlignment: CrossAxisAlignment.start,
+                                          children: [
+                                            Text('${participant.email ?? 'No email'}'),
+                                            if (isCreator)
+                                              Text(
+                                                'Group Admin',
+                                                style: TextStyle(
+                                                  color: theme.colorScheme.primary,
+                                                  fontWeight: FontWeight.w500,
+                                                ),
+                                              ),
+                                          ],
+                                        ),
+                                        trailing: _isAdmin && !isCurrentUser && !isCreator
+                                            ? IconButton(
+                                                onPressed: () => _removeMember(participant.id),
+                                                icon: const Icon(Icons.remove_circle_outline),
+                                                color: Colors.red,
+                                              )
+                                            : null,
+                                      );
+                                    },
+                                  ),
+                                ],
+                              ),
+                            ),
+                          );
+                        },
+                      );
+                    },
                   ),
 
                   const SizedBox(height: 24),
@@ -445,68 +474,18 @@ class _AddMembersScreenState extends State<AddMembersScreen> {
   Future<void> _loadUsers() async {
     setState(() => _isLoading = true);
     try {
-      print('🔍 Loading users for adding to group...');
-      print('   Current group participants: ${widget.currentParticipants.length}');
-      for (var p in widget.currentParticipants) {
-        print('   - ${p.displayName} (${p.id})');
-      }
+      // Use the stream-based getAllUsers method and convert to Future
+      final usersStream = ChatService.getAllUsers();
+      final users = await usersStream.first;
       
-      List<UserProfile> allUsers = [];
-      
-      try {
-        // Try to get all users first
-        final userStream = ChatService.getAllUsers();
-        allUsers = await userStream.first;
-        print('📋 Got ${allUsers.length} total users from database');
-        
-        for (var user in allUsers) {
-          print('   - ${user.displayName} (${user.id}) - ${user.email}');
-        }
-      } catch (e) {
-        print('❌ Error getting all users: $e');
-        // Fallback to search with common letters
-        final searches = ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k', 'l', 'm', 'n', 'o', 'p', 'q', 'r', 's', 't', 'u', 'v', 'w', 'x', 'y', 'z'];
-        for (String letter in searches) {
-          final searchResults = await ChatService.searchUsers(letter);
-          allUsers.addAll(searchResults);
-        }
-        // Remove duplicates
-        allUsers = allUsers.toSet().toList();
-        print('📋 Got ${allUsers.length} users from search fallback');
-      }
-
-      // Filter out current user and existing group members
-      final currentUserId = ChatService.currentUserId;
       final participantIds = widget.currentParticipants.map((p) => p.id).toList();
-      
-      print('🔍 Filtering users...');
-      print('   Current user ID: $currentUserId');
-      print('   Group participant IDs: $participantIds');
-      
-      final availableUsers = allUsers.where((user) {
-        final isCurrentUser = user.id == currentUserId;
-        final isGroupMember = participantIds.contains(user.id);
-        
-        print('   Checking ${user.displayName} (${user.id}):');
-        print('     - Is current user: $isCurrentUser');
-        print('     - Is group member: $isGroupMember');
-        print('     - Should include: ${!isCurrentUser && !isGroupMember}');
-        
-        return !isCurrentUser && !isGroupMember;
-      }).toList();
-      
+      final currentUserId = ChatService.currentUserId;
       setState(() {
-        _availableUsers = availableUsers;
+        // Exclude current group members AND current user
+        _availableUsers = users.where((user) => !participantIds.contains(user.id) && user.id != currentUserId).toList();
         _filteredUsers = _availableUsers;
       });
-      
-      print('✅ Final result: ${_availableUsers.length} users available to add');
-      for (var user in _availableUsers) {
-        print('   ✓ ${user.displayName} (${user.email})');
-      }
-      
     } catch (e) {
-      print('❌ Error loading users: $e');
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('Error loading users: $e')),
@@ -526,7 +505,7 @@ class _AddMembersScreenState extends State<AddMembersScreen> {
         _filteredUsers = _availableUsers
             .where((user) =>
                 user.displayName.toLowerCase().contains(query.toLowerCase()) ||
-                user.email!.toLowerCase().contains(query.toLowerCase()))
+                (user.email?.toLowerCase().contains(query.toLowerCase()) ?? false))
             .toList();
       }
     });
@@ -604,7 +583,7 @@ class _AddMembersScreenState extends State<AddMembersScreen> {
                                   : null,
                             ),
                             title: Text(user.displayName),
-                            subtitle: Text('${user.email}'),
+                            subtitle: Text('${user.email ?? 'No email'}'),
                             value: isSelected,
                             onChanged: (_) => _toggleUserSelection(user),
                           );

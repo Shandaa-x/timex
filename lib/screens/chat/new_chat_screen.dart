@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import '../../models/chat_models.dart';
+import 'services/chat_models.dart';
 import '../../services/chat_service.dart';
 import 'chat_room_screen.dart';
 import 'create_group_screen.dart';

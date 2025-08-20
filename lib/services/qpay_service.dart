@@ -1,7 +1,7 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:cloud_firestore/cloud_firestore.dart';
-import '../models/qpay_models.dart';
+import '../screens/qpay/qpay_models.dart';
 import '../utils/logger.dart';
 
 /// QPay Service - Flutter wrapper for QPay functionality

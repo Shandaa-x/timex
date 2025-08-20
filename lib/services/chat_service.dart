@@ -1,7 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import '../models/chat_models.dart';
-import 'notification_service.dart';
+import '../screens/chat/services/chat_models.dart';
+import '../screens/chat/services/notification_service.dart';
 
 class ChatService {
   static final FirebaseFirestore _firestore = FirebaseFirestore.instance;
@@ -40,6 +40,60 @@ class ChatService {
           .map((doc) => UserProfile.fromMap(doc.data(), doc.id))
           .where((user) => user.id != currentUserId)
           .toList();
+    } catch (e) {
+      print('Error searching users: $e');
+      return [];
+    }
+  }
+
+  // Search users by query with better matching
+  static Future<List<UserProfile>> searchUsersAdvanced(String query) async {
+    if (query.isEmpty) {
+      // Get all users as Future instead of Stream
+      final snapshot = await _firestore.collection('users').limit(50).get();
+      return snapshot.docs
+          .map((doc) => UserProfile.fromMap(doc.data(), doc.id))
+          .where((user) => user.id != currentUserId)
+          .toList();
+    }
+    
+    try {
+      // Try multiple search strategies
+      final List<UserProfile> allResults = [];
+      
+      // Search by display name
+      final displayNameQuery = await _firestore
+          .collection('users')
+          .where('displayName', isGreaterThanOrEqualTo: query)
+          .where('displayName', isLessThanOrEqualTo: query + '\uf8ff')
+          .limit(20)
+          .get();
+      
+      allResults.addAll(displayNameQuery.docs
+          .map((doc) => UserProfile.fromMap(doc.data(), doc.id))
+          .where((user) => user.id != currentUserId));
+      
+      // Search by email if query contains @
+      if (query.contains('@')) {
+        final emailQuery = await _firestore
+            .collection('users')
+            .where('email', isGreaterThanOrEqualTo: query)
+            .where('email', isLessThanOrEqualTo: query + '\uf8ff')
+            .limit(10)
+            .get();
+        
+        allResults.addAll(emailQuery.docs
+            .map((doc) => UserProfile.fromMap(doc.data(), doc.id))
+            .where((user) => user.id != currentUserId));
+      }
+      
+      // Remove duplicates and return
+      final uniqueResults = <String, UserProfile>{};
+      for (final user in allResults) {
+        uniqueResults[user.id] = user;
+      }
+      
+      return uniqueResults.values.toList();
     } catch (e) {
       print('Error searching users: $e');
       return [];
@@ -229,6 +283,7 @@ class ChatService {
         print('🔔 Message: $content');
         print('🔔 Sender: ${currentUser.displayName}');
         
+        // Send FCM notifications to other devices (real-time listener will handle local notifications)
         await NotificationService.sendChatNotification(
           chatRoomId: chatRoomId,
           senderName: currentUser.displayName,
@@ -255,30 +310,31 @@ class ChatService {
         .orderBy('timestamp', descending: true)
         .limit(50)
         .snapshots()
-        .asyncMap((snapshot) async {
-          // Check if current user is still a member of the chat room
-          final chatRoomDoc = await _firestore.collection('chatRooms').doc(chatRoomId).get();
-          if (!chatRoomDoc.exists) return <Message>[];
-          
-          final chatRoomData = chatRoomDoc.data()!;
-          final participants = List<String>.from(chatRoomData['participants'] ?? []);
-          
-          // If current user is not a participant, they can't see messages
-          if (!participants.contains(currentUserId)) {
-            return <Message>[];
-          }
-          
+        .map((snapshot) {
           return snapshot.docs.map((doc) {
             final message = Message.fromMap(doc.data(), doc.id);
             return {'message': message, 'data': doc.data()};
           }).where((item) {
             final message = item['message'] as Message;
-            
             // Show all non-system messages
             if (message.senderId != 'system') return true;
             
-            // For system messages, check visibility rules
-            return message.canUserSeeMessage(currentUserId);
+            final data = item['data'] as Map<String, dynamic>;
+            
+            // Check if this message is excluded for the current user
+            final excludeUserId = data['excludeUserId'] as String?;
+            if (excludeUserId != null && excludeUserId == currentUserId) {
+              return false; // Don't show this message to the excluded user
+            }
+            
+            // For targeted system messages, show if target user is current user
+            final targetUserId = data['targetUserId'] as String?;
+            if (targetUserId != null) {
+              return targetUserId == currentUserId;
+            }
+            
+            // For general system messages (no target or exclude), show to everyone
+            return true;
           }).map((item) => item['message'] as Message).toList();
         });
   }
@@ -305,13 +361,10 @@ class ChatService {
       
       // Find the target message and mark all messages up to it as read
       bool foundTarget = false;
-      final readTimestamp = DateTime.now();
-      
       for (var doc in messages) {
-        // Mark this message as read by current user with timestamp
+        // Mark this message as read by current user
         batch.update(doc.reference, {
           'readBy.$currentUserId': true,
-          'readTimestamp.$currentUserId': readTimestamp,
         });
         
         // If this is the target message, stop here
@@ -385,6 +438,30 @@ class ChatService {
       print('Error getting participant profiles: $e');
       return [];
     }
+  }
+
+  // Get participant profiles as a stream for real-time updates
+  static Stream<List<UserProfile>> getParticipantProfilesStream(List<String> participantIds) {
+    if (participantIds.isEmpty) return Stream.value([]);
+    
+    return _firestore
+        .collection('users')
+        .where(FieldPath.documentId, whereIn: participantIds.take(10).toList()) // Firestore limit of 10 for whereIn
+        .snapshots()
+        .map((snapshot) {
+      final profiles = snapshot.docs
+          .map((doc) => UserProfile.fromMap(doc.data(), doc.id))
+          .toList();
+      
+      // Sort profiles to match the order of participantIds
+      profiles.sort((a, b) {
+        final aIndex = participantIds.indexOf(a.id);
+        final bIndex = participantIds.indexOf(b.id);
+        return aIndex.compareTo(bIndex);
+      });
+      
+      return profiles;
+    });
   }
 
   // Update user online status
@@ -872,24 +949,17 @@ class ChatService {
     });
   }
 
-  // Get all users for adding to groups (excludes current user and existing group members)
-  static Future<List<UserProfile>> getAllUsersForGroupAdd([List<String>? existingMemberIds]) async {
+  // Get all users for adding to groups (excludes current user)
+  static Future<List<UserProfile>> getAllUsersForGroupAdd() async {
     try {
       final querySnapshot = await _firestore
           .collection('users')
           .get();
 
-      final allUsers = querySnapshot.docs
+      return querySnapshot.docs
           .map((doc) => UserProfile.fromMap(doc.data(), doc.id))
           .where((user) => user.id != currentUserId) // Exclude current user
           .toList();
-
-      if (existingMemberIds != null && existingMemberIds.isNotEmpty) {
-        // Also exclude existing group members
-        return allUsers.where((user) => !existingMemberIds.contains(user.id)).toList();
-      }
-
-      return allUsers;
     } catch (e) {
       print('Error getting all users for group add: $e');
       return [];
@@ -905,6 +975,74 @@ class ChatService {
       }
       return <String, String>{};
     });
+  }
+
+  // Vote on a message
+  static Future<bool> voteOnMessage({
+    required String chatRoomId,
+    required String messageId,
+    required String voteType, // 'vote' for simple voting system
+  }) async {
+    try {
+      final currentUser = await getCurrentUserProfile();
+      if (currentUser == null) return false;
+
+      final messageRef = _firestore
+          .collection('chatRooms')
+          .doc(chatRoomId)
+          .collection('messages')
+          .doc(messageId);
+
+      await _firestore.runTransaction((transaction) async {
+        final messageDoc = await transaction.get(messageRef);
+        if (!messageDoc.exists) return;
+
+        final messageData = messageDoc.data()!;
+        final votes = Map<String, dynamic>.from(messageData['votes'] ?? {});
+
+        if (votes.containsKey(currentUserId)) {
+          // User already voted, remove the vote (toggle)
+          votes.remove(currentUserId);
+        } else {
+          // Add new vote
+          votes[currentUserId] = {
+            'type': voteType,
+            'timestamp': DateTime.now(),
+            'voterName': currentUser.displayName,
+          };
+        }
+
+        transaction.update(messageRef, {'votes': votes});
+      });
+
+      return true;
+    } catch (e) {
+      print('Error voting on message: $e');
+      return false;
+    }
+  }
+
+  // Get votes for a message
+  static Future<Map<String, dynamic>> getMessageVotes({
+    required String chatRoomId,
+    required String messageId,
+  }) async {
+    try {
+      final messageDoc = await _firestore
+          .collection('chatRooms')
+          .doc(chatRoomId)
+          .collection('messages')
+          .doc(messageId)
+          .get();
+
+      if (messageDoc.exists) {
+        return Map<String, dynamic>.from(messageDoc.data()?['votes'] ?? {});
+      }
+      return {};
+    } catch (e) {
+      print('Error getting message votes: $e');
+      return {};
+    }
   }
 
   // Check if a user has read up to a specific message
@@ -939,87 +1077,6 @@ class ChatService {
       return lastReadTimestamp.compareTo(targetTimestamp) >= 0;
     } catch (e) {
       print('Error checking if user read up to message: $e');
-      return false;
-    }
-  }
-
-  // Get real-time message read status
-  static Stream<Map<String, dynamic>> getMessageReadStatus(String chatRoomId, String messageId) {
-    return _firestore
-        .collection('chatRooms')
-        .doc(chatRoomId)
-        .collection('messages')
-        .doc(messageId)
-        .snapshots()
-        .map((snapshot) {
-      if (!snapshot.exists) return {};
-      
-      final data = snapshot.data() as Map<String, dynamic>;
-      
-      // Extract read timestamps
-      Map<String, dynamic> readTimestamps = {};
-      data.forEach((key, value) {
-        if (key.startsWith('readTimestamp.')) {
-          final userId = key.substring('readTimestamp.'.length);
-          readTimestamps[userId] = value;
-        }
-      });
-      
-      return {
-        'readBy': data['readBy'] ?? {},
-        'readTimestamps': readTimestamps,
-        'timestamp': data['timestamp'],
-      };
-    });
-  }
-
-  // Vote/react on a message
-  static Future<bool> voteOnMessage({
-    required String chatRoomId,
-    required String messageId,
-    required String reaction, // '👍', '❤️', '😂', etc.
-  }) async {
-    try {
-      final currentUser = ChatService.currentUserId;
-      if (currentUser.isEmpty) return false;
-
-      await _firestore
-          .collection('chatRooms')
-          .doc(chatRoomId)
-          .collection('messages')
-          .doc(messageId)
-          .update({
-        'votes.$currentUser': reaction,
-      });
-
-      return true;
-    } catch (e) {
-      print('Error voting on message: $e');
-      return false;
-    }
-  }
-
-  // Remove vote/reaction from a message
-  static Future<bool> removeVoteFromMessage({
-    required String chatRoomId,
-    required String messageId,
-  }) async {
-    try {
-      final currentUser = ChatService.currentUserId;
-      if (currentUser.isEmpty) return false;
-
-      await _firestore
-          .collection('chatRooms')
-          .doc(chatRoomId)
-          .collection('messages')
-          .doc(messageId)
-          .update({
-        'votes.$currentUser': FieldValue.delete(),
-      });
-
-      return true;
-    } catch (e) {
-      print('Error removing vote from message: $e');
       return false;
     }
   }

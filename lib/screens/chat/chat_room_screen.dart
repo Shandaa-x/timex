@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:timex/screens/chat/group_management_screen.dart';
-import '../../models/chat_models.dart';
+import 'services/chat_models.dart';
 import '../../services/chat_service.dart';
-import '../../services/notification_service.dart';
+import 'services/notification_service.dart';
 
 class ChatRoomScreen extends StatefulWidget {
   final ChatRoom chatRoom;
@@ -52,15 +52,6 @@ class _ChatRoomScreenState extends State<ChatRoomScreen>
     ChatService.markMessagesAsRead(widget.chatRoom.id);
     // Clear notifications for this chat
     NotificationService.clearChatNotifications(widget.chatRoom.id);
-  }
-
-  @override
-  void didChangeDependencies() {
-    super.didChangeDependencies();
-    // Mark messages as read when screen becomes visible
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      _markAsRead();
-    });
   }
 
   Future<void> _sendMessage() async {
@@ -121,6 +112,12 @@ class _ChatRoomScreenState extends State<ChatRoomScreen>
     });
   }
 
+  void _setReplyMessage(Message message) {
+    setState(() {
+      _replyToMessage = message;
+    });
+  }
+
   Widget _buildTopTab(String text, IconData icon, bool isActive) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
@@ -152,9 +149,7 @@ class _ChatRoomScreenState extends State<ChatRoomScreen>
   Widget _buildAppBarTitle() {
     if (widget.chatRoom.type == 'group') {
       return FutureBuilder<List<UserProfile>>(
-        future: ChatService.getParticipantProfiles(
-          widget.chatRoom.participants,
-        ),
+        future: ChatService.getParticipantProfiles(widget.chatRoom.participants),
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.waiting) {
             return Row(
@@ -162,7 +157,11 @@ class _ChatRoomScreenState extends State<ChatRoomScreen>
                 CircleAvatar(
                   radius: 18,
                   backgroundColor: const Color(0xFF8B5CF6),
-                  child: const Icon(Icons.group, color: Colors.white, size: 20),
+                  child: const Icon(
+                    Icons.group,
+                    color: Colors.white,
+                    size: 20,
+                  ),
                 ),
                 const SizedBox(width: 12),
                 Expanded(
@@ -191,13 +190,13 @@ class _ChatRoomScreenState extends State<ChatRoomScreen>
               ],
             );
           }
-
+          
           final participants = snapshot.data ?? [];
           final otherParticipants = participants
               .where((p) => p.id != ChatService.currentUserId)
               .take(2)
               .toList();
-
+          
           Widget groupAvatar;
           if (otherParticipants.length >= 2) {
             // Show first 2 users' images overlapping
@@ -218,20 +217,16 @@ class _ChatRoomScreenState extends State<ChatRoomScreen>
                       ),
                       child: CircleAvatar(
                         radius: 10,
-                        backgroundImage:
-                            otherParticipants[0].photoURL != null &&
-                                otherParticipants[0].photoURL!.isNotEmpty
+                        backgroundImage: otherParticipants[0].photoURL != null && 
+                                         otherParticipants[0].photoURL!.isNotEmpty
                             ? NetworkImage(otherParticipants[0].photoURL!)
                             : null,
                         backgroundColor: const Color(0xFF8B5CF6),
-                        child:
-                            otherParticipants[0].photoURL == null ||
-                                otherParticipants[0].photoURL!.isEmpty
+                        child: otherParticipants[0].photoURL == null || 
+                               otherParticipants[0].photoURL!.isEmpty
                             ? Text(
                                 otherParticipants[0].displayName.isNotEmpty
-                                    ? otherParticipants[0].displayName
-                                          .substring(0, 1)
-                                          .toUpperCase()
+                                    ? otherParticipants[0].displayName.substring(0, 1).toUpperCase()
                                     : 'U',
                                 style: const TextStyle(
                                   color: Colors.white,
@@ -255,20 +250,16 @@ class _ChatRoomScreenState extends State<ChatRoomScreen>
                       ),
                       child: CircleAvatar(
                         radius: 10,
-                        backgroundImage:
-                            otherParticipants[1].photoURL != null &&
-                                otherParticipants[1].photoURL!.isNotEmpty
+                        backgroundImage: otherParticipants[1].photoURL != null && 
+                                         otherParticipants[1].photoURL!.isNotEmpty
                             ? NetworkImage(otherParticipants[1].photoURL!)
                             : null,
                         backgroundColor: const Color(0xFF8B5CF6),
-                        child:
-                            otherParticipants[1].photoURL == null ||
-                                otherParticipants[1].photoURL!.isNotEmpty
+                        child: otherParticipants[1].photoURL == null || 
+                               otherParticipants[1].photoURL!.isEmpty
                             ? Text(
                                 otherParticipants[1].displayName.isNotEmpty
-                                    ? otherParticipants[1].displayName
-                                          .substring(0, 1)
-                                          .toUpperCase()
+                                    ? otherParticipants[1].displayName.substring(0, 1).toUpperCase()
                                     : 'U',
                                 style: const TextStyle(
                                   color: Colors.white,
@@ -288,10 +279,14 @@ class _ChatRoomScreenState extends State<ChatRoomScreen>
             groupAvatar = CircleAvatar(
               radius: 18,
               backgroundColor: const Color(0xFF8B5CF6),
-              child: const Icon(Icons.group, color: Colors.white, size: 20),
+              child: const Icon(
+                Icons.group,
+                color: Colors.white,
+                size: 20,
+              ),
             );
           }
-
+          
           return Row(
             children: [
               groupAvatar,
@@ -334,35 +329,29 @@ class _ChatRoomScreenState extends State<ChatRoomScreen>
           isOnline: false,
         ),
       );
-
+      
       return Row(
         children: [
           Container(
             decoration: BoxDecoration(
               shape: BoxShape.circle,
               border: Border.all(
-                color: otherParticipant.isOnline
-                    ? const Color(0xFF10B981)
-                    : Colors.white24,
-                width: 2,
+                color: otherParticipant.isOnline ? const Color(0xFF10B981) : Colors.white24, 
+                width: 2
               ),
             ),
             child: CircleAvatar(
               radius: 18,
-              backgroundImage:
-                  otherParticipant.photoURL != null &&
-                      otherParticipant.photoURL!.isNotEmpty
+              backgroundImage: otherParticipant.photoURL != null && 
+                               otherParticipant.photoURL!.isNotEmpty
                   ? NetworkImage(otherParticipant.photoURL!)
                   : null,
               backgroundColor: const Color(0xFF8B5CF6),
-              child:
-                  otherParticipant.photoURL == null ||
-                      otherParticipant.photoURL!.isEmpty
+              child: otherParticipant.photoURL == null || 
+                     otherParticipant.photoURL!.isEmpty
                   ? Text(
                       otherParticipant.displayName.isNotEmpty
-                          ? otherParticipant.displayName
-                                .substring(0, 1)
-                                .toUpperCase()
+                          ? otherParticipant.displayName.substring(0, 1).toUpperCase()
                           : 'U',
                       style: const TextStyle(
                         color: Colors.white,
@@ -379,8 +368,8 @@ class _ChatRoomScreenState extends State<ChatRoomScreen>
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  otherParticipant.displayName.isNotEmpty
-                      ? otherParticipant.displayName
+                  otherParticipant.displayName.isNotEmpty 
+                      ? otherParticipant.displayName 
                       : widget.chatRoom.name,
                   style: const TextStyle(
                     fontWeight: FontWeight.w600,
@@ -434,10 +423,10 @@ class _ChatRoomScreenState extends State<ChatRoomScreen>
             IconButton(
               icon: const Icon(Icons.info_outline),
               onPressed: () {
-                Navigator.of(context).push(
+                Navigator.push(
+                  context,
                   MaterialPageRoute(
-                    builder: (context) =>
-                        GroupManagementScreen(chatRoom: widget.chatRoom),
+                    builder: (context) => GroupManagementScreen(chatRoom: widget.chatRoom),
                   ),
                 );
               },
@@ -564,26 +553,6 @@ class _ChatRoomScreenState extends State<ChatRoomScreen>
                   itemBuilder: (context, index) {
                     final message = messages[index];
                     final isMe = message.senderId == ChatService.currentUserId;
-                    final isLastMessage =
-                        index == 0; // Since reversed, first item is the latest
-
-                    // Check if this is a system message
-                    if (message.isSystemMessage) {
-                      return Padding(
-                        padding: const EdgeInsets.only(bottom: 12),
-                        child: _buildSystemMessageBubble(message),
-                      );
-                    }
-
-                    // Check if this is a deleted message
-                    if (message.isDeleted) {
-                      return Padding(
-                        padding: const EdgeInsets.only(bottom: 12),
-                        child: _buildDeletedMessageBubble(message, isMe),
-                      );
-                    }
-
-                    // Find the sender's profile for avatar and name
                     final senderProfile = _participants.firstWhere(
                       (p) => p.id == message.senderId,
                       orElse: () => UserProfile(
@@ -592,20 +561,9 @@ class _ChatRoomScreenState extends State<ChatRoomScreen>
                         email: '',
                       ),
                     );
-
                     return Padding(
                       padding: const EdgeInsets.only(bottom: 12),
-                      child: Column(
-                        children: [
-                          _buildMessageBubble(message, isMe, senderProfile),
-                          // Show read receipt under the last message from current user
-                          if (isMe && isLastMessage)
-                            Padding(
-                              padding: const EdgeInsets.only(top: 4, right: 16),
-                              child: _buildReadReceiptStatus(message),
-                            ),
-                        ],
-                      ),
+                      child: _buildMessageBubble(message, isMe, senderProfile, messages),
                     );
                   },
                 );
@@ -641,7 +599,9 @@ class _ChatRoomScreenState extends State<ChatRoomScreen>
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          _replyToMessage!.senderName,
+                          _replyToMessage!.senderId == ChatService.currentUserId
+                              ? 'You'
+                              : _replyToMessage!.senderName,
                           style: const TextStyle(
                             fontWeight: FontWeight.bold,
                             color: Color(0xFF8B5CF6),
@@ -756,71 +716,108 @@ class _ChatRoomScreenState extends State<ChatRoomScreen>
     Message message,
     bool isMe,
     UserProfile senderProfile,
+    List<Message> allMessages,
   ) {
-    return Align(
-      alignment: isMe ? Alignment.centerRight : Alignment.centerLeft,
-      child: Row(
-        mainAxisAlignment: isMe
-            ? MainAxisAlignment.end
-            : MainAxisAlignment.start,
-        crossAxisAlignment: CrossAxisAlignment.end,
-        children: [
-          if (!isMe) ...[
-            CircleAvatar(
-              radius: 16,
-              backgroundImage:
-                  senderProfile.photoURL != null &&
-                      senderProfile.photoURL!.isNotEmpty
-                  ? NetworkImage(senderProfile.photoURL!)
-                  : null,
-              backgroundColor: const Color(0xFF8B5CF6),
-              child:
-                  senderProfile.photoURL == null ||
-                      senderProfile.photoURL!.isEmpty
-                  ? Text(
-                      senderProfile.displayName.isNotEmpty
-                          ? senderProfile.displayName
-                                .substring(0, 1)
-                                .toUpperCase()
-                          : 'U',
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontWeight: FontWeight.bold,
-                        fontSize: 14,
-                      ),
-                    )
-                  : null,
+    // Handle system messages (centered, no bubble)
+    if (message.type == 'system') {
+      return Center(
+        child: Container(
+          margin: const EdgeInsets.symmetric(vertical: 4),
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+          decoration: BoxDecoration(
+            color: Colors.grey.shade200,
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: Text(
+            message.content,
+            style: TextStyle(
+              color: Colors.grey.shade600,
+              fontSize: 13,
+              fontStyle: FontStyle.italic,
             ),
-            const SizedBox(width: 8),
-          ],
-          Flexible(
-            child: Column(
-              crossAxisAlignment: isMe
-                  ? CrossAxisAlignment.end
-                  : CrossAxisAlignment.start,
-              children: [
-                // Show sender name in group chats (not for current user)
-                if (!isMe && widget.chatRoom.type == 'group') ...[
-                  Text(
-                    senderProfile.displayName,
-                    style: const TextStyle(
-                      fontSize: 12,
-                      fontWeight: FontWeight.w600,
-                      color: Color(0xFF8B5CF6),
-                    ),
-                  ),
-                  const SizedBox(height: 2),
-                ],
-                Column(
-                  crossAxisAlignment: isMe
-                      ? CrossAxisAlignment.end
-                      : CrossAxisAlignment.start,
-                  children: [
-                    GestureDetector(
-                      onLongPress: () => _showMessageOptions(message),
-                      child: Container(
+            textAlign: TextAlign.center,
+          ),
+        ),
+      );
+    }
+
+    // For direct chats, only show 'Seen' status under the last message sent by current user
+    bool showSeenStatus = false;
+    if (widget.chatRoom.type == 'direct' && isMe) {
+      // Find the last message sent by current user
+      final lastMyMessage = allMessages.firstWhere(
+        (m) => m.senderId == ChatService.currentUserId,
+        orElse: () => message,
+      );
+      if (lastMyMessage.id == message.id) {
+        showSeenStatus = true;
+      }
+    }
+    return Column(
+      crossAxisAlignment: isMe ? CrossAxisAlignment.end : CrossAxisAlignment.start,
+      children: [
+        // Show sender name for group chats (not for own messages)
+        if (!isMe && widget.chatRoom.type == 'group')
+          Padding(
+            padding: const EdgeInsets.only(left: 40, bottom: 4),
+            child: Text(
+              senderProfile.displayName,
+              style: TextStyle(
+                fontSize: 12,
+                color: Colors.grey.shade600,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+          ),
+        
+        Align(
+          alignment: isMe ? Alignment.centerRight : Alignment.centerLeft,
+          child: Row(
+            mainAxisAlignment: isMe
+                ? MainAxisAlignment.end
+                : MainAxisAlignment.start,
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              if (!isMe) ...[
+                CircleAvatar(
+                  radius: 16,
+                  backgroundImage:
+                      senderProfile.photoURL != null &&
+                          senderProfile.photoURL!.isNotEmpty
+                      ? NetworkImage(senderProfile.photoURL!)
+                      : null,
+                  backgroundColor: const Color(0xFF8B5CF6),
+                  child:
+                      senderProfile.photoURL == null ||
+                          senderProfile.photoURL!.isEmpty
+                      ? Text(
+                          senderProfile.displayName.isNotEmpty
+                              ? senderProfile.displayName
+                                    .substring(0, 1)
+                                    .toUpperCase()
+                              : 'U',
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontWeight: FontWeight.bold,
+                            fontSize: 14,
+                          ),
+                        )
+                      : null,
+                ),
+                const SizedBox(width: 8),
+              ],
+              Flexible(
+                child: GestureDetector(
+                  onTap: isMe ? () => _showMessageOptions(context, message) : null,
+                  onLongPress: !isMe ? () => _showMessageOptionsForOthers(context, message) : null,
+                  child: Column(
+                    crossAxisAlignment: isMe
+                        ? CrossAxisAlignment.end
+                        : CrossAxisAlignment.start,
+                    children: [
+                      Container(
                         constraints: BoxConstraints(
-                          maxWidth: MediaQuery.of(context).size.width * 0.5,
+                          maxWidth: MediaQuery.of(context).size.width * 0.7,
                         ),
                         padding: const EdgeInsets.symmetric(
                           horizontal: 12,
@@ -835,95 +832,575 @@ class _ChatRoomScreenState extends State<ChatRoomScreen>
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Text(
-                              message.isEdited
-                                  ? '${message.content} (edited)'
-                                  : message.content,
-                              style: TextStyle(
-                                color: isMe
-                                    ? Colors.white
-                                    : const Color(0xFF1F2937),
-                                fontSize: 15,
-                                fontStyle: message.isEdited
-                                    ? FontStyle.italic
-                                    : FontStyle.normal,
-                              ),
-                            ),
-                            Row(
-                              mainAxisAlignment: isMe
-                                  ? MainAxisAlignment.spaceBetween
-                                  : MainAxisAlignment.start,
-                              children: [
-                                if (!isMe &&
-                                    message.votes.isNotEmpty &&
-                                    widget.chatRoom.type == 'group') ...[
-                                  Container(
-                                    padding: const EdgeInsets.symmetric(
-                                      horizontal: 6,
-                                      vertical: 2,
-                                    ),
-                                    decoration: BoxDecoration(
-                                      color: const Color(0xFF10B981),
-                                      borderRadius: BorderRadius.circular(8),
-                                    ),
-                                    child: Text(
-                                      message.votes.length.toString(),
-                                      style: const TextStyle(
-                                        fontSize: 10,
-                                        color: Colors.white,
-                                        fontWeight: FontWeight.bold,
-                                      ),
-                                    ),
-                                  ),
-                                  const SizedBox(width: 8),
-                                ],
-                                Text(
-                                  _formatMessageTime(message.timestamp),
-                                  style: TextStyle(
-                                    fontSize: 11,
-                                    color: isMe
-                                        ? Colors.white
-                                        : const Color(0xFF9CA3AF),
-                                  ),
+                            // Reply preview if this message is a reply
+                            if (message.replyToId != null)
+                              _buildReplyPreview(message, isMe, allMessages),
+                            if (message.isDeleted)
+                              Text(
+                                'This message was deleted',
+                                style: TextStyle(
+                                  color: isMe ? Colors.white70 : Colors.grey.shade500,
+                                  fontSize: 14,
+                                  fontStyle: FontStyle.italic,
                                 ),
-                                if (isMe &&
-                                    message.votes.isNotEmpty &&
-                                    widget.chatRoom.type == 'group') ...[
-                                  const SizedBox(width: 8),
-                                  Container(
-                                    padding: const EdgeInsets.symmetric(
-                                      horizontal: 6,
-                                      vertical: 2,
-                                    ),
-                                    decoration: BoxDecoration(
-                                      color: Colors.white24,
-                                      borderRadius: BorderRadius.circular(8),
-                                    ),
-                                    child: Text(
-                                      message.votes.length.toString(),
-                                      style: const TextStyle(
-                                        fontSize: 10,
-                                        color: Colors.white,
-                                        fontWeight: FontWeight.bold,
-                                      ),
-                                    ),
-                                  ),
-                                ],
-                              ],
+                              )
+                            else
+                              Text(
+                                message.content,
+                                style: TextStyle(
+                                  color: isMe ? Colors.white : const Color(0xFF1F2937),
+                                  fontSize: 15,
+                                ),
+                              ),
+                            if (message.isEdited && !message.isDeleted)
+                              Text(
+                                'edited',
+                                style: TextStyle(
+                                  fontSize: 10,
+                                  color: isMe ? Colors.white70 : Colors.grey.shade500,
+                                  fontStyle: FontStyle.italic,
+                                ),
+                              ),
+                            const SizedBox(height: 2),
+                            Text(
+                              _formatMessageTime(message.timestamp),
+                              style: TextStyle(
+                                fontSize: 11,
+                                color: isMe ? Colors.white70 : const Color(0xFF9CA3AF),
+                              ),
                             ),
                           ],
                         ),
                       ),
-                    ),
-                    // Show vote display for group chats - removed as it's now inside the bubble
-                  ],
+                      // Vote count display
+                      if (message.votes.isNotEmpty && !message.isDeleted)
+                        GestureDetector(
+                          onTap: () => _showVotersList(context, message),
+                          child: Container(
+                            margin: const EdgeInsets.only(top: 4),
+                            width: 24,
+                            height: 24,
+                            decoration: const BoxDecoration(
+                              color: Colors.green,
+                              shape: BoxShape.circle,
+                            ),
+                            child: Center(
+                              child: Text(
+                                '${message.votes.length}',
+                                style: const TextStyle(
+                                  fontSize: 12,
+                                  color: Colors.white,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                      
+                      // Seen by status
+                      if (!message.isDeleted && ((widget.chatRoom.type == 'group' && _getMessageReaders(message).isNotEmpty) || showSeenStatus))
+                        _buildSeenStatus(message, isMe),
+                    ],
+                  ),
                 ),
-              ],
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildSeenStatus(Message message, bool isMe) {
+    final readers = _getMessageReaders(message);
+    
+    // For group chats, show "Seen by" for any message with readers
+    if (widget.chatRoom.type == 'group' && readers.isNotEmpty) {
+      final seenText = _formatSeenBy(readers);
+      return Align(
+        alignment: Alignment.centerRight,
+        child: Container(
+          margin: const EdgeInsets.only(top: 2),
+          child: Text(
+            seenText,
+            style: TextStyle(
+              fontSize: 10,
+              color: Colors.grey.shade500,
+              fontStyle: FontStyle.italic,
             ),
           ),
-        ],
+        ),
+      );
+    }
+    
+    // For direct chats, show "Seen" status only for own messages
+    if (widget.chatRoom.type == 'direct' && isMe && readers.isNotEmpty) {
+      return Align(
+        alignment: Alignment.centerRight,
+        child: Container(
+          margin: const EdgeInsets.only(top: 2),
+          child: FutureBuilder<String>(
+            future: _getSeenTimeForDirectChat(message),
+            builder: (context, snapshot) {
+              if (snapshot.hasData) {
+                return Text(
+                  'Seen ${snapshot.data}',
+                  style: TextStyle(
+                    fontSize: 10,
+                    color: Colors.grey.shade500,
+                    fontStyle: FontStyle.italic,
+                  ),
+                );
+              }
+              return Text(
+                'Seen',
+                style: TextStyle(
+                  fontSize: 10,
+                  color: Colors.grey.shade500,
+                  fontStyle: FontStyle.italic,
+                ),
+              );
+            },
+          ),
+        ),
+      );
+    }
+    
+    return const SizedBox.shrink();
+  }
+
+  // Get who has seen a message
+  List<UserProfile> _getMessageReaders(Message message) {
+    return _participants.where((participant) {
+      return message.readBy[participant.id] == true &&
+             participant.id != message.senderId; // Don't include sender
+    }).toList();
+  }
+
+  // Format seen by text for group chats
+  String _formatSeenBy(List<UserProfile> readers) {
+    if (readers.isEmpty) return '';
+    if (readers.length == 1) {
+      return 'Seen by ${readers.first.displayName}';
+    } else if (readers.length == 2) {
+      return 'Seen by ${readers[0].displayName}, ${readers[1].displayName}';
+    } else {
+      return 'Seen by ${readers[0].displayName}, ${readers[1].displayName} and ${readers.length - 2} others';
+    }
+  }
+
+  // Get time ago for direct chat seen status
+  String _getTimeAgo(DateTime timestamp) {
+    final now = DateTime.now();
+    final difference = now.difference(timestamp);
+    
+    if (difference.inMinutes < 1) {
+      return 'just now';
+    } else if (difference.inMinutes < 60) {
+      return '${difference.inMinutes}m ago';
+    } else if (difference.inHours < 24) {
+      return '${difference.inHours}h ago';
+    } else {
+      return '${difference.inDays}d ago';
+    }
+  }
+
+  // Get seen time for direct chats with more accurate timing
+  Future<String> _getSeenTimeForDirectChat(Message message) async {
+    try {
+      // Use the message timestamp as approximate seen time since the user is reading now
+      return _getTimeAgo(message.timestamp);
+    } catch (e) {
+      return 'recently';
+    }
+  }
+
+  void _showMessageOptions(BuildContext context, Message message) {
+    if (message.isDeleted) return;
+    
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (context) {
+        return Container(
+          padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 16),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: 40,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: Colors.grey.shade300,
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+              const SizedBox(height: 20),
+              ListTile(
+                leading: const Icon(Icons.reply, color: Color(0xFF8B5CF6)),
+                title: const Text('Reply'),
+                onTap: () {
+                  Navigator.pop(context);
+                  _setReplyMessage(message);
+                },
+              ),
+              ListTile(
+                leading: const Icon(Icons.edit, color: Color(0xFF8B5CF6)),
+                title: const Text('Edit Message'),
+                onTap: () {
+                  Navigator.pop(context);
+                  _editMessage(context, message);
+                },
+              ),
+              ListTile(
+                leading: const Icon(Icons.delete, color: Colors.red),
+                title: const Text('Delete Message'),
+                onTap: () {
+                  Navigator.pop(context);
+                  _deleteMessage(context, message);
+                },
+              ),
+              const SizedBox(height: 10),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  void _showMessageOptionsForOthers(BuildContext context, Message message) {
+    if (message.isDeleted) return;
+
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (context) {
+        return Container(
+          padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 16),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: 40,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: Colors.grey.shade300,
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+              const SizedBox(height: 20),
+              ListTile(
+                leading: const Icon(Icons.reply, color: Color(0xFF8B5CF6)),
+                title: const Text('Reply'),
+                onTap: () {
+                  Navigator.pop(context);
+                  _setReplyMessage(message);
+                },
+              ),
+              // Only show vote option for group chats
+              if (widget.chatRoom.type == 'group')
+                ListTile(
+                  leading: const Icon(Icons.how_to_vote, color: Color(0xFF8B5CF6)),
+                  title: const Text('Vote'),
+                  onTap: () {
+                    Navigator.pop(context);
+                    _showVoteOptions(context, message);
+                  },
+                ),
+              const SizedBox(height: 10),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  void _showVoteOptions(BuildContext context, Message message) {
+    if (message.isDeleted) return;
+
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (context) {
+        return Container(
+          padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 16),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: 40,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: Colors.grey.shade300,
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+              const SizedBox(height: 20),
+              const Text(
+                'Vote on this message',
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.w600,
+                  color: Color(0xFF1F2937),
+                ),
+              ),
+              const SizedBox(height: 20),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                children: [
+                  _buildVoteOption('', 'vote', message),
+                ],
+              ),
+              const SizedBox(height: 20),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildVoteOption(String emoji, String voteType, Message message) {
+    final hasVoted = message.votes.containsKey(ChatService.currentUserId);
+    
+    return GestureDetector(
+      onTap: () {
+        Navigator.pop(context);
+        _voteOnMessage(message, voteType);
+      },
+      child: Container(
+        width: 80,
+        height: 50,
+        decoration: BoxDecoration(
+          color: hasVoted ? Colors.red.withOpacity(0.1) : const Color(0xFF8B5CF6).withOpacity(0.1),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(
+            color: hasVoted ? Colors.red : const Color(0xFF8B5CF6), 
+            width: 2
+          ),
+        ),
+        child: Center(
+          child: Text(
+            hasVoted ? 'Unvote' : 'Vote',
+            style: TextStyle(
+              fontSize: 14,
+              fontWeight: FontWeight.w600,
+              color: hasVoted ? Colors.red : const Color(0xFF8B5CF6),
+            ),
+          ),
+        ),
       ),
     );
+  }
+
+  void _showVotersList(BuildContext context, Message message) {
+    if (message.votes.isEmpty) return;
+
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (context) {
+        return Container(
+          padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 16),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: 40,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: Colors.grey.shade300,
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+              const SizedBox(height: 20),
+              Text(
+                'Voted (${message.votes.length})',
+                style: const TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.w600,
+                  color: Color(0xFF1F2937),
+                ),
+              ),
+              const SizedBox(height: 20),
+              SizedBox(
+                height: 300,
+                child: ListView.builder(
+                  itemCount: message.votes.length,
+                  itemBuilder: (context, index) {
+                    final entry = message.votes.entries.toList()[index];
+                    final voteData = entry.value as Map<String, dynamic>;
+                    final voterName = voteData['voterName'] ?? 'Unknown User';
+                    final voterId = entry.key;
+                    
+                    // Find voter profile for email and photo
+                    final voterProfile = _participants.firstWhere(
+                      (p) => p.id == voterId,
+                      orElse: () => UserProfile(
+                        id: voterId,
+                        displayName: voterName,
+                        email: '',
+                      ),
+                    );
+
+                    return ListTile(
+                      leading: CircleAvatar(
+                        radius: 20,
+                        backgroundImage: voterProfile.photoURL != null && 
+                                         voterProfile.photoURL!.isNotEmpty
+                            ? NetworkImage(voterProfile.photoURL!)
+                            : null,
+                        backgroundColor: const Color(0xFF8B5CF6),
+                        child: voterProfile.photoURL == null || 
+                               voterProfile.photoURL!.isEmpty
+                            ? Text(
+                                voterName.isNotEmpty
+                                    ? voterName.substring(0, 1).toUpperCase()
+                                    : 'U',
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 16,
+                                ),
+                              )
+                            : null,
+                      ),
+                      title: Text(
+                        voterName,
+                        style: const TextStyle(
+                          fontWeight: FontWeight.w500,
+                          fontSize: 16,
+                        ),
+                      ),
+                      subtitle: Text(
+                        voterProfile.email ?? 'No email',
+                        style: TextStyle(
+                          color: Colors.grey.shade600,
+                          fontSize: 14,
+                        ),
+                      ),
+                      trailing: Container(
+                        width: 20,
+                        height: 20,
+                        decoration: const BoxDecoration(
+                          color: Colors.green,
+                          shape: BoxShape.circle,
+                        ),
+                        child: const Icon(
+                          Icons.check,
+                          color: Colors.white,
+                          size: 14,
+                        ),
+                      ),
+                    );
+                  },
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  Future<void> _editMessage(BuildContext context, Message message) async {
+    final controller = TextEditingController(text: message.content);
+    
+    final result = await showDialog<String>(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: const Text('Edit Message'),
+          content: TextField(
+            controller: controller,
+            maxLines: null,
+            decoration: const InputDecoration(
+              hintText: 'Enter new message...',
+              border: OutlineInputBorder(),
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Cancel'),
+            ),
+            TextButton(
+              onPressed: () => Navigator.pop(context, controller.text.trim()),
+              child: const Text('Save'),
+            ),
+          ],
+        );
+      },
+    );
+
+    if (result != null && result.isNotEmpty && result != message.content) {
+      final success = await ChatService.editMessage(
+        chatRoomId: widget.chatRoom.id,
+        messageId: message.id,
+        newContent: result,
+      );
+
+      if (!success) {
+        _showError('Failed to edit message');
+      }
+    }
+  }
+
+  Future<void> _deleteMessage(BuildContext context, Message message) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: const Text('Delete Message'),
+          content: const Text('Are you sure you want to delete this message? This action cannot be undone.'),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context, false),
+              child: const Text('Cancel'),
+            ),
+            TextButton(
+              onPressed: () => Navigator.pop(context, true),
+              style: TextButton.styleFrom(foregroundColor: Colors.red),
+              child: const Text('Delete'),
+            ),
+          ],
+        );
+      },
+    );
+
+    if (confirmed == true) {
+      final success = await ChatService.deleteMessage(
+        chatRoomId: widget.chatRoom.id,
+        messageId: message.id,
+      );
+
+      if (!success) {
+        _showError('Failed to delete message');
+      }
+    }
+  }
+
+  Future<void> _voteOnMessage(Message message, String voteType) async {
+    final success = await ChatService.voteOnMessage(
+      chatRoomId: widget.chatRoom.id,
+      messageId: message.id,
+      voteType: voteType,
+    );
+
+    if (!success) {
+      _showError('Failed to vote on message');
+    }
   }
 
   String _formatMessageTime(DateTime time) {
@@ -932,293 +1409,63 @@ class _ChatRoomScreenState extends State<ChatRoomScreen>
     return '$hour:$minute';
   }
 
-  Widget _buildSystemMessageBubble(Message message) {
-    return Center(
-      child: Container(
-        margin: const EdgeInsets.symmetric(vertical: 4),
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-        decoration: BoxDecoration(
-          color: Colors.grey.shade100,
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: Colors.grey.shade300, width: 0.5),
-        ),
-        child: Text(
-          message.content,
-          style: TextStyle(
-            color: Colors.grey.shade700,
-            fontSize: 13,
-            fontWeight: FontWeight.w500,
-          ),
-          textAlign: TextAlign.center,
-        ),
+  Widget _buildReplyPreview(Message message, bool isMe, List<Message> allMessages) {
+    final replyToMessage = allMessages.firstWhere(
+      (m) => m.id == message.replyToId,
+      orElse: () => Message(
+        id: '',
+        chatRoomId: message.chatRoomId,
+        senderId: '',
+        senderName: 'Unknown User',
+        content: 'Message not found',
+        timestamp: DateTime.now(),
       ),
     );
-  }
 
-  Widget _buildDeletedMessageBubble(Message message, bool isMe) {
-    final currentUserId = ChatService.currentUserId;
-    final deletedByCurrentUser = message.senderId == currentUserId;
+    final replyAuthor = replyToMessage.senderId == ChatService.currentUserId
+        ? 'You'
+        : replyToMessage.senderName;
 
-    return Align(
-      alignment: isMe ? Alignment.centerRight : Alignment.centerLeft,
-      child: Container(
-        margin: const EdgeInsets.symmetric(horizontal: 16),
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-        constraints: BoxConstraints(
-          maxWidth: MediaQuery.of(context).size.width * 0.7,
+    return Container(
+      margin: const EdgeInsets.only(bottom: 8),
+      padding: const EdgeInsets.all(8),
+      decoration: BoxDecoration(
+        color: isMe 
+            ? Colors.white.withOpacity(0.1)
+            : Colors.grey.shade100,
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(
+          color: isMe 
+              ? Colors.white.withOpacity(0.3)
+              : Colors.grey.shade300,
+          width: 1,
         ),
-        decoration: BoxDecoration(
-          color: Colors.grey.shade100,
-          borderRadius: BorderRadius.circular(15),
-          border: Border.all(color: Colors.grey.shade300, width: 0.5),
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(Icons.block, size: 16, color: Colors.grey.shade500),
-            const SizedBox(width: 8),
-            Flexible(
-              child: Text(
-                deletedByCurrentUser
-                    ? 'You deleted a message'
-                    : '${message.senderName} deleted a message',
-                style: TextStyle(
-                  color: Colors.grey.shade600,
-                  fontSize: 14,
-                  fontStyle: FontStyle.italic,
-                ),
-              ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            replyAuthor,
+            style: TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.w600,
+              color: isMe ? Colors.white : const Color(0xFF8B5CF6),
             ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  void _showMessageOptions(Message message) {
-    final currentUserId = ChatService.currentUserId;
-    final isMe = message.senderId == currentUserId;
-    final hasVoted = message.votes.containsKey(currentUserId);
-
-    showModalBottomSheet(
-      context: context,
-      builder: (context) => Container(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            // Show vote/unvote option for group chats
-            if (widget.chatRoom.type == 'group')
-              ListTile(
-                leading: Icon(
-                  hasVoted ? Icons.thumb_down : Icons.thumb_up,
-                  color: const Color(0xFF8B5CF6),
-                ),
-                title: Text(hasVoted ? 'Unvote' : 'Vote'),
-                onTap: () {
-                  Navigator.pop(context);
-                  _toggleVote(message);
-                },
-              ),
-            // Show edit/delete options only for own messages
-            if (isMe) ...[
-              ListTile(
-                leading: const Icon(Icons.edit, color: Color(0xFF8B5CF6)),
-                title: const Text('Edit'),
-                onTap: () {
-                  Navigator.pop(context);
-                  _editMessage(message);
-                },
-              ),
-              ListTile(
-                leading: const Icon(Icons.delete, color: Colors.red),
-                title: const Text('Delete'),
-                onTap: () {
-                  Navigator.pop(context);
-                  _deleteMessage(message);
-                },
-              ),
-            ],
-          ],
-        ),
-      ),
-    );
-  }
-
-  void _editMessage(Message message) {
-    final TextEditingController editController = TextEditingController(
-      text: message.content,
-    );
-
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Edit Message'),
-        content: TextField(
-          controller: editController,
-          decoration: const InputDecoration(
-            hintText: 'Enter new message...',
-            border: OutlineInputBorder(),
           ),
-          maxLines: null,
-          autofocus: true,
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Cancel'),
-          ),
-          TextButton(
-            onPressed: () async {
-              final newContent = editController.text.trim();
-              if (newContent.isNotEmpty && newContent != message.content) {
-                Navigator.pop(context);
-
-                final success = await ChatService.editMessage(
-                  chatRoomId: widget.chatRoom.id,
-                  messageId: message.id,
-                  newContent: newContent,
-                );
-
-                if (success && mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text('Message edited successfully'),
-                    ),
-                  );
-                } else if (mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Failed to edit message')),
-                  );
-                }
-              } else {
-                Navigator.pop(context);
-              }
-            },
-            child: const Text('Save'),
+          const SizedBox(height: 2),
+          Text(
+            replyToMessage.content.length > 50
+                ? '${replyToMessage.content.substring(0, 50)}...'
+                : replyToMessage.content,
+            style: TextStyle(
+              fontSize: 12,
+              color: isMe ? Colors.white70 : Colors.grey.shade600,
+            ),
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
           ),
         ],
       ),
     );
-  }
-
-  void _deleteMessage(Message message) {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Delete Message'),
-        content: const Text(
-          'Are you sure you want to delete this message? This action cannot be undone.',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Cancel'),
-          ),
-          TextButton(
-            onPressed: () async {
-              Navigator.pop(context);
-
-              final success = await ChatService.deleteMessage(
-                chatRoomId: widget.chatRoom.id,
-                messageId: message.id,
-              );
-
-              if (success && mounted) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Message deleted')),
-                );
-              } else if (mounted) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Failed to delete message')),
-                );
-              }
-            },
-            style: TextButton.styleFrom(foregroundColor: Colors.red),
-            child: const Text('Delete'),
-          ),
-        ],
-      ),
-    );
-  }
-
-  void _toggleVote(Message message) async {
-    final currentUserId = ChatService.currentUserId;
-    final hasVoted = message.votes.containsKey(currentUserId);
-
-    if (hasVoted) {
-      // Remove vote if already voted
-      await ChatService.removeVoteFromMessage(
-        chatRoomId: widget.chatRoom.id,
-        messageId: message.id,
-      );
-    } else {
-      // Add vote (using 'vote' as the reaction type)
-      await ChatService.voteOnMessage(
-        chatRoomId: widget.chatRoom.id,
-        messageId: message.id,
-        reaction: 'vote',
-      );
-    }
-  }
-
-  Widget _buildReadReceiptStatus(Message message) {
-    if (widget.chatRoom.type == 'group') {
-      // Group chat: show "Seen by name1, name2, +X"
-      final readByUsers = message.readBy.entries
-          .where(
-            (entry) => entry.key != ChatService.currentUserId && entry.value,
-          )
-          .map((entry) => entry.key)
-          .toList();
-
-      if (readByUsers.isEmpty) {
-        return const Text(
-          'Not seen',
-          style: TextStyle(fontSize: 11, color: Colors.grey),
-        );
-      }
-
-      final readByNames = readByUsers
-          .take(2)
-          .map((userId) {
-            final participant = _participants.firstWhere(
-              (p) => p.id == userId,
-              orElse: () =>
-                  UserProfile(id: userId, displayName: 'Unknown', email: ''),
-            );
-            return participant.displayName;
-          })
-          .where((name) => name != 'Unknown')
-          .toList();
-
-      String displayText = 'Seen by ${readByNames.join(', ')}';
-      if (readByUsers.length > 2) {
-        displayText += ', +${readByUsers.length - 2}';
-      }
-
-      return Text(
-        displayText,
-        style: const TextStyle(fontSize: 11, color: Colors.grey),
-      );
-    } else {
-      // Direct chat: show "Seen X ago" or "Not seen"
-      final otherUserId = widget.chatRoom.participants.firstWhere(
-        (id) => id != ChatService.currentUserId,
-      );
-
-      if (message.readBy[otherUserId] == true) {
-        // Calculate time ago - this is simplified, in a real app you'd store read timestamps
-        return const Text(
-          'Seen',
-          style: TextStyle(fontSize: 11, color: Colors.grey),
-        );
-      } else {
-        return const Text(
-          'Not seen',
-          style: TextStyle(fontSize: 11, color: Colors.grey),
-        );
-      }
-    }
   }
 }

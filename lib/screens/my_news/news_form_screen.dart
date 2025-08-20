@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import '../../models/news_model.dart';
+import 'widgets/news_model.dart';
 import '../../services/news_service.dart';
 
 class NewsFormScreen extends StatefulWidget {

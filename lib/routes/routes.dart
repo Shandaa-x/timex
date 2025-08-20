@@ -1,14 +1,14 @@
 import 'package:flutter/material.dart';
-import 'package:timex/screens/login/google_login_screen.dart';
+import 'package:timex/screens/main/login/google_login_screen.dart';
 import 'package:timex/screens/main/main_screen.dart';
 import 'package:timex/screens/my_news/my_news_screen.dart';
-import 'package:timex/screens/time_track/time_tracking_screen.dart';
-import 'package:timex/screens/auth/auth_wrapper.dart';
+import 'package:timex/screens/time/time_track/time_tracking_screen.dart';
+import 'package:timex/screens/main/auth/auth_wrapper.dart';
 import 'package:timex/screens/chat/chat_screen.dart';
 import 'package:timex/screens/chat/new_chat_screen.dart';
 import 'package:timex/screens/chat/create_group_screen.dart';
 import 'package:timex/screens/chat/group_management_screen.dart';
-import 'package:timex/models/chat_models.dart';
+import 'package:timex/screens/chat/services/chat_models.dart';
 
 class Routes {
   static const main = 'MainScreen';

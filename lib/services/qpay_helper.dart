@@ -5,8 +5,8 @@ library qpay_helper;
 import 'dart:convert';
 import 'dart:math';
 import 'package:http/http.dart' as http;
-import '../config/qpay_config.dart';
-import '../models/qpay_models.dart';
+import '../screens/qpay/qpay_config.dart';
+import '../screens/qpay/qpay_models.dart';
 import '../utils/logger.dart';
 
 /// QPay Helper class with core functionality

@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../index.dart';
-import '../services/notification_service.dart';
+import '../screens/chat/services/notification_service.dart';
 
 class CustomDrawer extends StatelessWidget {
   final Function(int)? onNavigateToTab;

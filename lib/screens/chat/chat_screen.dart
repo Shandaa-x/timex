@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
-import '../../models/chat_models.dart';
+import 'services/chat_models.dart';
 import '../../services/chat_service.dart';
-import '../../services/notification_service.dart';
+import 'services/notification_service.dart';
 import 'widgets/chat_room_tile.dart';
 import 'chat_room_screen.dart';
 import 'create_group_screen.dart';
@@ -79,35 +79,43 @@ class _ChatScreenState extends State<ChatScreen>
             onPressed: () async {
               print('🔔 Testing notifications and debugging...');
 
+              // Manual initialization of notification listeners
+              // await NotificationService.manuallyInitializeListeners();
+
               // Debug current user's FCM token
               await NotificationService.debugCheckFCMToken();
 
-              // Try to send a test notification to mungunshand_6
-              print('🔔 Testing direct notification to mungunshand_6...');
+              // Force refresh current user's device token
+              print('🔔 Force refreshing current user device token...');
+              await NotificationService.forceRefreshDeviceToken();
+
+              // Debug all users with FCM tokens
+              await NotificationService.debugListAllFCMTokens();
+
+              // Specifically check the problematic receiver from the logs
+              print('🔔 Checking receiver device status: IjLl3CSTwaTN4tM42yRNxakxDYx1');
+              await NotificationService.debugCheckReceiverDevices('IjLl3CSTwaTN4tM42yRNxakxDYx1');
+
+              // Try to send a test notification to the receiver
+              print('🔔 Testing direct notification to IjLl3CSTwaTN4tM42yRNxakxDYx1...');
               await NotificationService.debugSendNotificationToUser(
-                'mungunshand_6',
+                'IjLl3CSTwaTN4tM42yRNxakxDYx1',
                 'This is a test notification from debug',
               );
 
               // Send test local notification on current device
               await NotificationService.sendTestNotification();
-              
-              // FORCE show a notification (for immediate testing)
-              await NotificationService.debugForceShowNotification(
-                'TEST NOTIFICATION', 
-                'This should appear immediately!'
-              );
 
               ScaffoldMessenger.of(context).showSnackBar(
                 const SnackBar(
                   content: Text(
-                    'Debug complete! Check console for FCM status.',
+                    'Debug complete! Manual listener init + FCM analysis done. Check for notifications!',
                   ),
-                  duration: Duration(seconds: 3),
+                  duration: Duration(seconds: 4),
                 ),
               );
             },
-            tooltip: 'Test Notification & Debug',
+            tooltip: 'Test Notification & Advanced Debug',
           ),
         ],
         bottom: PreferredSize(
