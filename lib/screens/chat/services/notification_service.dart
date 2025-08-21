@@ -617,15 +617,15 @@ class NotificationService {
       final body = data['body'] as String?;
       final chatRoomId = data['chatRoomId'] as String?;
       
-      if (title != null && body != null) {
+      if (title != null && body != null && chatRoomId != null) {
         print('🔔 Showing push notification: $title - $body');
         
-        // Use a unique but consistent ID for the notification
-        final notificationId = docId.hashCode.abs() % 1000000; // Keep it within reasonable range
+        // Use consistent notification ID based on chat room
+        final notificationId = _generateNotificationId(chatRoomId);
         
         // Show local notification immediately
         await _localNotifications.show(
-          notificationId, // Use consistent ID instead of random
+          notificationId,
           title,
           body,
           NotificationDetails(
@@ -1478,8 +1478,10 @@ class NotificationService {
       print('   Body: $message');
 
       // Show local notification immediately for current user
+      final notificationId = _generateNotificationId(chatRoomId);
+      
       await _localNotifications.show(
-        chatRoomId.hashCode + DateTime.now().millisecondsSinceEpoch,
+        notificationId,
         title,
         message,
         NotificationDetails(
@@ -1598,8 +1600,10 @@ class NotificationService {
                   print('   Content: $content');
 
                   // Show notification immediately
+                  final notificationId = _generateNotificationId(chatRoomId);
+                  
                   await _localNotifications.show(
-                    chatRoomId.hashCode + DateTime.now().millisecondsSinceEpoch,
+                    notificationId,
                     title,
                     content,
                     NotificationDetails(

@@ -2,6 +2,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:timex/screens/chat/create-group/group_management_screen.dart';
+import '../../../widgets/text/text.dart';
 import '../model/chat_models.dart';
 import '../services/chat_service.dart';
 import '../services/notification_service.dart';
@@ -32,6 +33,8 @@ class _ChatRoomScreenState extends State<ChatRoomScreen>
     _loadParticipants();
     _markAsRead();
     _startRealTimeMessageListener(); // Add real-time listener
+    // Update user's online status when entering chat room
+    ChatService.updateOnlineStatus(true);
   }
 
   @override
@@ -40,6 +43,8 @@ class _ChatRoomScreenState extends State<ChatRoomScreen>
     _scrollController.dispose();
     _tabController.dispose();
     _messageListener?.cancel(); // Cancel listener
+    // Update user's online status when leaving chat room
+    ChatService.updateOnlineStatus(true); // Still online, just not in this specific chat
     super.dispose();
   }
 
@@ -131,7 +136,7 @@ class _ChatRoomScreenState extends State<ChatRoomScreen>
   void _showError(String message) {
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(message), backgroundColor: Colors.red),
+        SnackBar(content: txt(message, style: TxtStl.bodyText2(color: Colors.white)), backgroundColor: Colors.red),
       );
     }
   }
@@ -164,9 +169,9 @@ class _ChatRoomScreenState extends State<ChatRoomScreen>
             color: isActive ? const Color(0xFF9C27B0) : Colors.black,
           ),
           const SizedBox(width: 8),
-          Text(
+          txt(
             text,
-            style: TextStyle(
+            style: TxtStl.bodyText1(
               color: isActive ? const Color(0xFF9C27B0) : Colors.black,
               fontWeight: isActive ? FontWeight.w600 : FontWeight.w500,
             ),
@@ -196,25 +201,24 @@ class _ChatRoomScreenState extends State<ChatRoomScreen>
                 const SizedBox(width: 12),
                 Expanded(
                   child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        widget.chatRoom.name,
-                        style: const TextStyle(
-                          fontWeight: FontWeight.w600,
-                          fontSize: 18,
-                          color: Colors.white,
-                        ),
+                    crossAxisAlignment: CrossAxisAlignment.start,                  children: [
+                    txt(
+                      widget.chatRoom.name,
+                      style: TxtStl.titleText2(
+                        fontWeight: FontWeight.w600,
+                        fontSize: 18,
+                        color: Colors.white,
                       ),
-                      Text(
-                        'Group Chat',
-                        style: const TextStyle(
-                          fontSize: 13,
-                          color: Colors.white70,
-                          fontWeight: FontWeight.w400,
-                        ),
+                    ),
+                    txt(
+                      'Group Chat',
+                      style: TxtStl.bodyText2(
+                        fontSize: 13,
+                        color: Colors.white70,
+                        fontWeight: FontWeight.w400,
                       ),
-                    ],
+                    ),
+                  ],
                   ),
                 ),
               ],
@@ -254,11 +258,11 @@ class _ChatRoomScreenState extends State<ChatRoomScreen>
                         backgroundColor: const Color(0xFF8B5CF6),
                         child: otherParticipants[0].photoURL == null || 
                                otherParticipants[0].photoURL!.isEmpty
-                            ? Text(
+                            ? txt(
                                 otherParticipants[0].displayName.isNotEmpty
                                     ? otherParticipants[0].displayName.substring(0, 1).toUpperCase()
                                     : 'U',
-                                style: const TextStyle(
+                                style: TxtStl.labelText3(
                                   color: Colors.white,
                                   fontSize: 8,
                                   fontWeight: FontWeight.bold,
@@ -287,11 +291,11 @@ class _ChatRoomScreenState extends State<ChatRoomScreen>
                         backgroundColor: const Color(0xFF8B5CF6),
                         child: otherParticipants[1].photoURL == null || 
                                otherParticipants[1].photoURL!.isEmpty
-                            ? Text(
+                            ? txt(
                                 otherParticipants[1].displayName.isNotEmpty
                                     ? otherParticipants[1].displayName.substring(0, 1).toUpperCase()
                                     : 'U',
-                                style: const TextStyle(
+                                style: TxtStl.labelText3(
                                   color: Colors.white,
                                   fontSize: 8,
                                   fontWeight: FontWeight.bold,
@@ -325,17 +329,17 @@ class _ChatRoomScreenState extends State<ChatRoomScreen>
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(
+                    txt(
                       widget.chatRoom.name,
-                      style: const TextStyle(
+                      style: TxtStl.titleText2(
                         fontWeight: FontWeight.w600,
                         fontSize: 18,
                         color: Colors.white,
                       ),
                     ),
-                    Text(
+                    txt(
                       '${widget.chatRoom.participants.length} members',
-                      style: const TextStyle(
+                      style: TxtStl.bodyText2(
                         fontSize: 13,
                         color: Colors.white70,
                         fontWeight: FontWeight.w400,
@@ -349,90 +353,145 @@ class _ChatRoomScreenState extends State<ChatRoomScreen>
         },
       );
     } else {
-      // For direct chats, show the other user's avatar
-      final otherParticipant = _participants.firstWhere(
-        (p) => p.id != ChatService.currentUserId,
-        orElse: () => UserProfile(
-          id: '',
-          displayName: widget.chatRoom.name,
-          email: '',
-          isOnline: false,
-        ),
-      );
+      // For direct chats, show the other user's avatar with real-time status
+      final otherParticipantId = widget.chatRoom.participants
+          .firstWhere((id) => id != ChatService.currentUserId, orElse: () => '');
       
-      return Row(
-        children: [
-          Container(
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              border: Border.all(
-                color: otherParticipant.isOnline ? const Color(0xFF10B981) : Colors.white24, 
-                width: 2
+      if (otherParticipantId.isEmpty) {
+        // Fallback if no other participant found
+        return Row(
+          children: [
+            CircleAvatar(
+              radius: 18,
+              backgroundColor: const Color(0xFF8B5CF6),
+              child: txt(
+                widget.chatRoom.name.isNotEmpty
+                    ? widget.chatRoom.name.substring(0, 1).toUpperCase()
+                    : 'U',
+                style: TxtStl.bodyText4(
+                  color: Colors.white,
+                  fontWeight: FontWeight.bold,
+                  fontSize: 16,
+                ),
               ),
             ),
-            child: CircleAvatar(
-              radius: 18,
-              backgroundImage: otherParticipant.photoURL != null && 
-                               otherParticipant.photoURL!.isNotEmpty
-                  ? NetworkImage(otherParticipant.photoURL!)
-                  : null,
-              backgroundColor: const Color(0xFF8B5CF6),
-              child: otherParticipant.photoURL == null || 
-                     otherParticipant.photoURL!.isEmpty
-                  ? Text(
-                      otherParticipant.displayName.isNotEmpty
-                          ? otherParticipant.displayName.substring(0, 1).toUpperCase()
-                          : 'U',
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontWeight: FontWeight.bold,
-                        fontSize: 16,
-                      ),
-                    )
-                  : null,
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  txt(
+                    widget.chatRoom.name,
+                    style: TxtStl.titleText2(
+                      fontWeight: FontWeight.w600,
+                      fontSize: 18,
+                      color: Colors.white,
+                    ),
+                  ),
+                  txt(
+                    'Offline',
+                    style: TxtStl.bodyText2(
+                      fontSize: 13,
+                      color: Colors.white70,
+                      fontWeight: FontWeight.w400,
+                    ),
+                  ),
+                ],
+              ),
             ),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  otherParticipant.displayName.isNotEmpty 
-                      ? otherParticipant.displayName 
-                      : widget.chatRoom.name,
-                  style: const TextStyle(
-                    fontWeight: FontWeight.w600,
-                    fontSize: 18,
-                    color: Colors.white,
+          ],
+        );
+      }
+
+      return StreamBuilder<UserProfile?>(
+        stream: ChatService.getUserProfileStream(otherParticipantId),
+        builder: (context, snapshot) {
+          final otherParticipant = snapshot.data ?? 
+              _participants.firstWhere(
+                (p) => p.id == otherParticipantId,
+                orElse: () => UserProfile(
+                  id: otherParticipantId,
+                  displayName: widget.chatRoom.name,
+                  email: '',
+                  isOnline: false,
+                ),
+              );
+
+          return Row(
+            children: [
+              Container(
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  border: Border.all(
+                    color: otherParticipant.isOnline ? const Color(0xFF10B981) : Colors.white24, 
+                    width: 2
                   ),
                 ),
-                Row(
+                child: CircleAvatar(
+                  radius: 18,
+                  backgroundImage: otherParticipant.photoURL != null && 
+                                   otherParticipant.photoURL!.isNotEmpty
+                      ? NetworkImage(otherParticipant.photoURL!)
+                      : null,
+                  backgroundColor: const Color(0xFF8B5CF6),
+                  child: otherParticipant.photoURL == null || 
+                         otherParticipant.photoURL!.isEmpty
+                      ? txt(
+                          otherParticipant.displayName.isNotEmpty
+                              ? otherParticipant.displayName.substring(0, 1).toUpperCase()
+                              : 'U',
+                          style: TxtStl.bodyText4(
+                            color: Colors.white,
+                            fontWeight: FontWeight.bold,
+                            fontSize: 16,
+                          ),
+                        )
+                      : null,
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    if (otherParticipant.isOnline)
-                      Container(
-                        width: 8,
-                        height: 8,
-                        decoration: const BoxDecoration(
-                          color: Color(0xFF10B981),
-                          shape: BoxShape.circle,
+                    txt(
+                      otherParticipant.displayName.isNotEmpty 
+                          ? otherParticipant.displayName 
+                          : widget.chatRoom.name,
+                      style: TxtStl.titleText2(
+                        fontWeight: FontWeight.w600,
+                        fontSize: 18,
+                        color: Colors.white,
+                      ),
+                    ),
+                    Row(
+                      children: [
+                        if (otherParticipant.isOnline)
+                          Container(
+                            width: 8,
+                            height: 8,
+                            decoration: const BoxDecoration(
+                              color: Color(0xFF10B981),
+                              shape: BoxShape.circle,
+                            ),
+                          ),
+                        if (otherParticipant.isOnline) const SizedBox(width: 6),
+                        txt(
+                          otherParticipant.isOnline ? 'Online' : 'Offline',
+                          style: TxtStl.bodyText2(
+                            fontSize: 13,
+                            color: Colors.white70,
+                            fontWeight: FontWeight.w400,
+                          ),
                         ),
-                      ),
-                    if (otherParticipant.isOnline) const SizedBox(width: 6),
-                    Text(
-                      otherParticipant.isOnline ? 'Online' : 'Offline',
-                      style: const TextStyle(
-                        fontSize: 13,
-                        color: Colors.white70,
-                        fontWeight: FontWeight.w400,
-                      ),
+                      ],
                     ),
                   ],
                 ),
-              ],
-            ),
-          ),
-        ],
+              ),
+            ],
+          );
+        },
       );
     }
   }
@@ -533,9 +592,9 @@ class _ChatRoomScreenState extends State<ChatRoomScreen>
                           color: Colors.grey.shade400,
                         ),
                         const SizedBox(height: 16),
-                        Text(
+                        txt(
                           'Мессеж ачаалахад алдаа гарлаа',
-                          style: TextStyle(
+                          style: TxtStl.titleText2(
                             fontSize: 18,
                             color: Colors.grey.shade600,
                           ),
@@ -558,17 +617,17 @@ class _ChatRoomScreenState extends State<ChatRoomScreen>
                           color: Colors.grey.shade400,
                         ),
                         const SizedBox(height: 16),
-                        Text(
+                        txt(
                           'Мессеж байхгүй байна',
-                          style: TextStyle(
+                          style: TxtStl.titleText2(
                             fontSize: 18,
                             color: Colors.grey.shade600,
                           ),
                         ),
                         const SizedBox(height: 8),
-                        Text(
+                        txt(
                           'Эхний мессежийг илгээгээрэй',
-                          style: TextStyle(color: Colors.grey.shade500),
+                          style: TxtStl.bodyText3(color: Colors.grey.shade500),
                         ),
                       ],
                     ),
@@ -758,12 +817,11 @@ class _ChatRoomScreenState extends State<ChatRoomScreen>
             color: Colors.grey.shade200,
             borderRadius: BorderRadius.circular(12),
           ),
-          child: Text(
+          child: txt(
             message.content,
-            style: TextStyle(
+            style: TxtStl.bodyText2(
               color: Colors.grey.shade600,
               fontSize: 13,
-              fontStyle: FontStyle.italic,
             ),
             textAlign: TextAlign.center,
           ),
@@ -790,9 +848,9 @@ class _ChatRoomScreenState extends State<ChatRoomScreen>
         if (!isMe && widget.chatRoom.type == 'group')
           Padding(
             padding: const EdgeInsets.only(left: 40, bottom: 4),
-            child: Text(
+            child: txt(
               senderProfile.displayName,
-              style: TextStyle(
+              style: TxtStl.labelText2(
                 fontSize: 12,
                 color: Colors.grey.shade600,
                 fontWeight: FontWeight.w500,
@@ -866,35 +924,33 @@ class _ChatRoomScreenState extends State<ChatRoomScreen>
                             if (message.replyToId != null)
                               _buildReplyPreview(message, isMe, allMessages),
                             if (message.isDeleted)
-                              Text(
+                              txt(
                                 'This message was deleted',
-                                style: TextStyle(
+                                style: TxtStl.bodyText3(
                                   color: isMe ? Colors.white70 : Colors.grey.shade500,
                                   fontSize: 14,
-                                  fontStyle: FontStyle.italic,
                                 ),
                               )
                             else
-                              Text(
+                              txt(
                                 message.content,
-                                style: TextStyle(
+                                style: TxtStl.bodyText4(
                                   color: isMe ? Colors.white : const Color(0xFF1F2937),
                                   fontSize: 15,
                                 ),
                               ),
                             if (message.isEdited && !message.isDeleted)
-                              Text(
+                              txt(
                                 'edited',
-                                style: TextStyle(
+                                style: TxtStl.labelText1(
                                   fontSize: 10,
                                   color: isMe ? Colors.white70 : Colors.grey.shade500,
-                                  fontStyle: FontStyle.italic,
                                 ),
                               ),
                             const SizedBox(height: 2),
-                            Text(
+                            txt(
                               _formatMessageTime(message.timestamp),
-                              style: TextStyle(
+                              style: TxtStl.labelText1(
                                 fontSize: 11,
                                 color: isMe ? Colors.white70 : const Color(0xFF9CA3AF),
                               ),

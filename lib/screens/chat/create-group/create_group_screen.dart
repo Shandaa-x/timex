@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import '../../../widgets/text/text.dart';
 import '../model/chat_models.dart';
 import '../services/chat_service.dart';
 
@@ -137,67 +138,139 @@ class _CreateGroupScreenState extends State<CreateGroupScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-
     return Scaffold(
+      backgroundColor: const Color(0xFFF8FAFC),
       appBar: AppBar(
+        backgroundColor: Colors.white,
+        elevation: 0,
+        iconTheme: const IconThemeData(color: Color(0xFF1E293B)),
         title: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text('Create Group'),
+            txt(
+              'Create Group',
+              style: TxtStl.titleText2(
+                color: const Color(0xFF1E293B),
+                fontWeight: FontWeight.w600,
+              ),
+            ),
             if (_selectedUsers.isNotEmpty)
-              Text(
+              txt(
                 '${_selectedUsers.length} members selected',
-                style: theme.textTheme.bodySmall?.copyWith(
-                  color: theme.colorScheme.onSurface.withOpacity(0.7),
+                style: TxtStl.bodyText3(
+                  color: const Color(0xFF64748B),
                 ),
               ),
           ],
         ),
         actions: [
-          TextButton(
-            onPressed: _isLoading ? null : _createGroup,
-            child: _isLoading
-                ? const SizedBox(
-                    width: 16,
-                    height: 16,
-                    child: CircularProgressIndicator(strokeWidth: 2),
-                  )
-                : const Text('Create'),
+          Container(
+            margin: const EdgeInsets.only(right: 8),
+            child: TextButton(
+              onPressed: _isLoading ? null : _createGroup,
+              style: TextButton.styleFrom(
+                backgroundColor: const Color(0xFF8B5CF6),
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8),
+                ),
+              ),
+              child: _isLoading
+                  ? const SizedBox(
+                      width: 16,
+                      height: 16,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                      ),
+                    )
+                  : txt(
+                      'Create',
+                      style: TxtStl.bodyText1(
+                        color: Colors.white,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+            ),
           ),
         ],
       ),
-      body: Column(
-        children: [
-          // Group Info Section
-          Container(
-            padding: const EdgeInsets.all(16),
+      body: SingleChildScrollView(
+        child: Column(
+          children: [
+            // Group Info Section
+            Container(
+            padding: const EdgeInsets.all(20),
+            margin: const EdgeInsets.all(16),
             decoration: BoxDecoration(
-              color: theme.colorScheme.surface,
-              border: Border(
-                bottom: BorderSide(
-                  color: theme.colorScheme.outline.withOpacity(0.2),
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(16),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.05),
+                  blurRadius: 10,
+                  offset: const Offset(0, 2),
                 ),
-              ),
+              ],
             ),
             child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
+                txt(
+                  'Group Information',
+                  style: TxtStl.titleText2(
+                    color: const Color(0xFF1E293B),
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                const SizedBox(height: 16),
                 TextField(
                   controller: _groupNameController,
-                  decoration: const InputDecoration(
+                  decoration: InputDecoration(
                     labelText: 'Group Name',
                     hintText: 'Enter group name',
-                    border: OutlineInputBorder(),
+                    labelStyle: TxtStl.bodyText2(color: const Color(0xFF64748B)),
+                    hintStyle: TxtStl.bodyText3(color: const Color(0xFF94A3B8)),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
+                    ),
+                    enabledBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: const BorderSide(color: Color(0xFF8B5CF6), width: 2),
+                    ),
+                    filled: true,
+                    fillColor: const Color(0xFFF8FAFC),
                   ),
                   textCapitalization: TextCapitalization.words,
                 ),
                 const SizedBox(height: 16),
                 TextField(
                   controller: _groupDescriptionController,
-                  decoration: const InputDecoration(
+                  decoration: InputDecoration(
                     labelText: 'Description (optional)',
                     hintText: 'Enter group description',
-                    border: OutlineInputBorder(),
+                    labelStyle: TxtStl.bodyText2(color: const Color(0xFF64748B)),
+                    hintStyle: TxtStl.bodyText3(color: const Color(0xFF94A3B8)),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
+                    ),
+                    enabledBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: const BorderSide(color: Color(0xFF8B5CF6), width: 2),
+                    ),
+                    filled: true,
+                    fillColor: const Color(0xFFF8FAFC),
                   ),
                   maxLines: 3,
                   textCapitalization: TextCapitalization.sentences,
@@ -209,19 +282,46 @@ class _CreateGroupScreenState extends State<CreateGroupScreen> {
           // Selected Members Section
           if (_selectedUsers.isNotEmpty)
             Container(
-              height: 100,
-              padding: const EdgeInsets.symmetric(horizontal: 16),
+              margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: const Color(0xFF8B5CF6).withOpacity(0.08),
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(
+                  color: const Color(0xFF8B5CF6).withOpacity(0.2),
+                  width: 1,
+                ),
+              ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Padding(
-                    padding: const EdgeInsets.symmetric(vertical: 5),
-                    child: Text(
-                      'Selected Members (${_selectedUsers.length})',
-                      style: theme.textTheme.titleSmall,
-                    ),
+                  Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(6),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF8B5CF6),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: const Icon(
+                          Icons.group,
+                          color: Colors.white,
+                          size: 16,
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      txt(
+                        'Selected Members (${_selectedUsers.length})',
+                        style: TxtStl.bodyText1(
+                          color: const Color(0xFF1E293B),
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ],
                   ),
-                  Expanded(
+                  const SizedBox(height: 12),
+                  SizedBox(
+                    height: 70,
                     child: ListView.builder(
                       scrollDirection: Axis.horizontal,
                       itemCount: _selectedUsers.length,
@@ -233,22 +333,33 @@ class _CreateGroupScreenState extends State<CreateGroupScreen> {
                             children: [
                               Stack(
                                 children: [
-                                  CircleAvatar(
-                                    radius: 24,
-                                    backgroundImage: user.photoURL != null
-                                        ? NetworkImage(user.photoURL!)
-                                        : null,
-                                    child: user.photoURL == null
-                                        ? Text(
-                                            user.displayName.isNotEmpty
-                                                ? user.displayName[0].toUpperCase()
-                                                : 'U',
-                                            style: const TextStyle(
-                                              fontSize: 16,
-                                              fontWeight: FontWeight.bold,
-                                            ),
-                                          )
-                                        : null,
+                                  Container(
+                                    decoration: BoxDecoration(
+                                      shape: BoxShape.circle,
+                                      border: Border.all(
+                                        color: const Color(0xFF8B5CF6),
+                                        width: 2,
+                                      ),
+                                    ),
+                                    child: CircleAvatar(
+                                      radius: 22,
+                                      backgroundImage: user.photoURL != null && user.photoURL!.isNotEmpty
+                                          ? NetworkImage(user.photoURL!)
+                                          : null,
+                                      backgroundColor: const Color(0xFF8B5CF6),
+                                      child: user.photoURL == null || user.photoURL!.isEmpty
+                                          ? txt(
+                                              user.displayName.isNotEmpty
+                                                  ? user.displayName[0].toUpperCase()
+                                                  : 'U',
+                                              style: TxtStl.bodyText1(
+                                                color: Colors.white,
+                                                fontSize: 16,
+                                                fontWeight: FontWeight.bold,
+                                              ),
+                                            )
+                                          : null,
+                                    ),
                                   ),
                                   Positioned(
                                     top: -4,
@@ -258,12 +369,13 @@ class _CreateGroupScreenState extends State<CreateGroupScreen> {
                                       child: Container(
                                         padding: const EdgeInsets.all(2),
                                         decoration: BoxDecoration(
-                                          color: theme.colorScheme.error,
+                                          color: const Color(0xFFEF4444),
                                           shape: BoxShape.circle,
+                                          border: Border.all(color: Colors.white, width: 2),
                                         ),
                                         child: const Icon(
                                           Icons.close,
-                                          size: 16,
+                                          size: 14,
                                           color: Colors.white,
                                         ),
                                       ),
@@ -273,11 +385,13 @@ class _CreateGroupScreenState extends State<CreateGroupScreen> {
                               ),
                               const SizedBox(height: 4),
                               SizedBox(
-                                width: 60,
-                                child: Text(
+                                width: 50,
+                                child: txt(
                                   user.displayName,
+                                  style: TxtStl.labelText2(
+                                    color: const Color(0xFF1E293B),
+                                  ),
                                   textAlign: TextAlign.center,
-                                  style: theme.textTheme.bodySmall,
                                   maxLines: 1,
                                   overflow: TextOverflow.ellipsis,
                                 ),
@@ -294,34 +408,71 @@ class _CreateGroupScreenState extends State<CreateGroupScreen> {
 
           // Search Section
           Container(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            padding: const EdgeInsets.all(16),
+            margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
             decoration: BoxDecoration(
-              color: theme.colorScheme.surface,
-              border: Border(
-                bottom: BorderSide(
-                  color: theme.colorScheme.outline.withOpacity(0.2),
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(16),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.05),
+                  blurRadius: 10,
+                  offset: const Offset(0, 2),
                 ),
-              ),
+              ],
             ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
-                  'Add Members',
-                  style: theme.textTheme.titleSmall?.copyWith(
-                    fontWeight: FontWeight.bold,
-                  ),
+                Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(6),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF3B82F6),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: const Icon(
+                        Icons.person_add,
+                        color: Colors.white,
+                        size: 16,
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    txt(
+                      'Add Members',
+                      style: TxtStl.bodyText1(
+                        color: const Color(0xFF1E293B),
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ],
                 ),
-                const SizedBox(height: 8),
+                const SizedBox(height: 12),
                 TextField(
                   controller: _searchController,
                   decoration: InputDecoration(
                     hintText: 'Search users to add...',
-                    prefixIcon: const Icon(Icons.search),
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(25),
+                    hintStyle: TxtStl.bodyText3(color: const Color(0xFF94A3B8)),
+                    prefixIcon: const Icon(
+                      Icons.search,
+                      color: Color(0xFF64748B),
                     ),
-                    contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
+                    ),
+                    enabledBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: const BorderSide(color: Color(0xFF3B82F6), width: 2),
+                    ),
+                    filled: true,
+                    fillColor: const Color(0xFFF8FAFC),
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                   ),
                   onChanged: _filterUsers,
                 ),
@@ -330,126 +481,221 @@ class _CreateGroupScreenState extends State<CreateGroupScreen> {
           ),
 
           // Users List
-          Expanded(
-            child: _isLoading
-                ? const Center(child: CircularProgressIndicator())
-                : Column(
-                    children: [
-                      // Users count header
-                      if (_filteredUsers.isNotEmpty)
-                        Container(
-                          width: double.infinity,
-                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                          color: theme.colorScheme.surfaceContainerHighest.withOpacity(0.3),
-                          child: Text(
-                            '${_filteredUsers.where((user) => user.id != FirebaseAuth.instance.currentUser?.uid).length} users available',
-                            style: theme.textTheme.bodySmall?.copyWith(
-                              color: theme.colorScheme.onSurfaceVariant,
+          Container(
+            height: 400, // Fixed height for the users list
+            margin: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(16),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.05),
+                    blurRadius: 10,
+                    offset: const Offset(0, 2),
+                  ),
+                ],
+              ),
+              child: _isLoading
+                  ? const Center(
+                      child: CircularProgressIndicator(
+                        valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF8B5CF6)),
+                      ),
+                    )
+                  : Column(
+                      children: [
+                        // Users count header
+                        if (_filteredUsers.isNotEmpty)
+                          Container(
+                            width: double.infinity,
+                            padding: const EdgeInsets.all(16),
+                            decoration: const BoxDecoration(
+                              color: Color(0xFFF1F5F9),
+                              borderRadius: BorderRadius.only(
+                                topLeft: Radius.circular(16),
+                                topRight: Radius.circular(16),
+                              ),
+                            ),
+                            child: Row(
+                              children: [
+                                Container(
+                                  padding: const EdgeInsets.all(4),
+                                  decoration: BoxDecoration(
+                                    color: const Color(0xFF10B981),
+                                    borderRadius: BorderRadius.circular(6),
+                                  ),
+                                  child: const Icon(
+                                    Icons.people,
+                                    color: Colors.white,
+                                    size: 14,
+                                  ),
+                                ),
+                                const SizedBox(width: 8),
+                                txt(
+                                  '${_filteredUsers.where((user) => user.id != FirebaseAuth.instance.currentUser?.uid).length} users available',
+                                  style: TxtStl.bodyText3(
+                                    color: const Color(0xFF64748B),
+                                    fontWeight: FontWeight.w500,
+                                  ),
+                                ),
+                              ],
                             ),
                           ),
-                        ),
-                      
-                      Expanded(
-                        child: _filteredUsers.isEmpty
-                            ? Center(
-                                child: Column(
-                                  mainAxisAlignment: MainAxisAlignment.center,
-                                  children: [
-                                    Icon(
-                                      Icons.people_outline,
-                                      size: 64,
-                                      color: theme.colorScheme.onSurface.withOpacity(0.3),
-                                    ),
-                                    const SizedBox(height: 16),
-                                    Text(
-                                      _searchQuery.isEmpty 
-                                          ? 'No users found' 
-                                          : 'No users match your search',
-                                      style: theme.textTheme.bodyLarge?.copyWith(
-                                        color: theme.colorScheme.onSurface.withOpacity(0.6),
+                        
+                        Expanded(
+                          child: _filteredUsers.isEmpty
+                              ? Center(
+                                  child: Column(
+                                    mainAxisAlignment: MainAxisAlignment.center,
+                                    children: [
+                                      Container(
+                                        padding: const EdgeInsets.all(20),
+                                        decoration: BoxDecoration(
+                                          color: const Color(0xFF8B5CF6).withOpacity(0.1),
+                                          shape: BoxShape.circle,
+                                        ),
+                                        child: const Icon(
+                                          Icons.people_outline,
+                                          size: 48,
+                                          color: Color(0xFF8B5CF6),
+                                        ),
                                       ),
-                                    ),
-                                  ],
-                                ),
-                              )
-                            : ListView.builder(
-                                itemCount: _filteredUsers.length,
-                                itemBuilder: (context, index) {
-                                  final user = _filteredUsers[index];
-                                  final isSelected = _selectedUsers.any((u) => u.id == user.id);
-                                  final currentUser = FirebaseAuth.instance.currentUser;
-                                  final isCurrentUser = user.id == currentUser?.uid;
+                                      const SizedBox(height: 16),
+                                      txt(
+                                        _searchQuery.isEmpty 
+                                            ? 'No users found' 
+                                            : 'No users match your search',
+                                        style: TxtStl.bodyText1(
+                                          color: const Color(0xFF64748B),
+                                          fontWeight: FontWeight.w500,
+                                        ),
+                                      ),
+                                      const SizedBox(height: 8),
+                                      txt(
+                                        _searchQuery.isEmpty 
+                                            ? 'Try refreshing or check your connection'
+                                            : 'Try a different search term',
+                                        style: TxtStl.bodyText3(
+                                          color: const Color(0xFF94A3B8),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                )
+                              : ListView.builder(
+                                  padding: const EdgeInsets.all(8),
+                                  itemCount: _filteredUsers.length,
+                                  itemBuilder: (context, index) {
+                                    final user = _filteredUsers[index];
+                                    final isSelected = _selectedUsers.any((u) => u.id == user.id);
+                                    final currentUser = FirebaseAuth.instance.currentUser;
+                                    final isCurrentUser = user.id == currentUser?.uid;
 
-                                  if (isCurrentUser) {
-                                    return const SizedBox.shrink();
-                                  }
+                                    if (isCurrentUser) {
+                                      return const SizedBox.shrink();
+                                    }
 
-                                  return Card(
-                                    margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-                                    elevation: isSelected ? 2 : 0,
-                                    color: isSelected 
-                                        ? theme.colorScheme.primaryContainer.withOpacity(0.3)
-                                        : null,
-                                    child: ListTile(
-                                      leading: Stack(
-                                        children: [
-                                          CircleAvatar(
-                                            radius: 22,
-                                            backgroundImage: user.photoURL != null
-                                                ? NetworkImage(user.photoURL!)
-                                                : null,
-                                            child: user.photoURL == null
-                                                ? Text(
-                                                    user.displayName.isNotEmpty
-                                                        ? user.displayName[0].toUpperCase()
-                                                        : 'U',
-                                                    style: const TextStyle(fontWeight: FontWeight.bold),
-                                                  )
-                                                : null,
-                                          ),
-                                          if (user.isOnline)
-                                            Positioned(
-                                              bottom: 0,
-                                              right: 0,
-                                              child: Container(
-                                                width: 12,
-                                                height: 12,
-                                                decoration: BoxDecoration(
-                                                  color: Colors.green,
-                                                  shape: BoxShape.circle,
-                                                  border: Border.all(color: Colors.white, width: 2),
+                                    return Container(
+                                      margin: const EdgeInsets.symmetric(vertical: 4),
+                                      decoration: BoxDecoration(
+                                        color: isSelected 
+                                            ? const Color(0xFF8B5CF6).withOpacity(0.08)
+                                            : Colors.transparent,
+                                        borderRadius: BorderRadius.circular(12),
+                                        border: Border.all(
+                                          color: isSelected 
+                                              ? const Color(0xFF8B5CF6).withOpacity(0.3)
+                                              : const Color(0xFFE2E8F0),
+                                          width: 1,
+                                        ),
+                                      ),
+                                      child: ListTile(
+                                        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+                                        leading: Stack(
+                                          children: [
+                                            Container(
+                                              decoration: BoxDecoration(
+                                                shape: BoxShape.circle,
+                                                border: Border.all(
+                                                  color: isSelected 
+                                                      ? const Color(0xFF8B5CF6)
+                                                      : Colors.transparent,
+                                                  width: 2,
                                                 ),
                                               ),
+                                              child: CircleAvatar(
+                                                radius: 20,
+                                                backgroundImage: user.photoURL != null && user.photoURL!.isNotEmpty
+                                                    ? NetworkImage(user.photoURL!)
+                                                    : null,
+                                                backgroundColor: const Color(0xFF8B5CF6),
+                                                child: user.photoURL == null || user.photoURL!.isEmpty
+                                                    ? txt(
+                                                        user.displayName.isNotEmpty
+                                                            ? user.displayName[0].toUpperCase()
+                                                            : 'U',
+                                                        style: TxtStl.bodyText1(
+                                                          color: Colors.white,
+                                                          fontWeight: FontWeight.bold,
+                                                        ),
+                                                      )
+                                                    : null,
+                                              ),
                                             ),
-                                        ],
-                                      ),
-                                      title: Text(
-                                        user.displayName,
-                                        style: TextStyle(
-                                          fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                                            if (user.isOnline)
+                                              Positioned(
+                                                bottom: 0,
+                                                right: 0,
+                                                child: Container(
+                                                  width: 12,
+                                                  height: 12,
+                                                  decoration: BoxDecoration(
+                                                    color: const Color(0xFF10B981),
+                                                    shape: BoxShape.circle,
+                                                    border: Border.all(color: Colors.white, width: 2),
+                                                  ),
+                                                ),
+                                              ),
+                                          ],
                                         ),
-                                      ),
-                                      subtitle: Text(
-                                        user.email ?? 'No email',
-                                        style: TextStyle(
-                                          color: theme.colorScheme.onSurface.withOpacity(0.6),
+                                        title: txt(
+                                          user.displayName,
+                                          style: TxtStl.bodyText1(
+                                            color: const Color(0xFF1E293B),
+                                            fontWeight: isSelected ? FontWeight.w600 : FontWeight.w500,
+                                          ),
                                         ),
+                                        subtitle: txt(
+                                          user.email ?? 'No email',
+                                          style: TxtStl.bodyText3(
+                                            color: const Color(0xFF64748B),
+                                          ),
+                                        ),
+                                        trailing: Container(
+                                          decoration: BoxDecoration(
+                                            color: isSelected ? const Color(0xFF8B5CF6) : Colors.transparent,
+                                            border: Border.all(
+                                              color: isSelected ? const Color(0xFF8B5CF6) : const Color(0xFFD1D5DB),
+                                              width: 2,
+                                            ),
+                                            borderRadius: BorderRadius.circular(4),
+                                          ),
+                                          child: Icon(
+                                            Icons.check,
+                                            size: 16,
+                                            color: isSelected ? Colors.white : Colors.transparent,
+                                          ),
+                                        ),
+                                        onTap: () => _toggleUserSelection(user),
                                       ),
-                                      trailing: Checkbox(
-                                        value: isSelected,
-                                        onChanged: (_) => _toggleUserSelection(user),
-                                        activeColor: theme.colorScheme.primary,
-                                      ),
-                                      onTap: () => _toggleUserSelection(user),
-                                    ),
-                                  );
-                                },
-                              ),
-                      ),
-                    ],
-                  ),
-          ),
+                                    );
+                                  },
+                                ),
+                        ),
+                      ],
+                    ),
+            ),
         ],
+        ),
       ),
     );
   }

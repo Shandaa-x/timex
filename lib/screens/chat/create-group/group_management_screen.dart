@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:timex/screens/chat/add-member/add_members_screen.dart';
+import '../../../widgets/text/text.dart';
 import '../model/chat_models.dart';
 import '../services/chat_service.dart';
 
@@ -42,7 +43,13 @@ class _GroupManagementScreenState extends State<GroupManagementScreen> {
   Future<void> _updateGroupInfo() async {
     if (_groupNameController.text.trim().isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Group name cannot be empty')),
+        SnackBar(
+          content: txt(
+            'Group name cannot be empty',
+            style: TxtStl.bodyText2(color: Colors.white),
+          ),
+          backgroundColor: const Color(0xFFEF4444),
+        ),
       );
       return;
     }
@@ -57,7 +64,13 @@ class _GroupManagementScreenState extends State<GroupManagementScreen> {
       
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Group info updated successfully')),
+          SnackBar(
+            content: txt(
+              'Group info updated successfully',
+              style: TxtStl.bodyText2(color: Colors.white),
+            ),
+            backgroundColor: const Color(0xFF10B981),
+          ),
         );
       }
     } catch (e) {
@@ -83,17 +96,41 @@ class _GroupManagementScreenState extends State<GroupManagementScreen> {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Remove Member'),
-        content: const Text('Are you sure you want to remove this member from the group?'),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: txt(
+          'Remove Member',
+          style: TxtStl.titleText2(
+            color: const Color(0xFF1E293B),
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+        content: txt(
+          'Are you sure you want to remove this member from the group?',
+          style: TxtStl.bodyText2(
+            color: const Color(0xFF64748B),
+          ),
+        ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
-            child: const Text('Cancel'),
+            child: txt(
+              'Cancel',
+              style: TxtStl.bodyText1(
+                color: const Color(0xFF64748B),
+                fontWeight: FontWeight.w500,
+              ),
+            ),
           ),
           TextButton(
             onPressed: () => Navigator.pop(context, true),
-            style: TextButton.styleFrom(foregroundColor: Colors.red),
-            child: const Text('Remove'),
+            style: TextButton.styleFrom(foregroundColor: const Color(0xFFEF4444)),
+            child: txt(
+              'Remove',
+              style: TxtStl.bodyText1(
+                color: const Color(0xFFEF4444),
+                fontWeight: FontWeight.w600,
+              ),
+            ),
           ),
         ],
       ),
@@ -176,17 +213,41 @@ class _GroupManagementScreenState extends State<GroupManagementScreen> {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Leave Group'),
-        content: const Text('Are you sure you want to leave this group?'),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: txt(
+          'Leave Group',
+          style: TxtStl.titleText2(
+            color: const Color(0xFF1E293B),
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+        content: txt(
+          'Are you sure you want to leave this group?',
+          style: TxtStl.bodyText2(
+            color: const Color(0xFF64748B),
+          ),
+        ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
-            child: const Text('Cancel'),
+            child: txt(
+              'Cancel',
+              style: TxtStl.bodyText1(
+                color: const Color(0xFF64748B),
+                fontWeight: FontWeight.w500,
+              ),
+            ),
           ),
           TextButton(
             onPressed: () => Navigator.pop(context, true),
-            style: TextButton.styleFrom(foregroundColor: Colors.red),
-            child: const Text('Leave'),
+            style: TextButton.styleFrom(foregroundColor: const Color(0xFFEF4444)),
+            child: txt(
+              'Leave',
+              style: TxtStl.bodyText1(
+                color: const Color(0xFFEF4444),
+                fontWeight: FontWeight.w600,
+              ),
+            ),
           ),
         ],
       ),
@@ -220,58 +281,182 @@ class _GroupManagementScreenState extends State<GroupManagementScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-
     return Scaffold(
+      backgroundColor: const Color(0xFFF8FAFC),
       appBar: AppBar(
-        title: const Text('Group Info'),
+        backgroundColor: Colors.white,
+        elevation: 0,
+        iconTheme: const IconThemeData(color: Color(0xFF1E293B)),
+        title: txt(
+          'Group Info',
+          style: TxtStl.titleText2(
+            color: const Color(0xFF1E293B),
+            fontWeight: FontWeight.w600,
+          ),
+        ),
         actions: [
           if (_isAdmin)
-            TextButton(
-              onPressed: _isLoading ? null : _updateGroupInfo,
-              child: const Text('Save'),
+            Container(
+              margin: const EdgeInsets.only(right: 8),
+              child: TextButton(
+                onPressed: _isLoading ? null : _updateGroupInfo,
+                style: TextButton.styleFrom(
+                  backgroundColor: const Color(0xFF10B981),
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                ),
+                child: txt(
+                  'Save',
+                  style: TxtStl.bodyText1(
+                    color: Colors.white,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
             ),
         ],
       ),
       body: _isLoading
-          ? const Center(child: CircularProgressIndicator())
+          ? Center(
+              child: CircularProgressIndicator(
+                valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF8B5CF6)),
+              ),
+            )
           : SingleChildScrollView(
               padding: const EdgeInsets.all(16),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   // Group Info Section
-                  Card(
-                    child: Padding(
-                      padding: const EdgeInsets.all(16),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            'Group Information',
-                            style: theme.textTheme.titleLarge,
-                          ),
-                          const SizedBox(height: 16),
-                          TextField(
-                            controller: _groupNameController,
-                            decoration: const InputDecoration(
-                              labelText: 'Group Name',
-                              border: OutlineInputBorder(),
+                  Container(
+                    padding: const EdgeInsets.all(20),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(16),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withOpacity(0.05),
+                          blurRadius: 10,
+                          offset: const Offset(0, 2),
+                        ),
+                      ],
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.all(6),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFF3B82F6),
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              child: const Icon(
+                                Icons.info_outline,
+                                color: Colors.white,
+                                size: 16,
+                              ),
                             ),
-                            enabled: _isAdmin,
-                          ),
-                          const SizedBox(height: 16),
-                          TextField(
-                            controller: _groupDescriptionController,
-                            decoration: const InputDecoration(
-                              labelText: 'Description',
-                              border: OutlineInputBorder(),
+                            const SizedBox(width: 12),
+                            txt(
+                              'Group Information',
+                              style: TxtStl.titleText2(
+                                color: const Color(0xFF1E293B),
+                                fontWeight: FontWeight.w600,
+                              ),
                             ),
-                            maxLines: 3,
-                            enabled: _isAdmin,
+                          ],
+                        ),
+                        const SizedBox(height: 20),
+                        TextField(
+                          controller: _groupNameController,
+                          decoration: InputDecoration(
+                            labelText: 'Group Name',
+                            labelStyle: TxtStl.bodyText2(color: const Color(0xFF64748B)),
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(12),
+                              borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
+                            ),
+                            enabledBorder: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(12),
+                              borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
+                            ),
+                            focusedBorder: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(12),
+                              borderSide: const BorderSide(color: Color(0xFF3B82F6), width: 2),
+                            ),
+                            disabledBorder: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(12),
+                              borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
+                            ),
+                            filled: true,
+                            fillColor: _isAdmin ? const Color(0xFFF8FAFC) : const Color(0xFFF1F5F9),
+                          ),
+                          enabled: _isAdmin,
+                        ),
+                        const SizedBox(height: 16),
+                        TextField(
+                          controller: _groupDescriptionController,
+                          decoration: InputDecoration(
+                            labelText: 'Description',
+                            labelStyle: TxtStl.bodyText2(color: const Color(0xFF64748B)),
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(12),
+                              borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
+                            ),
+                            enabledBorder: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(12),
+                              borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
+                            ),
+                            focusedBorder: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(12),
+                              borderSide: const BorderSide(color: Color(0xFF3B82F6), width: 2),
+                            ),
+                            disabledBorder: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(12),
+                              borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
+                            ),
+                            filled: true,
+                            fillColor: _isAdmin ? const Color(0xFFF8FAFC) : const Color(0xFFF1F5F9),
+                          ),
+                          maxLines: 3,
+                          enabled: _isAdmin,
+                        ),
+                        if (!_isAdmin) ...[
+                          const SizedBox(height: 12),
+                          Container(
+                            padding: const EdgeInsets.all(12),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFFEF3C7),
+                              borderRadius: BorderRadius.circular(8),
+                              border: Border.all(color: const Color(0xFFF59E0B).withOpacity(0.3)),
+                            ),
+                            child: Row(
+                              children: [
+                                const Icon(
+                                  Icons.info,
+                                  color: Color(0xFFD97706),
+                                  size: 16,
+                                ),
+                                const SizedBox(width: 8),
+                                Expanded(
+                                  child: txt(
+                                    'Only group admins can edit group information',
+                                    style: TxtStl.bodyText3(
+                                      color: const Color(0xFFD97706),
+                                      fontWeight: FontWeight.w500,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
                           ),
                         ],
-                      ),
+                      ],
                     ),
                   ),
 
@@ -287,107 +472,239 @@ class _GroupManagementScreenState extends State<GroupManagementScreen> {
                         stream: ChatService.getParticipantProfilesStream(currentChatRoom.participants),
                         builder: (context, participantsSnapshot) {
                           if (participantsSnapshot.connectionState == ConnectionState.waiting) {
-                            return const Card(
-                              child: Padding(
-                                padding: EdgeInsets.all(16),
-                                child: Center(child: CircularProgressIndicator()),
+                            return Container(
+                              padding: const EdgeInsets.all(20),
+                              decoration: BoxDecoration(
+                                color: Colors.white,
+                                borderRadius: BorderRadius.circular(16),
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: Colors.black.withOpacity(0.05),
+                                    blurRadius: 10,
+                                    offset: const Offset(0, 2),
+                                  ),
+                                ],
+                              ),
+                              child: const Center(
+                                child: CircularProgressIndicator(
+                                  valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF8B5CF6)),
+                                ),
                               ),
                             );
                           }
                           
                           final participants = participantsSnapshot.data ?? [];
                           
-                          return Card(
-                            child: Padding(
-                              padding: const EdgeInsets.all(16),
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Row(
-                                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                    children: [
-                                      Text(
-                                        'Members (${participants.length})',
-                                        style: theme.textTheme.titleLarge,
-                                      ),
-                                      if (_isAdmin)
-                                        TextButton.icon(
-                                          onPressed: _addMembers,
-                                          icon: const Icon(Icons.person_add),
-                                          label: const Text('Add'),
+                          return Container(
+                            padding: const EdgeInsets.all(20),
+                            decoration: BoxDecoration(
+                              color: Colors.white,
+                              borderRadius: BorderRadius.circular(16),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: Colors.black.withOpacity(0.05),
+                                  blurRadius: 10,
+                                  offset: const Offset(0, 2),
+                                ),
+                              ],
+                            ),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Row(
+                                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                  children: [
+                                    Row(
+                                      children: [
+                                        Container(
+                                          padding: const EdgeInsets.all(6),
+                                          decoration: BoxDecoration(
+                                            color: const Color(0xFF8B5CF6),
+                                            borderRadius: BorderRadius.circular(8),
+                                          ),
+                                          child: const Icon(
+                                            Icons.group,
+                                            color: Colors.white,
+                                            size: 16,
+                                          ),
                                         ),
-                                    ],
-                                  ),
-                                  const SizedBox(height: 16),
-                                  ListView.builder(
-                                    shrinkWrap: true,
-                                    physics: const NeverScrollableScrollPhysics(),
-                                    itemCount: participants.length,
-                                    itemBuilder: (context, index) {
-                                      final participant = participants[index];
-                                      final isCurrentUser = participant.id == FirebaseAuth.instance.currentUser?.uid;
-                                      final isCreator = participant.id == currentChatRoom.createdBy;
+                                        const SizedBox(width: 12),
+                                        txt(
+                                          'Members (${participants.length})',
+                                          style: TxtStl.titleText2(
+                                            color: const Color(0xFF1E293B),
+                                            fontWeight: FontWeight.w600,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                    if (_isAdmin)
+                                      TextButton.icon(
+                                        onPressed: _addMembers,
+                                        style: TextButton.styleFrom(
+                                          backgroundColor: const Color(0xFF10B981).withOpacity(0.1),
+                                          foregroundColor: const Color(0xFF10B981),
+                                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                                          shape: RoundedRectangleBorder(
+                                            borderRadius: BorderRadius.circular(8),
+                                          ),
+                                        ),
+                                        icon: const Icon(Icons.person_add, size: 16),
+                                        label: txt(
+                                          'Add',
+                                          style: TxtStl.bodyText3(
+                                            color: const Color(0xFF10B981),
+                                            fontWeight: FontWeight.w600,
+                                          ),
+                                        ),
+                                      ),
+                                  ],
+                                ),
+                                const SizedBox(height: 16),
+                                ListView.builder(
+                                  shrinkWrap: true,
+                                  physics: const NeverScrollableScrollPhysics(),
+                                  itemCount: participants.length,
+                                  itemBuilder: (context, index) {
+                                    final participant = participants[index];
+                                    final isCurrentUser = participant.id == FirebaseAuth.instance.currentUser?.uid;
+                                    final isCreator = participant.id == currentChatRoom.createdBy;
 
-                                      return ListTile(
-                                        contentPadding: EdgeInsets.zero,
-                                        leading: Stack(
-                                          children: [
-                                            CircleAvatar(
-                                              backgroundImage: participant.photoURL != null
-                                                  ? NetworkImage(participant.photoURL!)
-                                                  : null,
-                                              child: participant.photoURL == null
-                                                  ? Text(
-                                                      participant.displayName.isNotEmpty
-                                                          ? participant.displayName[0].toUpperCase()
-                                                          : 'U',
-                                                      style: const TextStyle(fontWeight: FontWeight.bold),
-                                                    )
-                                                  : null,
-                                            ),
-                                            if (participant.isOnline)
-                                              Positioned(
-                                                bottom: 0,
-                                                right: 0,
-                                                child: Container(
-                                                  width: 12,
-                                                  height: 12,
-                                                  decoration: BoxDecoration(
-                                                    color: Colors.green,
-                                                    shape: BoxShape.circle,
-                                                    border: Border.all(color: Colors.white, width: 2),
+                                    return Container(
+                                      margin: const EdgeInsets.only(bottom: 8),
+                                      padding: const EdgeInsets.all(12),
+                                      decoration: BoxDecoration(
+                                        color: isCurrentUser 
+                                            ? const Color(0xFF8B5CF6).withOpacity(0.08)
+                                            : const Color(0xFFF8FAFC),
+                                        borderRadius: BorderRadius.circular(12),
+                                        border: Border.all(
+                                          color: isCurrentUser 
+                                              ? const Color(0xFF8B5CF6).withOpacity(0.2)
+                                              : const Color(0xFFE2E8F0),
+                                        ),
+                                      ),
+                                      child: Row(
+                                        children: [
+                                          Stack(
+                                            children: [
+                                              Container(
+                                                decoration: BoxDecoration(
+                                                  shape: BoxShape.circle,
+                                                  border: Border.all(
+                                                    color: isCreator 
+                                                        ? const Color(0xFFF59E0B)
+                                                        : isCurrentUser 
+                                                            ? const Color(0xFF8B5CF6)
+                                                            : Colors.transparent,
+                                                    width: 2,
                                                   ),
                                                 ),
-                                              ),
-                                          ],
-                                        ),
-                                        title: Text(participant.displayName),
-                                        subtitle: Column(
-                                          crossAxisAlignment: CrossAxisAlignment.start,
-                                          children: [
-                                            Text('${participant.email ?? 'No email'}'),
-                                            if (isCreator)
-                                              Text(
-                                                'Group Admin',
-                                                style: TextStyle(
-                                                  color: theme.colorScheme.primary,
-                                                  fontWeight: FontWeight.w500,
+                                                child: CircleAvatar(
+                                                  radius: 20,
+                                                  backgroundImage: participant.photoURL != null && participant.photoURL!.isNotEmpty
+                                                      ? NetworkImage(participant.photoURL!)
+                                                      : null,
+                                                  backgroundColor: const Color(0xFF8B5CF6),
+                                                  child: participant.photoURL == null || participant.photoURL!.isEmpty
+                                                      ? txt(
+                                                          participant.displayName.isNotEmpty
+                                                              ? participant.displayName[0].toUpperCase()
+                                                              : 'U',
+                                                          style: TxtStl.bodyText1(
+                                                            color: Colors.white,
+                                                            fontWeight: FontWeight.bold,
+                                                          ),
+                                                        )
+                                                      : null,
                                                 ),
                                               ),
-                                          ],
-                                        ),
-                                        trailing: _isAdmin && !isCurrentUser && !isCreator
-                                            ? IconButton(
+                                              if (participant.isOnline)
+                                                Positioned(
+                                                  bottom: 0,
+                                                  right: 0,
+                                                  child: Container(
+                                                    width: 12,
+                                                    height: 12,
+                                                    decoration: BoxDecoration(
+                                                      color: const Color(0xFF10B981),
+                                                      shape: BoxShape.circle,
+                                                      border: Border.all(color: Colors.white, width: 2),
+                                                    ),
+                                                  ),
+                                                ),
+                                            ],
+                                          ),
+                                          const SizedBox(width: 12),
+                                          Expanded(
+                                            child: Column(
+                                              crossAxisAlignment: CrossAxisAlignment.start,
+                                              children: [
+                                                Row(
+                                                  children: [
+                                                    Expanded(
+                                                      child: txt(
+                                                        isCurrentUser 
+                                                            ? '${participant.displayName} (You)'
+                                                            : participant.displayName,
+                                                        style: TxtStl.bodyText1(
+                                                          color: const Color(0xFF1E293B),
+                                                          fontWeight: FontWeight.w600,
+                                                        ),
+                                                      ),
+                                                    ),
+                                                    if (isCreator)
+                                                      Container(
+                                                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                                                        decoration: BoxDecoration(
+                                                          color: const Color(0xFFF59E0B),
+                                                          borderRadius: BorderRadius.circular(12),
+                                                        ),
+                                                        child: txt(
+                                                          'Admin',
+                                                          style: TxtStl.labelText1(
+                                                            color: Colors.white,
+                                                            fontSize: 10,
+                                                            fontWeight: FontWeight.w600,
+                                                          ),
+                                                        ),
+                                                      ),
+                                                  ],
+                                                ),
+                                                const SizedBox(height: 2),
+                                                txt(
+                                                  participant.email ?? 'No email',
+                                                  style: TxtStl.bodyText3(
+                                                    color: const Color(0xFF64748B),
+                                                  ),
+                                                ),
+                                              ],
+                                            ),
+                                          ),
+                                          if (_isAdmin && !isCurrentUser && !isCreator)
+                                            Container(
+                                              margin: const EdgeInsets.only(left: 8),
+                                              decoration: BoxDecoration(
+                                                color: const Color(0xFFEF4444).withOpacity(0.1),
+                                                borderRadius: BorderRadius.circular(8),
+                                              ),
+                                              child: IconButton(
                                                 onPressed: () => _removeMember(participant.id),
-                                                icon: const Icon(Icons.remove_circle_outline),
-                                                color: Colors.red,
-                                              )
-                                            : null,
-                                      );
-                                    },
-                                  ),
-                                ],
-                              ),
+                                                icon: const Icon(
+                                                  Icons.remove_circle_outline,
+                                                  color: Color(0xFFEF4444),
+                                                  size: 18,
+                                                ),
+                                                padding: const EdgeInsets.all(8),
+                                                constraints: const BoxConstraints(),
+                                              ),
+                                            ),
+                                        ],
+                                      ),
+                                    );
+                                  },
+                                ),
+                              ],
                             ),
                           );
                         },
@@ -398,36 +715,106 @@ class _GroupManagementScreenState extends State<GroupManagementScreen> {
                   const SizedBox(height: 24),
 
                   // Danger Zone
-                  Card(
-                    color: Colors.red.shade50,
-                    child: Padding(
-                      padding: const EdgeInsets.all(16),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            'Danger Zone',
-                            style: theme.textTheme.titleLarge?.copyWith(
-                              color: Colors.red,
-                            ),
-                          ),
-                          const SizedBox(height: 16),
-                          SizedBox(
-                            width: double.infinity,
-                            child: OutlinedButton.icon(
-                              onPressed: _leaveGroup,
-                              icon: const Icon(Icons.exit_to_app, color: Colors.red),
-                              label: const Text(
-                                'Leave Group',
-                                style: TextStyle(color: Colors.red),
-                              ),
-                              style: OutlinedButton.styleFrom(
-                                side: const BorderSide(color: Colors.red),
-                              ),
-                            ),
-                          ),
-                        ],
+                  Container(
+                    padding: const EdgeInsets.all(20),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFFEF2F2),
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(
+                        color: const Color(0xFFEF4444).withOpacity(0.2),
+                        width: 1,
                       ),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withOpacity(0.05),
+                          blurRadius: 10,
+                          offset: const Offset(0, 2),
+                        ),
+                      ],
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.all(6),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFFEF4444),
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              child: const Icon(
+                                Icons.warning_outlined,
+                                color: Colors.white,
+                                size: 16,
+                              ),
+                            ),
+                            const SizedBox(width: 12),
+                            txt(
+                              'Danger Zone',
+                              style: TxtStl.titleText2(
+                                color: const Color(0xFFEF4444),
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 16),
+                        Container(
+                          width: double.infinity,
+                          child: OutlinedButton.icon(
+                            onPressed: _leaveGroup,
+                            style: OutlinedButton.styleFrom(
+                              foregroundColor: const Color(0xFFEF4444),
+                              side: const BorderSide(color: Color(0xFFEF4444), width: 1.5),
+                              backgroundColor: Colors.white,
+                              padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                            ),
+                            icon: const Icon(Icons.exit_to_app, size: 18),
+                            label: txt(
+                              'Leave Group',
+                              style: TxtStl.bodyText1(
+                                color: const Color(0xFFEF4444),
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+                        Container(
+                          padding: const EdgeInsets.all(12),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFFED7D7),
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: Row(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const Icon(
+                                Icons.info,
+                                color: Color(0xFFDC2626),
+                                size: 16,
+                              ),
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: txt(
+                                  'Once you leave this group, you will no longer receive messages and won\'t be able to rejoin unless added by an admin.',
+                                  style: TxtStl.bodyText3(
+                                    color: const Color(0xFFDC2626),
+                                    fontWeight: FontWeight.w500,
+                                  ),
+                                  maxLines: 3,
+                                  overflow: TextOverflow.visible,
+                                  softWrap: true,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
                     ),
                   ),
                 ],

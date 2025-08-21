@@ -9,6 +9,9 @@ class ChatService {
   
   static String get currentUserId => _auth.currentUser?.uid ?? '';
 
+  // Get current user email for additional filtering
+  static String get currentUserEmail => _auth.currentUser?.email ?? '';
+
   // Get current user profile
   static Future<UserProfile?> getCurrentUserProfile() async {
     if (currentUserId.isEmpty) return null;
@@ -22,6 +25,16 @@ class ChatService {
       print('Error getting current user profile: $e');
     }
     return null;
+  }
+
+  // Check if a user profile is the current user (multiple checks for safety)
+  static bool isCurrentUser(UserProfile user) {
+    final currentId = currentUserId;
+    final currentEmail = currentUserEmail;
+    
+    // Return true if user matches current user by ID or email
+    return (currentId.isNotEmpty && user.id == currentId) ||
+           (currentEmail.isNotEmpty && user.email == currentEmail);
   }
 
   // Search users for chat
@@ -100,47 +113,10 @@ class ChatService {
     }
   }
 
-  // Create or get direct chat room
+  // Create or get direct chat room (legacy method - now just calls the main method)
   static Future<String?> createDirectChatRoom(String otherUserId) async {
-    try {
-      final currentUser = await getCurrentUserProfile();
-      if (currentUser == null) return null;
-
-      // Check if chat room already exists
-      final existingRoom = await _firestore
-          .collection('chatRooms')
-          .where('type', isEqualTo: 'direct')
-          .where('participants', arrayContains: currentUserId)
-          .get();
-
-      for (var doc in existingRoom.docs) {
-        final participants = List<String>.from(doc.data()['participants']);
-        if (participants.contains(otherUserId) && participants.length == 2) {
-          return doc.id;
-        }
-      }
-
-      // Create new direct chat room
-      final otherUser = await _firestore.collection('users').doc(otherUserId).get();
-      if (!otherUser.exists) return null;
-
-      final otherUserData = UserProfile.fromMap(otherUser.data()!, otherUser.id);
-      
-      final chatRoom = ChatRoom(
-        id: '',
-        type: 'direct',
-        name: otherUserData.displayName,
-        participants: [currentUserId, otherUserId],
-        createdAt: DateTime.now(),
-        createdBy: currentUserId,
-      );
-
-      final docRef = await _firestore.collection('chatRooms').add(chatRoom.toMap());
-      return docRef.id;
-    } catch (e) {
-      print('Error creating direct chat room: $e');
-      return null;
-    }
+    final chatRoom = await getOrCreateDirectChat(otherUserId);
+    return chatRoom?.id;
   }
 
   // Create group chat room
@@ -173,20 +149,30 @@ class ChatService {
       final docRef = await _firestore.collection('chatRooms').add(chatRoom.toMap());
       final chatRoomId = docRef.id;
       
-      // Send system message for group creation
+      print('🏗️ Creating group: $name');
+      print('🏗️ Creator: ${currentUser.displayName} ($currentUserId)');
+      print('🏗️ Added members: $participantIds');
+      
+      // Send system message for group creation (only the creator sees this)
       await _sendSystemMessage(
         chatRoomId: chatRoomId,
         content: 'You created the group',
         targetUserId: currentUserId,
       );
       
-      // Send system messages to added members
+      // Send system messages to added members (each member sees their own message)
       for (String participantId in participantIds) {
-        await _sendSystemMessage(
-          chatRoomId: chatRoomId,
-          content: '${currentUser.displayName} added you to the group',
-          targetUserId: participantId,
-        );
+        // Only send "added you" message to participants who are NOT the creator
+        if (participantId != currentUserId) {
+          print('🏗️ Sending "added you" message to: $participantId');
+          await _sendSystemMessage(
+            chatRoomId: chatRoomId,
+            content: '${currentUser.displayName} added you to the group',
+            targetUserId: participantId,
+          );
+        } else {
+          print('🏗️ Skipping "added you" message for creator: $participantId');
+        }
       }
       
       return chatRoomId;
@@ -206,8 +192,15 @@ class ChatService {
         // Removed .orderBy('lastMessageTime', descending: true) temporarily to avoid index requirement
         .snapshots()
         .map((snapshot) {
+          final currentId = currentUserId; // Get current user ID once
           final chatRooms = snapshot.docs
               .map((doc) => ChatRoom.fromMap(doc.data(), doc.id))
+              .where((room) => 
+                (room.type == 'group') || // Include all group chats
+                (room.type == 'direct' && // For direct chats, ensure valid other participants
+                 room.participants.length >= 2 && 
+                 room.participants.any((id) => id != currentId))
+              )
               .toList();
           
           // Sort in memory instead of in query
@@ -249,9 +242,14 @@ class ChatService {
         .where('participants', arrayContains: currentUserId)
         .snapshots()
         .map((snapshot) {
+          final currentId = currentUserId; // Get current user ID once
           final directChatRooms = snapshot.docs
               .map((doc) => ChatRoom.fromMap(doc.data(), doc.id))
-              .where((room) => room.type == 'direct') // Filter for direct chats only
+              .where((room) => 
+                room.type == 'direct' && // Filter for direct chats only
+                room.participants.length >= 2 && // Must have at least 2 participants
+                room.participants.any((id) => id != currentId) // Must have at least one other participant
+              )
               .toList();
           
           // Sort by lastMessageTime in descending order (most recent first)
@@ -574,8 +572,17 @@ class ChatService {
       if (deleteCount > 0) {
         await batch.commit();
         print('✅ Successfully deleted $deleteCount notification documents for current user: $currentUserId');
+        
+        // IMPORTANT: Also clear the local notifications from the user's phone
+        await NotificationService.clearChatNotifications(chatRoomId);
+        print('✅ Local phone notifications also cleared for chat room: $chatRoomId');
       } else {
         print('ℹ️ No notification documents found to delete for current user: $currentUserId');
+        
+        // Even if no Firebase documents were found, still clear local notifications
+        // in case there were local notifications without corresponding Firebase docs
+        await NotificationService.clearChatNotifications(chatRoomId);
+        print('✅ Local phone notifications cleared as safety measure for chat room: $chatRoomId');
       }
       
     } catch (e) {
@@ -597,10 +604,18 @@ class ChatService {
         'participants': FieldValue.arrayRemove([currentUserId]),
       });
 
-      // Send system message
+      // Send system message to the person leaving (they see "You left the group")
       await _sendSystemMessage(
         chatRoomId: chatRoomId,
+        content: 'You left the group',
+        targetUserId: currentUserId,
+      );
+
+      // Send system message to remaining members (they see "[username] left the group")
+      await _sendSystemMessageExcludingUser(
+        chatRoomId: chatRoomId,
         content: '$userName left the group',
+        excludeUserId: currentUserId,
       );
     } catch (e) {
       print('Error leaving group: $e');
@@ -653,17 +668,18 @@ class ChatService {
       // Remove user from participants
       await removeFromGroup(chatRoomId, userId);
 
-      // Message for the removed user
+      // Message for the removed user (only they will see this)
       await _sendSystemMessage(
         chatRoomId: chatRoomId,
         content: '$currentUserName removed you from the group',
         targetUserId: userId,
       );
       
-      // General message for the group
-      await _sendSystemMessage(
+      // General message for the group (everyone EXCEPT the removed user will see this)
+      await _sendSystemMessageExcludingUser(
         chatRoomId: chatRoomId,
         content: '$currentUserName removed $removedUserName from the group',
+        excludeUserId: userId,
       );
     } catch (e) {
       print('Error removing member from group: $e');
@@ -686,6 +702,22 @@ class ChatService {
     return null;
   }
 
+  // Get user profile as a stream for real-time updates
+  static Stream<UserProfile?> getUserProfileStream(String userId) {
+    if (userId.isEmpty) return Stream.value(null);
+    
+    return _firestore
+        .collection('users')
+        .doc(userId)
+        .snapshots()
+        .map((doc) {
+      if (doc.exists) {
+        return UserProfile.fromMap(doc.data()!, doc.id);
+      }
+      return null;
+    });
+  }
+
   // Get all users from the users collection
   static Stream<List<UserProfile>> getAllUsers() {
     return _firestore
@@ -694,41 +726,114 @@ class ChatService {
         .map((snapshot) {
       return snapshot.docs
           .map((doc) => UserProfile.fromMap(doc.data(), doc.id))
-          .where((user) => user.id != currentUserId) // Exclude current user
+          .where((user) => !isCurrentUser(user)) // Use robust current user check
           .toList();
     });
   }
 
+  // Static cache to prevent duplicate creation attempts
+  static final Map<String, Future<ChatRoom?>> _pendingDirectChats = {};
+
   // Get or create direct chat with a user
   static Future<ChatRoom?> getOrCreateDirectChat(String otherUserId) async {
+    if (currentUserId.isEmpty || otherUserId.isEmpty || currentUserId == otherUserId) {
+      return null;
+    }
+
+    // Create a unique key for this conversation (order doesn't matter)
+    final participants = [currentUserId, otherUserId]..sort();
+    final conversationKey = participants.join('_');
+
+    // If there's already a pending request for this conversation, wait for it
+    if (_pendingDirectChats.containsKey(conversationKey)) {
+      print('📱 Waiting for existing chat creation: $conversationKey');
+      return await _pendingDirectChats[conversationKey];
+    }
+
+    // Create a new request and cache it
+    final chatFuture = _getOrCreateDirectChatInternal(otherUserId);
+    _pendingDirectChats[conversationKey] = chatFuture;
+
     try {
-      // Check if direct chat already exists
-      final existingChats = await _firestore
+      final result = await chatFuture;
+      return result;
+    } finally {
+      // Remove from cache when done (success or failure)
+      _pendingDirectChats.remove(conversationKey);
+    }
+  }
+
+  // Internal method that does the actual work
+  static Future<ChatRoom?> _getOrCreateDirectChatInternal(String otherUserId) async {
+    try {
+      print('📱 Searching for existing direct chat between $currentUserId and $otherUserId');
+
+      // First, try a more targeted query
+      final currentUserChats = await _firestore
           .collection('chatRooms')
           .where('type', isEqualTo: 'direct')
           .where('participants', arrayContains: currentUserId)
           .get();
 
-      // Find existing direct chat with the other user
-      for (var doc in existingChats.docs) {
+      // Check if any of these chats also contain the other user
+      for (var doc in currentUserChats.docs) {
         final participants = List<String>.from(doc.data()['participants'] ?? []);
-        if (participants.contains(otherUserId) && participants.length == 2) {
+        if (participants.length == 2 && participants.contains(otherUserId)) {
+          print('📱 Found existing direct chat: ${doc.id}');
           return ChatRoom.fromMap(doc.data(), doc.id);
         }
       }
 
-      // Create new direct chat if none exists
-      final chatRoomId = await createDirectChatRoom(otherUserId);
-      if (chatRoomId != null) {
-        final doc = await _firestore.collection('chatRooms').doc(chatRoomId).get();
-        if (doc.exists) {
-          return ChatRoom.fromMap(doc.data()!, doc.id);
+      print('📱 No existing chat found, creating new one...');
+
+      // Use Firestore transaction to ensure atomicity
+      return await _firestore.runTransaction<ChatRoom?>((transaction) async {
+        // Double-check within the transaction to prevent race conditions
+        final recentChats = await _firestore
+            .collection('chatRooms')
+            .where('type', isEqualTo: 'direct')
+            .where('participants', arrayContains: currentUserId)
+            .get();
+
+        // Check again if chat exists
+        for (var doc in recentChats.docs) {
+          final participants = List<String>.from(doc.data()['participants'] ?? []);
+          if (participants.length == 2 && participants.contains(otherUserId)) {
+            print('📱 Found existing chat during transaction: ${doc.id}');
+            return ChatRoom.fromMap(doc.data(), doc.id);
+          }
         }
-      }
+
+        // Verify other user exists
+        final otherUserDoc = await transaction.get(
+          _firestore.collection('users').doc(otherUserId)
+        );
+        if (!otherUserDoc.exists) {
+          print('❌ Other user does not exist: $otherUserId');
+          return null;
+        }
+
+        // Create new chat room within transaction
+        final chatRoomRef = _firestore.collection('chatRooms').doc();
+        final chatRoom = ChatRoom(
+          id: chatRoomRef.id,
+          type: 'direct',
+          name: 'Direct Chat',
+          participants: [currentUserId, otherUserId],
+          createdAt: DateTime.now(),
+          createdBy: currentUserId,
+        );
+
+        transaction.set(chatRoomRef, chatRoom.toMap());
+        print('📱 Created new direct chat in transaction: ${chatRoomRef.id}');
+        
+        return chatRoom;
+      });
+
     } catch (e) {
-      print('Error getting or creating direct chat: $e');
+      print('❌ Error getting or creating direct chat: $e');
+      return null;
     }
-    return null;
   }
 
   // Get direct chat stream for real-time updates
@@ -753,19 +858,25 @@ class ChatService {
   }
 
   // Find existing direct chat without creating one
+  // Find existing direct chat without creating one
   static Future<ChatRoom?> findExistingDirectChat(String otherUserId) async {
     try {
-      // Check if direct chat already exists
-      final existingChats = await _firestore
+      if (currentUserId.isEmpty || otherUserId.isEmpty || currentUserId == otherUserId) {
+        return null;
+      }
+
+      // Comprehensive search: find any direct chat room containing both users
+      final allDirectChats = await _firestore
           .collection('chatRooms')
           .where('type', isEqualTo: 'direct')
-          .where('participants', arrayContains: currentUserId)
           .get();
 
-      // Find existing direct chat with the other user
-      for (var doc in existingChats.docs) {
+      // Look for existing chat room with both participants
+      for (var doc in allDirectChats.docs) {
         final participants = List<String>.from(doc.data()['participants'] ?? []);
-        if (participants.contains(otherUserId) && participants.length == 2) {
+        if (participants.length == 2 && 
+            participants.contains(currentUserId) && 
+            participants.contains(otherUserId)) {
           return ChatRoom.fromMap(doc.data(), doc.id);
         }
       }
@@ -1254,5 +1365,193 @@ class ChatService {
       print('Error checking if user read up to message: $e');
       return false;
     }
+  }
+
+  // Utility method to clean up duplicate direct chat rooms
+  static Future<void> cleanupDuplicateDirectChats() async {
+    try {
+      print('🧹 Starting cleanup of duplicate direct chat rooms...');
+      
+      final allDirectChats = await _firestore
+          .collection('chatRooms')
+          .where('type', isEqualTo: 'direct')
+          .get();
+
+      print('📊 Total direct chat rooms found: ${allDirectChats.docs.length}');
+
+      // Group chat rooms by participant pairs
+      Map<String, List<QueryDocumentSnapshot>> participantGroups = {};
+      Map<String, int> userPairCounts = {};
+      
+      for (var doc in allDirectChats.docs) {
+        final participants = List<String>.from(doc.data()['participants'] ?? []);
+        if (participants.length == 2) {
+          // Create a consistent key for this participant pair
+          participants.sort();
+          final key = participants.join('_');
+          
+          if (participantGroups[key] == null) {
+            participantGroups[key] = [];
+            userPairCounts[key] = 0;
+          }
+          participantGroups[key]!.add(doc);
+          userPairCounts[key] = userPairCounts[key]! + 1;
+        }
+      }
+      
+      print('📊 Unique user pairs: ${participantGroups.length}');
+      
+      // Show duplicates
+      int totalDuplicates = 0;
+      for (var entry in userPairCounts.entries) {
+        if (entry.value > 1) {
+          print('🔍 User pair "${entry.key}" has ${entry.value} chat rooms (${entry.value - 1} duplicates)');
+          totalDuplicates += (entry.value - 1);
+        }
+      }
+      
+      print('📊 Total duplicates to be removed: $totalDuplicates');
+      
+      if (totalDuplicates == 0) {
+        print('✅ No duplicates found!');
+        return;
+      }
+      
+      // Delete duplicates, keeping only the oldest one
+      int deletedCount = 0;
+      final batch = _firestore.batch();
+      
+      for (var group in participantGroups.values) {
+        if (group.length > 1) {
+          // Sort by creation time to keep the oldest
+          group.sort((a, b) {
+            final aCreated = (a.data() as Map<String, dynamic>)['createdAt']?.toDate() ?? DateTime.now();
+            final bCreated = (b.data() as Map<String, dynamic>)['createdAt']?.toDate() ?? DateTime.now();
+            return aCreated.compareTo(bCreated);
+          });
+          
+          // Delete all except the first (oldest)
+          for (int i = 1; i < group.length; i++) {
+            print('🗑️ Marking duplicate chat room for deletion: ${group[i].id}');
+            batch.delete(group[i].reference);
+            deletedCount++;
+          }
+        }
+      }
+      
+      if (deletedCount > 0) {
+        print('🧹 Executing batch delete of $deletedCount chat rooms...');
+        await batch.commit();
+        print('✅ Cleanup complete. Successfully deleted $deletedCount duplicate chat rooms.');
+      } else {
+        print('ℹ️ No duplicates to delete.');
+      }
+      
+    } catch (e) {
+      print('❌ Error cleaning up duplicate chat rooms: $e');
+    }
+  }
+
+  // Method to analyze and report chat room statistics
+  static Future<void> analyzeChatRoomStatistics() async {
+    try {
+      print('📊 CHAT ROOM STATISTICS ANALYSIS');
+      print('═══════════════════════════════════');
+      
+      // Get all users
+      final allUsersSnapshot = await _firestore.collection('users').get();
+      final totalUsers = allUsersSnapshot.docs.length;
+      print('👥 Total users in system: $totalUsers');
+      
+      // Get all direct chats
+      final allDirectChats = await _firestore
+          .collection('chatRooms')
+          .where('type', isEqualTo: 'direct')
+          .get();
+      
+      print('💬 Total direct chat rooms: ${allDirectChats.docs.length}');
+      
+      // Calculate expected vs actual
+      final maxPossibleDirectChats = (totalUsers * (totalUsers - 1)) ~/ 2; // n(n-1)/2
+      print('� Maximum possible direct chats: $maxPossibleDirectChats');
+      
+      // Analyze by user pairs
+      Map<String, int> userPairCounts = {};
+      Map<String, List<String>> pairToIds = {};
+      
+      for (var doc in allDirectChats.docs) {
+        final participants = List<String>.from(doc.data()['participants'] ?? []);
+        if (participants.length == 2) {
+          participants.sort();
+          final key = participants.join('_');
+          
+          if (userPairCounts[key] == null) {
+            userPairCounts[key] = 0;
+            pairToIds[key] = [];
+          }
+          userPairCounts[key] = userPairCounts[key]! + 1;
+          pairToIds[key]!.add(doc.id);
+        }
+      }
+      
+      final uniquePairs = userPairCounts.length;
+      print('🔗 Unique user pairs with chats: $uniquePairs');
+      
+      // Find duplicates
+      final duplicatePairs = userPairCounts.entries.where((e) => e.value > 1).toList();
+      print('🚨 User pairs with duplicate chats: ${duplicatePairs.length}');
+      
+      if (duplicatePairs.isNotEmpty) {
+        print('🔍 DUPLICATE DETAILS:');
+        for (var pair in duplicatePairs) {
+          final ids = pairToIds[pair.key] ?? [];
+          print('   Pair "${pair.key}": ${pair.value} chats (IDs: ${ids.join(', ')})');
+        }
+        
+        final totalDuplicates = duplicatePairs.map((e) => e.value - 1).reduce((a, b) => a + b);
+        print('📊 Total duplicate chat rooms: $totalDuplicates');
+        print('📊 Expected after cleanup: ${allDirectChats.docs.length - totalDuplicates}');
+      } else {
+        print('✅ No duplicate chat rooms found!');
+      }
+      
+      // Current user specific analysis
+      final currentId = currentUserId;
+      if (currentId.isNotEmpty) {
+        print('═══════════════════════════════════');
+        print('👤 CURRENT USER ANALYSIS ($currentId)');
+        
+        final currentUserChats = allDirectChats.docs.where((doc) {
+          final participants = List<String>.from(doc.data()['participants'] ?? []);
+          return participants.contains(currentId);
+        }).toList();
+        
+        print('Current user direct chats: ${currentUserChats.length}');
+        print('Expected max for current user: ${totalUsers - 1}');
+        
+        if (currentUserChats.length > totalUsers - 1) {
+          print('ERROR: Current user has MORE chats than possible! This indicates duplicates.');
+        }
+      }
+      
+      print('═══════════════════════════════════');
+      
+    } catch (e) {
+      print('❌ Error analyzing chat room statistics: $e');
+    }
+  }
+
+  // Debug method to check current user filtering
+  static void debugCurrentUser() {
+    final currentId = currentUserId;
+    final currentEmail = currentUserEmail;
+    final currentUser = _auth.currentUser;
+    
+    print('🔍 DEBUG Current User Info:');
+    print('  - Current User ID: "$currentId"');
+    print('  - Current User Email: "$currentEmail"');
+    print('  - Auth User UID: "${currentUser?.uid ?? 'null'}"');
+    print('  - Auth User Email: "${currentUser?.email ?? 'null'}"');
+    print('  - Auth User Display Name: "${currentUser?.displayName ?? 'null'}"');
   }
 }
