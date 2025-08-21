@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
-import 'services/chat_models.dart';
-import '../../services/chat_service.dart';
+import 'model/chat_models.dart';
+import 'services/chat_service.dart';
 import 'services/notification_service.dart';
 import 'widgets/chat_room_tile.dart';
-import 'chat_room_screen.dart';
-import 'create_group_screen.dart';
+import 'chatroom/chat_room_screen.dart';
+import 'create-group/create_group_screen.dart';
 
 class ChatScreen extends StatefulWidget {
   const ChatScreen({Key? key}) : super(key: key);
@@ -192,22 +192,22 @@ class _ChatScreenState extends State<ChatScreen>
   }
 
   Widget _buildAllChatsList() {
-    return StreamBuilder<List<UserProfile>>(
-      stream: ChatService.getAllUsers(),
-      builder: (context, userSnapshot) {
-        return StreamBuilder<List<ChatRoom>>(
-          stream: ChatService.getUserChatRooms(),
-          builder: (context, chatSnapshot) {
-            if (userSnapshot.connectionState == ConnectionState.waiting ||
-                chatSnapshot.connectionState == ConnectionState.waiting) {
-              return const Center(
-                child: CircularProgressIndicator(
-                  valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF8B5CF6)),
-                ),
-              );
-            }
+    return StreamBuilder<List<ChatRoom>>(
+      stream: ChatService.getUserChatRooms(), // Get all chats (already sorted by lastMessageTime)
+      builder: (context, chatSnapshot) {
+        return StreamBuilder<List<UserProfile>>(
+          stream: ChatService.getAllUsers(),
+          builder: (context, userSnapshot) {
+            // if (chatSnapshot.connectionState == ConnectionState.waiting ||
+            //     userSnapshot.connectionState == ConnectionState.waiting) {
+            //   return const Center(
+            //     child: CircularProgressIndicator(
+            //       valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF8B5CF6)),
+            //     ),
+            //   );
+            // }
 
-            if (userSnapshot.hasError || chatSnapshot.hasError) {
+            if (chatSnapshot.hasError || userSnapshot.hasError) {
               return Center(
                 child: Column(
                   mainAxisAlignment: MainAxisAlignment.center,
@@ -231,17 +231,40 @@ class _ChatScreenState extends State<ChatScreen>
               );
             }
 
+            final List<ChatRoom> existingChatRooms = chatSnapshot.data ?? [];
             final List<UserProfile> allUsers = userSnapshot.data ?? [];
-            final List<ChatRoom> groupChats = (chatSnapshot.data ?? [])
-                .where((chat) => chat.type == 'group')
+
+            // Separate chat rooms into those with messages and those without
+            final chatRoomsWithMessages = existingChatRooms
+                .where((chat) => chat.lastMessage != null && chat.lastMessage!.isNotEmpty)
                 .toList();
+
+            final chatRoomsWithoutMessages = existingChatRooms
+                .where((chat) => chat.lastMessage == null || chat.lastMessage!.isEmpty)
+                .toList();
+
+            // Sort rooms without messages by creation time (or name if no creation time)
+            chatRoomsWithoutMessages.sort((a, b) {
+              return b.createdAt.compareTo(a.createdAt); // Most recent created first
+            });
 
             // Filter out current user
             final otherUsers = allUsers
                 .where((user) => user.id != ChatService.currentUserId)
                 .toList();
 
-            if (otherUsers.isEmpty && groupChats.isEmpty) {
+            // Get users who don't have existing chat rooms yet
+            final existingDirectChatUserIds = existingChatRooms
+                .where((chat) => chat.type == 'direct')
+                .expand((chat) => chat.participants)
+                .where((id) => id != ChatService.currentUserId)
+                .toSet();
+
+            final usersWithoutChats = otherUsers
+                .where((user) => !existingDirectChatUserIds.contains(user.id))
+                .toList();
+
+            if (chatRoomsWithMessages.isEmpty && chatRoomsWithoutMessages.isEmpty && usersWithoutChats.isEmpty) {
               return Center(
                 child: Column(
                   mainAxisAlignment: MainAxisAlignment.center,
@@ -265,18 +288,25 @@ class _ChatScreenState extends State<ChatScreen>
               );
             }
 
+            // Combine all items in order: chats with messages -> chats without messages -> users without chats
+            final totalItems = chatRoomsWithMessages.length + chatRoomsWithoutMessages.length + usersWithoutChats.length;
+
             return ListView.builder(
               padding: const EdgeInsets.symmetric(vertical: 8),
-              itemCount: otherUsers.length + groupChats.length,
+              itemCount: totalItems,
               itemBuilder: (context, index) {
-                if (index < otherUsers.length) {
-                  // Show user
-                  final user = otherUsers[index];
-                  return _buildUserTile(user);
+                if (index < chatRoomsWithMessages.length) {
+                  // Show chat rooms with messages first (sorted by lastMessageTime)
+                  final chatRoom = chatRoomsWithMessages[index];
+                  return _buildChatRoomTile(chatRoom);
+                } else if (index < chatRoomsWithMessages.length + chatRoomsWithoutMessages.length) {
+                  // Show chat rooms without messages second
+                  final chatRoom = chatRoomsWithoutMessages[index - chatRoomsWithMessages.length];
+                  return _buildChatRoomTile(chatRoom);
                 } else {
-                  // Show group chat
-                  final groupChat = groupChats[index - otherUsers.length];
-                  return _buildChatRoomTile(groupChat);
+                  // Show users without existing chats last
+                  final user = usersWithoutChats[index - chatRoomsWithMessages.length - chatRoomsWithoutMessages.length];
+                  return _buildUserTile(user);
                 }
               },
             );
@@ -287,78 +317,123 @@ class _ChatScreenState extends State<ChatScreen>
   }
 
   Widget _buildUserChatsList() {
-    return StreamBuilder<List<UserProfile>>(
-      stream: ChatService.getAllUsers(),
-      builder: (context, snapshot) {
-        if (snapshot.connectionState == ConnectionState.waiting) {
-          return const Center(
-            child: CircularProgressIndicator(
-              valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF8B5CF6)),
-            ),
-          );
-        }
+    return StreamBuilder<List<ChatRoom>>(
+      stream: ChatService.getUserDirectChatRooms(), // Get only direct chats (already sorted by lastMessageTime)
+      builder: (context, chatSnapshot) {
+        return StreamBuilder<List<UserProfile>>(
+          stream: ChatService.getAllUsers(),
+          builder: (context, userSnapshot) {
+            // if (chatSnapshot.connectionState == ConnectionState.waiting ||
+            //     userSnapshot.connectionState == ConnectionState.waiting) {
+            //   return const Center(
+            //     child: CircularProgressIndicator(
+            //       valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF8B5CF6)),
+            //     ),
+            //   );
+            // }
 
-        if (snapshot.hasError) {
-          return Center(
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Icon(
-                  Icons.error_outline,
-                  size: 64,
-                  color: Colors.grey.shade400,
+            if (chatSnapshot.hasError || userSnapshot.hasError) {
+              return Center(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(
+                      Icons.error_outline,
+                      size: 64,
+                      color: Colors.grey.shade400,
+                    ),
+                    const SizedBox(height: 16),
+                    Text(
+                      'Алдаа гарлаа',
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.w600,
+                        color: Colors.grey.shade600,
+                      ),
+                    ),
+                  ],
                 ),
-                const SizedBox(height: 16),
-                Text(
-                  'Алдаа гарлаа',
-                  style: TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.w600,
-                    color: Colors.grey.shade600,
-                  ),
-                ),
-              ],
-            ),
-          );
-        }
+              );
+            }
 
-        final List<UserProfile> allUsers = snapshot.data ?? [];
-        
-        // Filter out current user
-        final otherUsers = allUsers
-            .where((user) => user.id != ChatService.currentUserId)
-            .toList();
+            final List<ChatRoom> existingDirectChats = chatSnapshot.data ?? [];
+            final List<UserProfile> allUsers = userSnapshot.data ?? [];
 
-        if (otherUsers.isEmpty) {
-          return Center(
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Icon(
-                  Icons.person_outline,
-                  size: 64,
-                  color: Colors.grey.shade400,
-                ),
-                const SizedBox(height: 16),
-                Text(
-                  'Хэрэглэгч байхгүй байна',
-                  style: TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.w600,
-                    color: Colors.grey.shade600,
-                  ),
-                ),
-              ],
-            ),
-          );
-        }
+            // Separate direct chats into those with messages and those without
+            final directChatsWithMessages = existingDirectChats
+                .where((chat) => chat.lastMessage != null && chat.lastMessage!.isNotEmpty)
+                .toList();
 
-        return ListView.builder(
-          padding: const EdgeInsets.symmetric(vertical: 8),
-          itemCount: otherUsers.length,
-          itemBuilder: (context, index) {
-            final user = otherUsers[index];
-            return _buildUserTile(user);
+            final directChatsWithoutMessages = existingDirectChats
+                .where((chat) => chat.lastMessage == null || chat.lastMessage!.isEmpty)
+                .toList();
+
+            // Sort chats without messages by creation time
+            directChatsWithoutMessages.sort((a, b) {
+              return b.createdAt.compareTo(a.createdAt); // Most recent created first
+            });
+
+            // Filter out current user
+            final otherUsers = allUsers
+                .where((user) => user.id != ChatService.currentUserId)
+                .toList();
+
+            // Get users who don't have existing direct chats yet
+            final existingDirectChatUserIds = existingDirectChats
+                .expand((chat) => chat.participants)
+                .where((id) => id != ChatService.currentUserId)
+                .toSet();
+
+            final usersWithoutDirectChats = otherUsers
+                .where((user) => !existingDirectChatUserIds.contains(user.id))
+                .toList();
+
+            if (directChatsWithMessages.isEmpty && directChatsWithoutMessages.isEmpty && usersWithoutDirectChats.isEmpty) {
+              return Center(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(
+                      Icons.person_outline,
+                      size: 64,
+                      color: Colors.grey.shade400,
+                    ),
+                    const SizedBox(height: 16),
+                    Text(
+                      'Хэрэглэгч байхгүй байна',
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.w600,
+                        color: Colors.grey.shade600,
+                      ),
+                    ),
+                  ],
+                ),
+              );
+            }
+
+            // Combine all items in order: chats with messages -> chats without messages -> users without chats
+            final totalItems = directChatsWithMessages.length + directChatsWithoutMessages.length + usersWithoutDirectChats.length;
+
+            return ListView.builder(
+              padding: const EdgeInsets.symmetric(vertical: 8),
+              itemCount: totalItems,
+              itemBuilder: (context, index) {
+                if (index < directChatsWithMessages.length) {
+                  // Show direct chats with messages first (sorted by lastMessageTime)
+                  final chatRoom = directChatsWithMessages[index];
+                  return _buildChatRoomTile(chatRoom);
+                } else if (index < directChatsWithMessages.length + directChatsWithoutMessages.length) {
+                  // Show direct chats without messages second
+                  final chatRoom = directChatsWithoutMessages[index - directChatsWithMessages.length];
+                  return _buildChatRoomTile(chatRoom);
+                } else {
+                  // Show users without existing direct chats last
+                  final user = usersWithoutDirectChats[index - directChatsWithMessages.length - directChatsWithoutMessages.length];
+                  return _buildUserTile(user);
+                }
+              },
+            );
           },
         );
       },
@@ -382,13 +457,13 @@ class _ChatScreenState extends State<ChatScreen>
     return StreamBuilder<List<ChatRoom>>(
       stream: ChatService.getUserGroupChatRooms(),
       builder: (context, snapshot) {
-        if (snapshot.connectionState == ConnectionState.waiting) {
-          return const Center(
-            child: CircularProgressIndicator(
-              valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF8B5CF6)),
-            ),
-          );
-        }
+        // if (snapshot.connectionState == ConnectionState.waiting) {
+        //   return const Center(
+        //     child: CircularProgressIndicator(
+        //       valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF8B5CF6)),
+        //     ),
+        //   );
+        // }
 
         if (snapshot.hasError) {
           return Center(
@@ -422,7 +497,11 @@ class _ChatScreenState extends State<ChatScreen>
 
         List<ChatRoom> chatRooms = snapshot.data ?? [];
 
-        // Filter by search query
+        // Separate into groups with and without messages
+        List<ChatRoom> groupsWithMessages = [];
+        List<ChatRoom> groupsWithoutMessages = [];
+
+        // Filter by search query first
         if (_searchQuery.isNotEmpty) {
           chatRooms = chatRooms
               .where(
@@ -432,9 +511,24 @@ class _ChatScreenState extends State<ChatScreen>
                         false),
               )
               .toList();
+          // For search results, show all matching groups regardless of message status
+          groupsWithMessages = chatRooms.where((room) => room.lastMessage != null && room.lastMessage!.isNotEmpty).toList();
+          groupsWithoutMessages = chatRooms.where((room) => room.lastMessage == null || room.lastMessage!.isEmpty).toList();
+        } else {
+          // When not searching, separate all groups
+          groupsWithMessages = chatRooms.where((room) => room.lastMessage != null && room.lastMessage!.isNotEmpty).toList();
+          groupsWithoutMessages = chatRooms.where((room) => room.lastMessage == null || room.lastMessage!.isEmpty).toList();
         }
 
-        if (chatRooms.isEmpty) {
+        // Sort groups without messages by creation time
+        groupsWithoutMessages.sort((a, b) {
+          return b.createdAt.compareTo(a.createdAt); // Most recent created first
+        });
+
+        // Combine the lists: groups with messages first, then groups without messages
+        final allGroups = [...groupsWithMessages, ...groupsWithoutMessages];
+
+        if (allGroups.isEmpty) {
           return Center(
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
@@ -459,23 +553,6 @@ class _ChatScreenState extends State<ChatScreen>
                   style: TextStyle(color: Colors.grey.shade500),
                   textAlign: TextAlign.center,
                 ),
-                const SizedBox(height: 16),
-                if (_searchQuery.isEmpty)
-                  ElevatedButton.icon(
-                    onPressed: () {
-                      Navigator.of(context).push(
-                        MaterialPageRoute(
-                          builder: (context) => const CreateGroupScreen(),
-                        ),
-                      );
-                    },
-                    icon: const Icon(Icons.group_add),
-                    label: const Text('Бүлэг үүсгэх'),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFF8B5CF6),
-                      foregroundColor: Colors.white,
-                    ),
-                  ),
               ],
             ),
           );
@@ -483,9 +560,9 @@ class _ChatScreenState extends State<ChatScreen>
 
         return ListView.builder(
           padding: const EdgeInsets.symmetric(vertical: 8),
-          itemCount: chatRooms.length,
+          itemCount: allGroups.length,
           itemBuilder: (context, index) {
-            final chatRoom = chatRooms[index];
+            final chatRoom = allGroups[index];
             return _buildChatRoomTile(chatRoom);
           },
         );

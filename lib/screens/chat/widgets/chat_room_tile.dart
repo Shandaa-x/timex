@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
-import '../services/chat_models.dart';
-import '../../../services/chat_service.dart';
+import '../model/chat_models.dart';
+import '../services/chat_service.dart';
 
 class ChatRoomTile extends StatelessWidget {
   final ChatRoom chatRoom;

@@ -3,7 +3,7 @@ import 'dart:async';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import '../../../services/chat_service.dart';
+import 'chat_service.dart';
 import 'fcm_config.dart';
 
 class NotificationService {
@@ -224,9 +224,14 @@ class NotificationService {
   // Show local notification from FCM message
   static Future<void> _showLocalNotification(RemoteMessage message) async {
     final notification = message.notification;
-    if (notification != null) {
+    final chatRoomId = message.data['chatRoomId'];
+    
+    if (notification != null && chatRoomId != null) {
+      // Use consistent notification ID based on chat room
+      final notificationId = _generateNotificationId(chatRoomId);
+      
       await _localNotifications.show(
-        message.hashCode,
+        notificationId,
         notification.title,
         notification.body,
         NotificationDetails(
@@ -260,6 +265,7 @@ class NotificationService {
     required String message,
     required DateTime timestamp,
     required bool isGroupChat,
+    String? messageId,
   }) async {
     print('🔔 sendChatNotification called');
     print('   Chat room: $chatRoomId');
@@ -365,6 +371,7 @@ class NotificationService {
               'senderId': currentUserId,
               'senderPhotoURL': senderPhotoURL,
               'chatRoomId': chatRoomId,
+              'messageId': messageId, // Include messageId for cleanup
               'isGroupChat': isGroupChat,
               'timestamp': FieldValue.serverTimestamp(),
               'delivered': false,
@@ -393,6 +400,7 @@ class NotificationService {
     required bool isGroupChat,
     String? senderPhotoURL,
     String? receiverId,
+    String? messageId,
   }) async {
     try {
       final currentUserId = ChatService.currentUserId;
@@ -415,12 +423,13 @@ class NotificationService {
         'senderId': currentUserId,
         'senderPhotoURL': senderPhotoURL,
         'chatRoomId': chatRoomId,
+        'messageId': messageId, // Include messageId for cleanup
         'isGroupChat': isGroupChat,
         'timestamp': FieldValue.serverTimestamp(),
         'delivered': false,
       });
 
-      print('✅ Single notification document created: ${notificationRef.id}');
+      print('✅ Single notification document created: ${notificationRef.id} (messageId: $messageId)');
     } catch (e) {
       print('❌ Error creating push notification: $e');
     }
@@ -477,7 +486,44 @@ class NotificationService {
 
   // Clear notifications for a specific chat
   static Future<void> clearChatNotifications(String chatRoomId) async {
-    await _localNotifications.cancel(chatRoomId.hashCode);
+    try {
+      print('🧹 Clearing local notifications for chat room: $chatRoomId');
+      
+      // Generate the base notification ID for this chat room
+      final baseNotificationId = _generateNotificationId(chatRoomId);
+      
+      // Cancel the main chat notification
+      await _localNotifications.cancel(baseNotificationId);
+      
+      // Also try to cancel with the old hash method for backward compatibility
+      await _localNotifications.cancel(chatRoomId.hashCode);
+      
+      // Cancel a range of potential notification IDs for this chat room
+      // (in case multiple messages created multiple notifications)
+      for (int i = 0; i < 10; i++) {
+        await _localNotifications.cancel(baseNotificationId + i);
+      }
+      
+      print('✅ Local notifications cleared for chat room: $chatRoomId');
+    } catch (e) {
+      print('❌ Error clearing chat notifications: $e');
+    }
+  }
+
+  // Clear all chat notifications from the phone
+  static Future<void> clearAllChatNotifications() async {
+    try {
+      print('🧹 Clearing ALL local chat notifications');
+      await _localNotifications.cancelAll();
+      print('✅ All local notifications cleared');
+    } catch (e) {
+      print('❌ Error clearing all notifications: $e');
+    }
+  }
+
+  // Generate consistent notification ID for a chat room
+  static int _generateNotificationId(String chatRoomId) {
+    return chatRoomId.hashCode.abs() % 1000000; // Keep within reasonable range
   }
 
   static void _startCleanupTimer() {

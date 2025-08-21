@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
-import 'widgets/news_model.dart';
-import '../../services/news_service.dart';
+import 'models/news_model.dart';
+import 'service/news_service.dart';
 
 class NewsFormScreen extends StatefulWidget {
   final NewsModel? news; // null for create, non-null for edit

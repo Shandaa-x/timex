@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'services/chat_models.dart';
-import '../../services/chat_service.dart';
+import '../model/chat_models.dart';
+import '../services/chat_service.dart';
 
 class CreateGroupScreen extends StatefulWidget {
   final List<UserProfile>? selectedUsers;
@@ -215,7 +215,7 @@ class _CreateGroupScreenState extends State<CreateGroupScreen> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Padding(
-                    padding: const EdgeInsets.symmetric(vertical: 8),
+                    padding: const EdgeInsets.symmetric(vertical: 5),
                     child: Text(
                       'Selected Members (${_selectedUsers.length})',
                       style: theme.textTheme.titleSmall,

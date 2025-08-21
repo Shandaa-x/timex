@@ -6,7 +6,7 @@ import 'package:timex/screens/main/home/home_screen.dart';
 import 'package:timex/index.dart';
 import 'package:timex/screens/time/time_track/time_tracking_screen.dart';
 import 'package:timex/screens/qpay/qr_code_screen.dart';
-import 'package:timex/services/realtime_food_total_service.dart';
+import 'package:timex/screens/food/food_report/services/realtime_food_total_service.dart';
 import 'package:timex/screens/chat/services/notification_service.dart';
 import 'package:timex/routes/routes.dart';
 

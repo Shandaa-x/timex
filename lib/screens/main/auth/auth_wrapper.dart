@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:timex/screens/main/login/google_login_screen.dart';
-import '../login/login_selection_screen.dart';
 import '../main_screen.dart';
+import 'package:timex/index.dart';
 
 class AuthWrapper extends StatelessWidget {
   const AuthWrapper({super.key});

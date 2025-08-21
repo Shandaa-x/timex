@@ -5,10 +5,9 @@ import 'package:timex/screens/my_news/my_news_screen.dart';
 import 'package:timex/screens/time/time_track/time_tracking_screen.dart';
 import 'package:timex/screens/main/auth/auth_wrapper.dart';
 import 'package:timex/screens/chat/chat_screen.dart';
-import 'package:timex/screens/chat/new_chat_screen.dart';
-import 'package:timex/screens/chat/create_group_screen.dart';
-import 'package:timex/screens/chat/group_management_screen.dart';
-import 'package:timex/screens/chat/services/chat_models.dart';
+import 'package:timex/screens/chat/create-group/create_group_screen.dart';
+import 'package:timex/screens/chat/create-group/group_management_screen.dart';
+import 'package:timex/screens/chat/model/chat_models.dart';
 
 class Routes {
   static const main = 'MainScreen';
@@ -20,7 +19,6 @@ class Routes {
   static const authWrapper = 'AuthWrapper';
   static const myNews = 'MyNewsScreen';
   static const chat = 'ChatScreen';
-  static const newChat = 'NewChatScreen';
   static const createGroup = 'CreateGroupScreen';
   static const groupManagement = 'GroupManagementScreen';
 
@@ -65,12 +63,6 @@ class Routes {
       case Routes.chat:
         route = MaterialPageRoute(
           builder: (context) => const ChatScreen(),
-          settings: settings,
-        );
-        break;
-      case Routes.newChat:
-        route = MaterialPageRoute(
-          builder: (context) => const NewChatScreen(),
           settings: settings,
         );
         break;

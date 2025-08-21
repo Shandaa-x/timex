@@ -1,7 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import '../screens/chat/services/chat_models.dart';
-import '../screens/chat/services/notification_service.dart';
+import '../model/chat_models.dart';
+import 'notification_service.dart';
 
 class ChatService {
   static final FirebaseFirestore _firestore = FirebaseFirestore.instance;
@@ -226,10 +226,40 @@ class ChatService {
         .collection('chatRooms')
         .where('participants', arrayContains: currentUserId)
         .snapshots()
-        .map((snapshot) => snapshot.docs
-            .map((doc) => ChatRoom.fromMap(doc.data(), doc.id))
-            .where((room) => room.type == 'group') // Filter in app instead of query
-            .toList());
+        .map((snapshot) {
+          final groupChatRooms = snapshot.docs
+              .map((doc) => ChatRoom.fromMap(doc.data(), doc.id))
+              .where((room) => room.type == 'group') // Filter in app instead of query
+              .toList();
+          
+          // Sort by lastMessageTime in descending order (most recent first)
+          groupChatRooms.sort((a, b) => (b.lastMessageTime ?? DateTime.now())
+              .compareTo(a.lastMessageTime ?? DateTime.now()));
+          
+          return groupChatRooms;
+        });
+  }
+
+  // Get only direct chat rooms for the current user (for Messages tab)
+  static Stream<List<ChatRoom>> getUserDirectChatRooms() {
+    if (currentUserId.isEmpty) return Stream.value([]);
+
+    return _firestore
+        .collection('chatRooms')
+        .where('participants', arrayContains: currentUserId)
+        .snapshots()
+        .map((snapshot) {
+          final directChatRooms = snapshot.docs
+              .map((doc) => ChatRoom.fromMap(doc.data(), doc.id))
+              .where((room) => room.type == 'direct') // Filter for direct chats only
+              .toList();
+          
+          // Sort by lastMessageTime in descending order (most recent first)
+          directChatRooms.sort((a, b) => (b.lastMessageTime ?? DateTime.now())
+              .compareTo(a.lastMessageTime ?? DateTime.now()));
+          
+          return directChatRooms;
+        });
   }
 
   // Send message
@@ -256,11 +286,14 @@ class ChatService {
       );
 
       // Add message to messages subcollection
-      await _firestore
+      final messageRef = await _firestore
           .collection('chatRooms')
           .doc(chatRoomId)
           .collection('messages')
           .add(message.toMap());
+
+      // Get the messageId from the document reference
+      final messageId = messageRef.id;
 
       // Update chat room's last message info
       await _firestore.collection('chatRooms').doc(chatRoomId).update({
@@ -280,6 +313,7 @@ class ChatService {
         
         // Send notification to other participants (not the sender)
         print('🔔 Sending notification for chat room: ${chatRoom.id}');
+        print('🔔 Message ID: $messageId');
         print('🔔 Message: $content');
         print('🔔 Sender: ${currentUser.displayName}');
         
@@ -291,6 +325,7 @@ class ChatService {
           message: content,
           timestamp: DateTime.now(),
           isGroupChat: chatRoom.type == 'group',
+          messageId: messageId, // Pass the actual messageId
         );
       }
 
@@ -381,6 +416,9 @@ class ChatService {
         await _firestore.collection('chatRooms').doc(chatRoomId).update({
           'lastReadBy.$currentUserId': messageId.isEmpty ? messages.last.id : messageId,
         });
+        
+        // Clean up notification documents after marking messages as read
+        await _cleanupNotifications(chatRoomId, messageId.isEmpty ? messages.last.id : messageId);
       }
     } catch (e) {
       print('Error marking messages as read up to $messageId: $e');
@@ -408,219 +446,225 @@ class ChatService {
     }
   }
 
-  // Get chat room details
-  static Future<ChatRoom?> getChatRoom(String chatRoomId) async {
+  // Clean up notification documents based on read status
+  static Future<void> _cleanupNotifications(String chatRoomId, String upToMessageId) async {
     try {
-      final doc = await _firestore.collection('chatRooms').doc(chatRoomId).get();
-      if (doc.exists) {
-        return ChatRoom.fromMap(doc.data()!, doc.id);
-      }
-    } catch (e) {
-      print('Error getting chat room: $e');
-    }
-    return null;
-  }
-
-  // Get user profiles for participants
-  static Future<List<UserProfile>> getParticipantProfiles(List<String> participantIds) async {
-    if (participantIds.isEmpty) return [];
-
-    try {
-      final profiles = <UserProfile>[];
-      for (String id in participantIds) {
-        final doc = await _firestore.collection('users').doc(id).get();
-        if (doc.exists) {
-          profiles.add(UserProfile.fromMap(doc.data()!, doc.id));
-        }
-      }
-      return profiles;
-    } catch (e) {
-      print('Error getting participant profiles: $e');
-      return [];
-    }
-  }
-
-  // Get participant profiles as a stream for real-time updates
-  static Stream<List<UserProfile>> getParticipantProfilesStream(List<String> participantIds) {
-    if (participantIds.isEmpty) return Stream.value([]);
-    
-    return _firestore
-        .collection('users')
-        .where(FieldPath.documentId, whereIn: participantIds.take(10).toList()) // Firestore limit of 10 for whereIn
-        .snapshots()
-        .map((snapshot) {
-      final profiles = snapshot.docs
-          .map((doc) => UserProfile.fromMap(doc.data(), doc.id))
-          .toList();
+      print('🧹 Cleaning up notifications for chatRoom: $chatRoomId, upTo message: $upToMessageId');
       
-      // Sort profiles to match the order of participantIds
-      profiles.sort((a, b) {
-        final aIndex = participantIds.indexOf(a.id);
-        final bIndex = participantIds.indexOf(b.id);
-        return aIndex.compareTo(bIndex);
-      });
+      // Get chat room details to determine if it's direct or group chat
+      final chatRoom = await getChatRoom(chatRoomId);
+      if (chatRoom == null) return;
       
-      return profiles;
-    });
-  }
-
-  // Update user online status
-  static Future<void> updateOnlineStatus(bool isOnline) async {
-    if (currentUserId.isEmpty) return;
-
-    try {
-      await _firestore.collection('users').doc(currentUserId).update({
-        'isOnline': isOnline,
-        'lastSeen': DateTime.now(),
-      });
-    } catch (e) {
-      print('Error updating online status: $e');
-    }
-  }
-
-  // Edit message
-  static Future<bool> editMessage({
-    required String chatRoomId,
-    required String messageId,
-    required String newContent,
-  }) async {
-    try {
-      await _firestore
+      // Get all messages up to the specified message that were marked as read
+      final messagesQuery = await _firestore
           .collection('chatRooms')
           .doc(chatRoomId)
+          .collection('messages')
+          .orderBy('timestamp', descending: false)
+          .get();
+      
+      final messages = messagesQuery.docs;
+      final messagesToCheck = <String>[];
+      
+      // Collect message IDs up to the target message
+      for (var doc in messages) {
+        messagesToCheck.add(doc.id);
+        if (doc.id == upToMessageId) break;
+      }
+      
+      // Check each message and clean up notifications if conditions are met
+      for (String messageId in messagesToCheck) {
+        await _checkAndCleanupMessageNotifications(chatRoom, messageId);
+      }
+      
+    } catch (e) {
+      print('Error cleaning up notifications: $e');
+    }
+  }
+
+  // Check and cleanup notifications for a specific message
+  static Future<void> _checkAndCleanupMessageNotifications(ChatRoom chatRoom, String messageId) async {
+    try {
+      // Get the message details
+      final messageDoc = await _firestore
+          .collection('chatRooms')
+          .doc(chatRoom.id)
           .collection('messages')
           .doc(messageId)
-          .update({
-        'content': newContent,
-        'isEdited': true,
-        'editedAt': DateTime.now(),
-      });
-
-      // Update chat room's last message if it's the most recent one
-      final latestMessage = await _firestore
-          .collection('chatRooms')
-          .doc(chatRoomId)
-          .collection('messages')
-          .orderBy('timestamp', descending: true)
-          .limit(1)
           .get();
-
-      if (latestMessage.docs.isNotEmpty && 
-          latestMessage.docs.first.id == messageId) {
-        await _firestore.collection('chatRooms').doc(chatRoomId).update({
-          'lastMessage': newContent,
-        });
-      }
-
-      return true;
-    } catch (e) {
-      print('Error editing message: $e');
-      return false;
-    }
-  }
-
-  // Delete message (mark as deleted instead of removing)
-  static Future<bool> deleteMessage({
-    required String chatRoomId,
-    required String messageId,
-  }) async {
-    try {
-      // Mark message as deleted instead of removing it
-      await _firestore
-          .collection('chatRooms')
-          .doc(chatRoomId)
-          .collection('messages')
-          .doc(messageId)
-          .update({
-        'isDeleted': true,
-        'deletedAt': FieldValue.serverTimestamp(),
-        'content': '', // Clear the original content for privacy
-      });
-
-      // Update chat room's last message if it was the most recent one
-      final messages = await _firestore
-          .collection('chatRooms')
-          .doc(chatRoomId)
-          .collection('messages')
-          .orderBy('timestamp', descending: true)
-          .limit(1)
-          .get();
-
-      if (messages.docs.isNotEmpty) {
-        final latestMessage = Message.fromMap(messages.docs.first.data(), messages.docs.first.id);
-        
-        String lastMessage;
-        if (latestMessage.isDeleted) {
-          // Store deleted message with both sender ID and name for proper display
-          lastMessage = '${latestMessage.senderId}|${latestMessage.senderName}:DELETED_MESSAGE';
-        } else {
-          lastMessage = latestMessage.content;
+      
+      if (!messageDoc.exists) return;
+      
+      final message = Message.fromMap(messageDoc.data()!, messageDoc.id);
+      final senderId = message.senderId;
+      
+      // Skip if this is a system message or current user is the sender
+      if (senderId == 'system' || senderId == currentUserId) return;
+      
+      bool shouldCleanupForCurrentUser = false;
+      
+      if (chatRoom.type == 'direct') {
+        // For direct chat: cleanup if receiving user (not sender) has read the message
+        // The receiving user is the current user who just marked it as read
+        if (currentUserId != senderId) {
+          shouldCleanupForCurrentUser = message.readBy[currentUserId] == true;
+          print('🧹 Direct chat - Current user ($currentUserId) read message from $senderId: $shouldCleanupForCurrentUser');
         }
-        
-        await _firestore.collection('chatRooms').doc(chatRoomId).update({
-          'lastMessage': lastMessage,
-          'lastMessageTime': latestMessage.timestamp,
-          'lastMessageSender': latestMessage.senderId,
-        });
       } else {
-        // No messages left
-        await _firestore.collection('chatRooms').doc(chatRoomId).update({
-          'lastMessage': null,
-          'lastMessageTime': null,
-          'lastMessageSender': null,
-        });
+        // For group chat: cleanup ONLY for the current user if they have read the message
+        // Each user's notification should be cleaned up individually when THEY read it
+        shouldCleanupForCurrentUser = message.readBy[currentUserId] == true;
+        print('🧹 Group chat - Current user ($currentUserId) read message from $senderId: $shouldCleanupForCurrentUser');
+        
+        // Log other users' read status for debugging
+        final allParticipants = chatRoom.participants;
+        final otherUsers = allParticipants.where((id) => id != senderId && id != currentUserId).toList();
+        for (String otherUserId in otherUsers) {
+          final hasRead = message.readBy[otherUserId] == true;
+          print('🧹   - User $otherUserId has read: $hasRead');
+        }
       }
-
-      return true;
+      
+      if (shouldCleanupForCurrentUser) {
+        // Find and delete notification documents ONLY for the current user
+        await _deleteNotificationDocuments(chatRoom.id, messageId);
+      }
+      
     } catch (e) {
-      print('Error deleting message: $e');
-      return false;
+      print('Error checking message notifications for cleanup: $e');
     }
   }
 
-  // Update group information
-  static Future<void> updateGroupInfo(String chatRoomId, {String? name, String? description}) async {
+  // Delete notification documents from push_notifications collection
+  static Future<void> _deleteNotificationDocuments(String chatRoomId, String messageId) async {
     try {
-      final updateData = <String, dynamic>{};
-      if (name != null) updateData['name'] = name;
-      if (description != null) updateData['description'] = description;
-
-      if (updateData.isNotEmpty) {
-        await _firestore
-            .collection('chatRooms')
-            .doc(chatRoomId)
-            .update(updateData);
+      print('🗑️ Deleting notification documents for chatRoom: $chatRoomId, message: $messageId');
+      print('🗑️ Current user who read the message: $currentUserId');
+      
+      // Query push_notifications collection for documents related to this chat room and SPECIFIC to current user
+      final notificationsQuery = await _firestore
+          .collection('push_notifications')
+          .where('chatRoomId', isEqualTo: chatRoomId)
+          .where('recipientId', isEqualTo: currentUserId) // Only delete notifications for current user
+          .get();
+      
+      final batch = _firestore.batch();
+      int deleteCount = 0;
+      
+      for (var doc in notificationsQuery.docs) {
+        final data = doc.data();
+        final docMessageId = data['messageId'] as String?;
+        final recipientId = data['recipientId'] as String?;
+        
+        // Double-check that this notification belongs to the current user
+        if (recipientId == currentUserId) {
+          // Delete if this notification is for the specific message we're cleaning up
+          // If no messageId in notification doc, delete all notifications for this chat room for current user
+          // (older notifications might not have messageId field)
+          if (docMessageId == null || docMessageId == messageId) {
+            batch.delete(doc.reference);
+            deleteCount++;
+            print('🗑️ Marking notification document for deletion: ${doc.id} (recipient: $recipientId)');
+          }
+        } else {
+          print('⚠️ Skipping notification for different user: $recipientId');
+        }
       }
+      
+      if (deleteCount > 0) {
+        await batch.commit();
+        print('✅ Successfully deleted $deleteCount notification documents for current user: $currentUserId');
+      } else {
+        print('ℹ️ No notification documents found to delete for current user: $currentUserId');
+      }
+      
     } catch (e) {
-      print('Error updating group info: $e');
-      throw Exception('Failed to update group info');
+      print('Error deleting notification documents: $e');
     }
   }
 
-  // Add members to group
-  static Future<void> addToGroup(String chatRoomId, List<String> userIds) async {
+  // Leave group
+  static Future<void> leaveGroup(String chatRoomId) async {
     try {
+      final currentUser = await getUserProfile(currentUserId);
+      final userName = currentUser?.displayName ?? 'User';
+      
+      // Remove user from participants
       await _firestore
           .collection('chatRooms')
           .doc(chatRoomId)
           .update({
-        'participants': FieldValue.arrayUnion(userIds),
+        'participants': FieldValue.arrayRemove([currentUserId]),
       });
+
+      // Send system message
+      await _sendSystemMessage(
+        chatRoomId: chatRoomId,
+        content: '$userName left the group',
+      );
+    } catch (e) {
+      print('Error leaving group: $e');
+      throw Exception('Failed to leave group');
+    }
+  }
+
+  // Add members to group with system messages
+  static Future<void> addMembersToGroup(String chatRoomId, List<String> userIds) async {
+    try {
+      final currentUser = await getUserProfile(currentUserId);
+      final currentUserName = currentUser?.displayName ?? 'Admin';
+      
+      // Add users to participants
+      await addToGroup(chatRoomId, userIds);
+
+      // Send system messages
+      for (String userId in userIds) {
+        final addedUser = await getUserProfile(userId);
+        final addedUserName = addedUser?.displayName ?? 'User';
+        
+        // Message for the added user (only they will see this)
+        await _sendSystemMessage(
+          chatRoomId: chatRoomId,
+          content: '$currentUserName added you to the group',
+          targetUserId: userId,
+        );
+        
+        // General message for the group (everyone EXCEPT the added user will see this)
+        await _sendSystemMessageExcludingUser(
+          chatRoomId: chatRoomId,
+          content: '$currentUserName added $addedUserName to the group',
+          excludeUserId: userId,
+        );
+      }
     } catch (e) {
       print('Error adding members to group: $e');
       throw Exception('Failed to add members to group');
     }
   }
 
-  // Remove member from group
-  static Future<void> removeFromGroup(String chatRoomId, String userId) async {
+  // Remove member from group with system messages
+  static Future<void> removeMemberFromGroup(String chatRoomId, String userId) async {
     try {
-      await _firestore
-          .collection('chatRooms')
-          .doc(chatRoomId)
-          .update({
-        'participants': FieldValue.arrayRemove([userId]),
-      });
+      final currentUser = await getUserProfile(currentUserId);
+      final removedUser = await getUserProfile(userId);
+      final currentUserName = currentUser?.displayName ?? 'Admin';
+      final removedUserName = removedUser?.displayName ?? 'User';
+      
+      // Remove user from participants
+      await removeFromGroup(chatRoomId, userId);
+
+      // Message for the removed user
+      await _sendSystemMessage(
+        chatRoomId: chatRoomId,
+        content: '$currentUserName removed you from the group',
+        targetUserId: userId,
+      );
+      
+      // General message for the group
+      await _sendSystemMessage(
+        chatRoomId: chatRoomId,
+        content: '$currentUserName removed $removedUserName from the group',
+      );
     } catch (e) {
       print('Error removing member from group: $e');
       throw Exception('Failed to remove member from group');
@@ -847,91 +891,222 @@ class ChatService {
     }
   }
 
-  // Leave group
-  static Future<void> leaveGroup(String chatRoomId) async {
+  // Edit message
+  static Future<bool> editMessage({
+    required String chatRoomId,
+    required String messageId,
+    required String newContent,
+  }) async {
     try {
-      final currentUser = await getUserProfile(currentUserId);
-      final userName = currentUser?.displayName ?? 'User';
-      
-      // Remove user from participants
+      await _firestore
+          .collection('chatRooms')
+          .doc(chatRoomId)
+          .collection('messages')
+          .doc(messageId)
+          .update({
+        'content': newContent,
+        'isEdited': true,
+        'editedAt': DateTime.now(),
+      });
+
+      // Update chat room's last message if it's the most recent one
+      final latestMessage = await _firestore
+          .collection('chatRooms')
+          .doc(chatRoomId)
+          .collection('messages')
+          .orderBy('timestamp', descending: true)
+          .limit(1)
+          .get();
+
+      if (latestMessage.docs.isNotEmpty && 
+          latestMessage.docs.first.id == messageId) {
+        await _firestore.collection('chatRooms').doc(chatRoomId).update({
+          'lastMessage': newContent,
+        });
+      }
+
+      return true;
+    } catch (e) {
+      print('Error editing message: $e');
+      return false;
+    }
+  }
+
+  // Delete message (mark as deleted instead of removing)
+  static Future<bool> deleteMessage({
+    required String chatRoomId,
+    required String messageId,
+  }) async {
+    try {
+      // Mark message as deleted instead of removing it
+      await _firestore
+          .collection('chatRooms')
+          .doc(chatRoomId)
+          .collection('messages')
+          .doc(messageId)
+          .update({
+        'isDeleted': true,
+        'deletedAt': FieldValue.serverTimestamp(),
+        'content': '', // Clear the original content for privacy
+      });
+
+      // Update chat room's last message if it was the most recent one
+      final messages = await _firestore
+          .collection('chatRooms')
+          .doc(chatRoomId)
+          .collection('messages')
+          .orderBy('timestamp', descending: true)
+          .limit(1)
+          .get();
+
+      if (messages.docs.isNotEmpty) {
+        final latestMessage = Message.fromMap(messages.docs.first.data(), messages.docs.first.id);
+        
+        String lastMessage;
+        if (latestMessage.isDeleted) {
+          // Store deleted message with both sender ID and name for proper display
+          lastMessage = '${latestMessage.senderId}|${latestMessage.senderName}:DELETED_MESSAGE';
+        } else {
+          lastMessage = latestMessage.content;
+        }
+        
+        await _firestore.collection('chatRooms').doc(chatRoomId).update({
+          'lastMessage': lastMessage,
+          'lastMessageTime': latestMessage.timestamp,
+          'lastMessageSender': latestMessage.senderId,
+        });
+      } else {
+        // No messages left
+        await _firestore.collection('chatRooms').doc(chatRoomId).update({
+          'lastMessage': null,
+          'lastMessageTime': null,
+          'lastMessageSender': null,
+        });
+      }
+
+      return true;
+    } catch (e) {
+      print('Error deleting message: $e');
+      return false;
+    }
+  }
+
+  // Update group information
+  static Future<void> updateGroupInfo(String chatRoomId, {String? name, String? description}) async {
+    try {
+      final updateData = <String, dynamic>{};
+      if (name != null) updateData['name'] = name;
+      if (description != null) updateData['description'] = description;
+
+      if (updateData.isNotEmpty) {
+        await _firestore
+            .collection('chatRooms')
+            .doc(chatRoomId)
+            .update(updateData);
+      }
+    } catch (e) {
+      print('Error updating group info: $e');
+      throw Exception('Failed to update group info');
+    }
+  }
+
+  // Add members to group
+  static Future<void> addToGroup(String chatRoomId, List<String> userIds) async {
+    try {
       await _firestore
           .collection('chatRooms')
           .doc(chatRoomId)
           .update({
-        'participants': FieldValue.arrayRemove([currentUserId]),
+        'participants': FieldValue.arrayUnion(userIds),
       });
-
-      // Send system message
-      await _sendSystemMessage(
-        chatRoomId: chatRoomId,
-        content: '$userName left the group',
-      );
-    } catch (e) {
-      print('Error leaving group: $e');
-      throw Exception('Failed to leave group');
-    }
-  }
-
-  // Add members to group with system messages
-  static Future<void> addMembersToGroup(String chatRoomId, List<String> userIds) async {
-    try {
-      final currentUser = await getUserProfile(currentUserId);
-      final currentUserName = currentUser?.displayName ?? 'Admin';
-      
-      // Add users to participants
-      await addToGroup(chatRoomId, userIds);
-
-      // Send system messages
-      for (String userId in userIds) {
-        final addedUser = await getUserProfile(userId);
-        final addedUserName = addedUser?.displayName ?? 'User';
-        
-        // Message for the added user (only they will see this)
-        await _sendSystemMessage(
-          chatRoomId: chatRoomId,
-          content: '$currentUserName added you to the group',
-          targetUserId: userId,
-        );
-        
-        // General message for the group (everyone EXCEPT the added user will see this)
-        await _sendSystemMessageExcludingUser(
-          chatRoomId: chatRoomId,
-          content: '$currentUserName added $addedUserName to the group',
-          excludeUserId: userId,
-        );
-      }
     } catch (e) {
       print('Error adding members to group: $e');
       throw Exception('Failed to add members to group');
     }
   }
 
-  // Remove member from group with system messages
-  static Future<void> removeMemberFromGroup(String chatRoomId, String userId) async {
+  // Remove member from group
+  static Future<void> removeFromGroup(String chatRoomId, String userId) async {
     try {
-      final currentUser = await getUserProfile(currentUserId);
-      final removedUser = await getUserProfile(userId);
-      final currentUserName = currentUser?.displayName ?? 'Admin';
-      final removedUserName = removedUser?.displayName ?? 'User';
-      
-      // Remove user from participants
-      await removeFromGroup(chatRoomId, userId);
-
-      // Message for the removed user
-      await _sendSystemMessage(
-        chatRoomId: chatRoomId,
-        content: '$currentUserName removed you from the group',
-        targetUserId: userId,
-      );
-      
-      // General message for the group
-      await _sendSystemMessage(
-        chatRoomId: chatRoomId,
-        content: '$currentUserName removed $removedUserName from the group',
-      );
+      await _firestore
+          .collection('chatRooms')
+          .doc(chatRoomId)
+          .update({
+        'participants': FieldValue.arrayRemove([userId]),
+      });
     } catch (e) {
       print('Error removing member from group: $e');
       throw Exception('Failed to remove member from group');
+    }
+  }
+
+  // Get chat room details
+  static Future<ChatRoom?> getChatRoom(String chatRoomId) async {
+    try {
+      final doc = await _firestore.collection('chatRooms').doc(chatRoomId).get();
+      if (doc.exists) {
+        return ChatRoom.fromMap(doc.data()!, doc.id);
+      }
+    } catch (e) {
+      print('Error getting chat room: $e');
+    }
+    return null;
+  }
+
+  // Get user profiles for participants
+  static Future<List<UserProfile>> getParticipantProfiles(List<String> participantIds) async {
+    if (participantIds.isEmpty) return [];
+
+    try {
+      final profiles = <UserProfile>[];
+      for (String id in participantIds) {
+        final doc = await _firestore.collection('users').doc(id).get();
+        if (doc.exists) {
+          profiles.add(UserProfile.fromMap(doc.data()!, doc.id));
+        }
+      }
+      return profiles;
+    } catch (e) {
+      print('Error getting participant profiles: $e');
+      return [];
+    }
+  }
+
+  // Get participant profiles as a stream for real-time updates
+  static Stream<List<UserProfile>> getParticipantProfilesStream(List<String> participantIds) {
+    if (participantIds.isEmpty) return Stream.value([]);
+    
+    return _firestore
+        .collection('users')
+        .where(FieldPath.documentId, whereIn: participantIds.take(10).toList()) // Firestore limit of 10 for whereIn
+        .snapshots()
+        .map((snapshot) {
+      final profiles = snapshot.docs
+          .map((doc) => UserProfile.fromMap(doc.data(), doc.id))
+          .toList();
+      
+      // Sort profiles to match the order of participantIds
+      profiles.sort((a, b) {
+        final aIndex = participantIds.indexOf(a.id);
+        final bIndex = participantIds.indexOf(b.id);
+        return aIndex.compareTo(bIndex);
+      });
+      
+      return profiles;
+    });
+  }
+
+  // Update user online status
+  static Future<void> updateOnlineStatus(bool isOnline) async {
+    if (currentUserId.isEmpty) return;
+
+    try {
+      await _firestore.collection('users').doc(currentUserId).update({
+        'isOnline': isOnline,
+        'lastSeen': DateTime.now(),
+      });
+    } catch (e) {
+      print('Error updating online status: $e');
     }
   }
 

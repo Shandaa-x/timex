@@ -1,9 +1,10 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:timex/screens/chat/group_management_screen.dart';
-import 'services/chat_models.dart';
-import '../../services/chat_service.dart';
-import 'services/notification_service.dart';
+import 'package:timex/screens/chat/create-group/group_management_screen.dart';
+import '../model/chat_models.dart';
+import '../services/chat_service.dart';
+import '../services/notification_service.dart';
 
 class ChatRoomScreen extends StatefulWidget {
   final ChatRoom chatRoom;
@@ -22,6 +23,7 @@ class _ChatRoomScreenState extends State<ChatRoomScreen>
   List<UserProfile> _participants = [];
   Message? _replyToMessage;
   late TabController _tabController;
+  StreamSubscription? _messageListener;
 
   @override
   void initState() {
@@ -29,6 +31,7 @@ class _ChatRoomScreenState extends State<ChatRoomScreen>
     _tabController = TabController(length: 3, vsync: this);
     _loadParticipants();
     _markAsRead();
+    _startRealTimeMessageListener(); // Add real-time listener
   }
 
   @override
@@ -36,7 +39,34 @@ class _ChatRoomScreenState extends State<ChatRoomScreen>
     _messageController.dispose();
     _scrollController.dispose();
     _tabController.dispose();
+    _messageListener?.cancel(); // Cancel listener
     super.dispose();
+  }
+
+  // Add real-time message listener
+  void _startRealTimeMessageListener() {
+    print('🔄 Starting real-time message listener for chat room: ${widget.chatRoom.id}');
+    
+    _messageListener = ChatService.getChatMessages(widget.chatRoom.id).listen((messages) {
+      if (messages.isNotEmpty) {
+        // Get the latest message
+        final latestMessage = messages.first;
+        
+        // If the latest message is from someone else and not read by current user
+        if (latestMessage.senderId != ChatService.currentUserId && 
+            latestMessage.readBy[ChatService.currentUserId] != true) {
+          
+          print('🔄 New message received from ${latestMessage.senderName}: ${latestMessage.content}');
+          print('🔄 Auto-marking as read since user is in chat room');
+          
+          // Automatically mark as read since user is actively viewing the chat
+          ChatService.markMessagesAsRead(widget.chatRoom.id);
+          
+          // Clear local notifications for this chat
+          NotificationService.clearChatNotifications(widget.chatRoom.id);
+        }
+      }
+    });
   }
 
   Future<void> _loadParticipants() async {
@@ -482,15 +512,15 @@ class _ChatRoomScreenState extends State<ChatRoomScreen>
             child: StreamBuilder<List<Message>>(
               stream: ChatService.getChatMessages(widget.chatRoom.id),
               builder: (context, snapshot) {
-                if (snapshot.connectionState == ConnectionState.waiting) {
-                  return const Center(
-                    child: CircularProgressIndicator(
-                      valueColor: AlwaysStoppedAnimation<Color>(
-                        Color(0xFF8B5CF6),
-                      ),
-                    ),
-                  );
-                }
+                // if (snapshot.connectionState == ConnectionState.waiting) {
+                //   return const Center(
+                //     child: CircularProgressIndicator(
+                //       valueColor: AlwaysStoppedAnimation<Color>(
+                //         Color(0xFF8B5CF6),
+                //       ),
+                //     ),
+                //   );
+                // }
 
                 if (snapshot.hasError) {
                   return Center(
